@@ -1,0 +1,124 @@
+{
+    "data": [
+        {
+            "label": "Salinitas",
+            "value": "salinity"
+        },
+        {
+            "label": "Suhu air",
+            "value": "water_temperature"
+        },
+        {
+            "label": "pH pagi",
+            "value": "pH_morning"
+        },
+        {
+            "label": "pH siang",
+            "value": "pH_afternoon"
+        },
+        {
+            "label": "DO",
+            "value": "dissolved_oxygen"
+        },
+        {
+            "label": "Kekerasan",
+            "value": "hardness"
+        },
+        {
+            "label": "Alkalinitas",
+            "value": "alkalinity"
+        },
+        {
+            "label": "ORP",
+            "value": "orp"
+        },
+        {
+            "label": "Kalsium",
+            "value": "calcium"
+        },
+        {
+            "label": "Magnesium",
+            "value": "magnesium"
+        },
+        {
+            "label": "Amonium",
+            "value": "ammonium"
+        },
+        {
+            "label": "Fosfor",
+            "value": "phosphorus"
+        },
+        {
+            "label": "Nitrit",
+            "value": "nitrite"
+        },
+        {
+            "label": "Nitrat",
+            "value": "nitrate"
+        },
+        {
+            "label": "Plankton",
+            "value": "plankton"
+        },
+        {
+            "label": "Alga hijau",
+            "value": "green_algae"
+        },
+        {
+            "label": "Alga biru",
+            "value": "blue_algae"
+        },
+        {
+            "label": "Diatom",
+            "value": "diatom"
+        },
+        {
+            "label": "Euglena",
+            "value": "euglena"
+        },
+        {
+            "label": "Dinoflagela",
+            "value": "dinoflagellates"
+        },
+        {
+            "label": "Protozoa",
+            "value": "protozoa"
+        },
+        {
+            "label": "Zooplankton",
+            "value": "zooplankton"
+        },
+        {
+            "label": "Vibrio kuning",
+            "value": "vibrio_yellow"
+        },
+        {
+            "label": "Vibrio hijau",
+            "value": "vibrio_green"
+        },
+        {
+            "label": "Vibrio hitam",
+            "value": "vibrio_black"
+        },
+        {
+            "label": "Total vibrio",
+            "value": "total_vibrio"
+        },
+        {
+            "label": "Total bakteri",
+            "value": "total_bacteria"
+        },
+        {
+            "label": "Vibrio (%)",
+            "value": "vibrio_percentage"
+        },
+        {
+            "label": "WQI",
+            "value": "wqi"
+        },
+        {
+            "label": "WQV",
+            "value": "wqv"
+        }
+    ]
+}

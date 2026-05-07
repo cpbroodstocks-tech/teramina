@@ -1,0 +1,27 @@
+__pycache__
+
+.env
+
+.DS_Store
+
+*.ipynb
+
+*.pem
+
+.vscode
+users.csv
+
+# Service account / credential files
+*firebase-adminsdk*.json
+*-firebase-adminsdk*.json
+backend-*.json
+teramina-*.json
+
+# FAISS / vector indices
+*.faiss
+index.faiss
+
+# Images / misc
+*.png
+*.jpg
+*.jpeg

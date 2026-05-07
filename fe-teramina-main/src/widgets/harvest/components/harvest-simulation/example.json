@@ -1,0 +1,73 @@
+[
+  {
+    "fields": [
+      {
+        "column": "harvest_no",
+        "column_title": "Harvest No."
+      },
+      {
+        "column": "harvest_type",
+        "column_title": "Harvest Type"
+      },
+      {
+        "column": "doc",
+        "column_title": "DOC"
+      },
+      {
+        "column": "biomass_kg",
+        "column_title": "Biomass (Kg)"
+      },
+      {
+        "column": "size",
+        "column_title": "Size"
+      },
+      {
+        "column": "revenue",
+        "column_title": "Revenue"
+      },
+      {
+        "column": "profit",
+        "column_title": "Profit"
+      }
+    ],
+    "rows": [
+      {
+        "harvest_no": 1,
+        "harvest_type": "partial",
+        "doc": 5,
+        "biomass_kg": "0 kg",
+        "size": 12085.64,
+        "revenue": "IDR 0",
+        "profit": "IDR -1,702,689"
+      },
+      {
+        "harvest_no": 2,
+        "harvest_type": "partial",
+        "doc": 10,
+        "biomass_kg": "0 kg",
+        "size": 5542.33,
+        "revenue": "IDR 0",
+        "profit": "IDR -3,551,697"
+      },
+      {
+        "harvest_no": 3,
+        "harvest_type": "partial",
+        "doc": 15,
+        "biomass_kg": "0 kg",
+        "size": 2851.63,
+        "revenue": "IDR 0",
+        "profit": "IDR -5,611,068"
+      },
+      {
+        "harvest_no": 4,
+        "harvest_type": "final",
+        "doc": 118,
+        "biomass_kg": "1,000 kg",
+        "size": 30.74,
+        "revenue": "IDR 76,806,426",
+        "profit": "IDR -67,149,402"
+      }
+    ],
+    "message": null
+  }
+]

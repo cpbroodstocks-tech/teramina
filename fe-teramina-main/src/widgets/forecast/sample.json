@@ -1,0 +1,816 @@
+{
+  "production_forecast": {
+    "title": "Production Forecast",
+    "data": [
+      {
+        "title": "Current Biomass",
+        "value": 2129,
+        "unit": "kg",
+        "description": "The current weight of shrimp that are currently in the pond."
+      },
+      {
+        "title": "Forecasted Biomass",
+        "value": 2283,
+        "unit": "kg",
+        "description": "The forecasted weight of shrimp that are currently in the pond."
+      },
+      {
+        "title": "Current ABW",
+        "value": 7.72,
+        "unit": "gr",
+        "description": "The average weight of shrimp in a population at current DOC."
+      },
+      {
+        "title": "Forecasted ABW",
+        "value": 8.38,
+        "unit": "gr",
+        "description": "The estimated average weight of shrimp in a population at forecasted DOC"
+      }
+    ],
+    "plot": {
+      "forecast_biomass": {
+        "title": {
+          "text": "Biomass",
+          "left": "center"
+        },
+        "legend": {
+          "data": [
+            [
+              "origin",
+              "predicted"
+            ]
+          ],
+          "show": false,
+          "top": "10%"
+        },
+        "tooltip": {
+          "trigger": "axis"
+        },
+        "xAxis": {
+          "type": "category",
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59
+          ]
+        },
+        "yAxis": {
+          "type": "value"
+        },
+        "visualMap": {
+          "show": false,
+          "dimension": 0,
+          "pieces": [
+            {
+              "lte": 55,
+              "color": "#474DA4"
+            },
+            {
+              "gt": 55,
+              "lte": 59,
+              "color": "#FBBC05"
+            }
+          ]
+        },
+        "series": [
+          {
+            "name": [
+              "origin",
+              "predicted"
+            ],
+            "data": [
+              15,
+              17,
+              19,
+              22,
+              4,
+              6,
+              9,
+              11,
+              13,
+              16,
+              26,
+              36,
+              46,
+              56,
+              66,
+              101,
+              139,
+              173,
+              211,
+              245,
+              321,
+              397,
+              472,
+              547,
+              615,
+              625,
+              635,
+              645,
+              655,
+              664,
+              723,
+              781,
+              839,
+              897,
+              947,
+              1008,
+              1069,
+              1129,
+              1190,
+              1253,
+              1335,
+              1416,
+              1497,
+              1578,
+              1654,
+              1767,
+              1879,
+              1991,
+              2102,
+              1710,
+              1794,
+              1878,
+              1961,
+              2044,
+              2121,
+              2201,
+              2227,
+              2255,
+              2283
+            ],
+            "type": "line",
+            "symbol": "none",
+            "markArea": {
+              "itemStyle": {
+                "color": "#f4f5fb"
+              },
+              "data": [
+                [
+                  {
+                    "name": "forecast",
+                    "xAxis": 55
+                  },
+                  {
+                    "xAxis": 59
+                  }
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "forecast_abw": {
+        "title": {
+          "text": "ABW",
+          "left": "center"
+        },
+        "legend": {
+          "data": [
+            [
+              "origin",
+              "predicted"
+            ]
+          ],
+          "show": false,
+          "top": "10%"
+        },
+        "tooltip": {
+          "trigger": "axis"
+        },
+        "xAxis": {
+          "type": "category",
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59
+          ]
+        },
+        "yAxis": {
+          "type": "value"
+        },
+        "visualMap": {
+          "show": false,
+          "dimension": 0,
+          "pieces": [
+            {
+              "lte": 55,
+              "color": "#474DA4"
+            },
+            {
+              "gt": 55,
+              "lte": 59,
+              "color": "#FBBC05"
+            }
+          ]
+        },
+        "series": [
+          {
+            "name": [
+              "origin",
+              "predicted"
+            ],
+            "data": [
+              0.04,
+              0.04,
+              0.05,
+              0.06,
+              0.01,
+              0.02,
+              0.02,
+              0.03,
+              0.03,
+              0.04,
+              0.07,
+              0.09,
+              0.12,
+              0.14,
+              0.17,
+              0.26,
+              0.36,
+              0.45,
+              0.55,
+              0.64,
+              0.84,
+              1.04,
+              1.24,
+              1.44,
+              1.62,
+              1.65,
+              1.68,
+              1.71,
+              1.74,
+              1.77,
+              1.93,
+              2.09,
+              2.25,
+              2.41,
+              2.55,
+              2.72,
+              2.89,
+              3.06,
+              3.23,
+              3.41,
+              3.64,
+              3.87,
+              4.1,
+              4.33,
+              4.55,
+              4.87,
+              5.19,
+              5.51,
+              5.83,
+              6.14,
+              6.46,
+              6.78,
+              7.1,
+              7.42,
+              7.72,
+              8.03,
+              8.14,
+              8.26,
+              8.38
+            ],
+            "type": "line",
+            "symbol": "none",
+            "markArea": {
+              "itemStyle": {
+                "color": "#f4f5fb"
+              },
+              "data": [
+                [
+                  {
+                    "name": "forecast",
+                    "xAxis": 55
+                  },
+                  {
+                    "xAxis": 59
+                  }
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "economic_forecast": {
+    "title": "Economic Forecast",
+    "data": [
+      {
+        "title": "Current Revenue",
+        "value": "25,000,000.0",
+        "unit": "Rp",
+        "description": "The amount of money that the farm earns from the sale of shrimp in the current DOC."
+      },
+      {
+        "title": "Forecasted Revenue",
+        "value": "129,116,032.0",
+        "unit": "Rp",
+        "description": "The amount of money that the farm earns from the sale of shrimp in the forecasted DOC."
+      },
+      {
+        "title": "Current Profit",
+        "value": "-28,154,799.0",
+        "unit": "Rp",
+        "description": "The amount of money that a shrimp farm earns after deducting all of its expenses in the current DOC."
+      },
+      {
+        "title": "Forecasted Profit",
+        "value": "63,444,254.0",
+        "unit": "Rp",
+        "description": "The amount of money that a shrimp farm earns after deducting all of its expenses in the forecasted DOC."
+      }
+    ],
+    "plot": {
+      "forecast_revenue": {
+        "title": {
+          "text": "Revenue",
+          "left": "center"
+        },
+        "legend": {
+          "data": [
+            [
+              "origin",
+              "predicted"
+            ]
+          ],
+          "show": false,
+          "top": "10%"
+        },
+        "tooltip": {
+          "trigger": "axis"
+        },
+        "xAxis": {
+          "type": "category",
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59
+          ]
+        },
+        "yAxis": {
+          "type": "value"
+        },
+        "visualMap": {
+          "show": false,
+          "dimension": 0,
+          "pieces": [
+            {
+              "lte": 55,
+              "color": "#474DA4"
+            },
+            {
+              "gt": 55,
+              "lte": 59,
+              "color": "#FBBC05"
+            }
+          ]
+        },
+        "series": [
+          {
+            "name": [
+              "origin",
+              "predicted"
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              25000000,
+              25000000,
+              25000000,
+              25000000,
+              25000000,
+              25000000,
+              25000000,
+              25000000,
+              25000000,
+              129116032
+            ],
+            "type": "line",
+            "symbol": "none",
+            "markArea": {
+              "itemStyle": {
+                "color": "#f4f5fb"
+              },
+              "data": [
+                [
+                  {
+                    "name": "forecast",
+                    "xAxis": 55
+                  },
+                  {
+                    "xAxis": 59
+                  }
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "forecast_profit": {
+        "title": {
+          "text": "Profit",
+          "left": "center"
+        },
+        "legend": {
+          "data": [
+            [
+              "origin",
+              "predicted"
+            ]
+          ],
+          "show": false,
+          "top": "10%"
+        },
+        "tooltip": {
+          "trigger": "axis"
+        },
+        "xAxis": {
+          "type": "category",
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59
+          ]
+        },
+        "yAxis": {
+          "type": "value"
+        },
+        "visualMap": {
+          "show": false,
+          "dimension": 0,
+          "pieces": [
+            {
+              "lte": 55,
+              "color": "#474DA4"
+            },
+            {
+              "gt": 55,
+              "lte": 59,
+              "color": "#FBBC05"
+            }
+          ]
+        },
+        "series": [
+          {
+            "name": [
+              "origin",
+              "predicted"
+            ],
+            "data": [
+              -358120,
+              -718070,
+              -1081117,
+              -1445056,
+              -1811900,
+              -2177001,
+              -2553869,
+              -2939134,
+              -3323627,
+              -3708727,
+              -4107055,
+              -4509512,
+              -4927992,
+              -5356068,
+              -5794583,
+              -6258274,
+              -6733239,
+              -7239675,
+              -7763059,
+              -8304223,
+              -8887672,
+              -9493634,
+              -10119413,
+              -10766886,
+              -11433905,
+              -12268868,
+              -13121155,
+              -13988506,
+              -14913136,
+              -15907502,
+              -16911738,
+              -17972330,
+              -19063926,
+              -20178450,
+              -21332216,
+              -22520914,
+              -23777068,
+              -25033499,
+              -26343138,
+              -27701571,
+              -29083646,
+              -30526080,
+              -32012310,
+              -33536301,
+              -35152967,
+              -36799259,
+              -38466665,
+              -40252759,
+              -42076704,
+              -20082282,
+              -21630023,
+              -23200639,
+              -24798882,
+              -26460276,
+              -28154799,
+              -29934518,
+              -31724875,
+              -33526096,
+              63444254
+            ],
+            "type": "line",
+            "symbol": "none",
+            "markArea": {
+              "itemStyle": {
+                "color": "#f4f5fb"
+              },
+              "data": [
+                [
+                  {
+                    "name": "forecast",
+                    "xAxis": 55
+                  },
+                  {
+                    "xAxis": 59
+                  }
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

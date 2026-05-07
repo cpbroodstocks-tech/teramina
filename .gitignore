@@ -1,0 +1,34 @@
+# Local secrets and environment
+.env
+.env.*
+!.env.example
+
+# Dependency and build output
+node_modules/
+dist/
+dist-ssr/
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Local/editor files
+.DS_Store
+.vscode/
+.idea/
+*.log
+
+# Local credentials
+*.pem
+*firebase-adminsdk*.json
+*-firebase-adminsdk*.json
+backend-*.json
+teramina-*.json
+
+# Generated/vector artifacts
+*.faiss
+index.faiss
+
+# Preserved nested repo metadata
+.nested-git-backups/

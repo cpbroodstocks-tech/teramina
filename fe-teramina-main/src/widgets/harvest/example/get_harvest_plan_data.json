@@ -1,0 +1,22 @@
+{
+    "partial1": {
+        "doc": 60,
+        "biomass": 120,
+        "is_editable": false
+    },
+    "partial2": {
+        "doc": 80,
+        "biomass": 1000,
+        "is_editable": false
+    },
+    "partial3": {
+        "doc": 90,
+        "biomass": 890,
+        "is_editable": true
+    },
+    "final": {
+        "doc": 100,
+        "biomass": 1200,
+        "is_editable": true
+    }
+}

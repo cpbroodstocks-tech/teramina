@@ -1,0 +1,28 @@
+{
+    "data": [
+        {
+            "label": "Siklus 1",
+            "value": "cycle_1"
+        },
+        {
+            "label": "Siklus 2",
+            "value": "cycle_2"
+        },
+        {
+            "label": "Siklus 3",
+            "value": "cycle_3"
+        },
+        {
+            "label": "Siklus 4",
+            "value": "cycle_4"
+        },
+        {
+            "label": "Siklus 5",
+            "value": "cycle_5"
+        },
+        {
+            "label": "Siklus 6",
+            "value": "cycle_6"
+        }
+    ]
+}

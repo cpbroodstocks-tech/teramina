@@ -1,0 +1,282 @@
+{
+  "code": 200,
+  "message": "OK",
+  "payload": {
+    "feed_status": {
+      "title": "Feeding Status",
+      "data": [
+        {
+          "title": "DOC",
+          "value": 20,
+          "unit": "days"
+        },
+        {
+          "title": "Feed Given",
+          "value": 12.45,
+          "unit": "kg"
+        },
+        {
+          "title": "Feed Cost",
+          "value": "Rp 2,059,399.0",
+          "unit": ""
+        },
+        {
+          "title": "Feed Convertion Ratio",
+          "value": 0.0011,
+          "unit": ""
+        },
+        {
+          "title": "Feed Rate",
+          "value": 10.21,
+          "unit": "%"
+        }
+      ]
+    },
+    "feed_adjustment": {
+      "title": "Original Feeding Rate",
+      "data": [
+        {
+          "title": "Original Feeding Rate",
+          "value": 5.22,
+          "unit": "%",
+          "description": "The original the amount of feed given to shrimp in one DOC."
+        },
+        {
+          "title": "Adjustment Feeding Rate",
+          "value": 10.21,
+          "unit": "%",
+          "description": "The suggested amount of feed given to shrimp in one DOC calculated using Teramina’s algorithm."
+        },
+        {
+          "title": "Protein Content",
+          "value": 36,
+          "unit": "%",
+          "description": "The amount of protein present in the feed given to shrimp"
+        },
+        {
+          "title": "CHB:CP",
+          "value": "2:1",
+          "unit": "",
+          "description": "The ratio of Crude Protein (CP) to Crude Hydrolysable Carbohydrates (CHB)."
+        }
+      ],
+      "plot": {
+        "title": {
+          "text": ""
+        },
+        "legend": {
+          "data": [
+            "original",
+            "adjustment"
+          ],
+          "show": true,
+          "top": "10%"
+        },
+        "tooltip": {
+          "trigger": "axis"
+        },
+        "xAxis": {
+          "type": "category",
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20
+          ]
+        },
+        "yAxis": {
+          "type": "value"
+        },
+        "series": [
+          {
+            "name": "original",
+            "data": [
+              0.17,
+              0.15,
+              0.13,
+              0.12,
+              0.11,
+              0.1,
+              0.09,
+              0.08,
+              0.07,
+              0.07,
+              0.07,
+              0.07,
+              0.06,
+              0.06,
+              0.06,
+              0.06,
+              0.06,
+              0.06,
+              0.05,
+              0.05
+            ],
+            "type": "line",
+            "symbol": "none"
+          },
+          {
+            "name": "adjustment",
+            "data": [
+              0.24,
+              0.24,
+              0.25,
+              0.23,
+              0.22,
+              0.2,
+              0.19,
+              0.17,
+              0.16,
+              0.16,
+              0.15,
+              0.15,
+              0.14,
+              0.14,
+              0.13,
+              0.13,
+              0.12,
+              0.11,
+              0.11,
+              0.1
+            ],
+            "type": "line",
+            "symbol": "none"
+          }
+        ],
+        "color": [
+          "#474DA4",
+          "#FBBC05"
+        ]
+      }
+    },
+    "daily_feed_adjustment": {
+      "title": "Daily Feeding Adjustment",
+      "data": [
+        {
+          "title": "Recommendation",
+          "data": [
+            {
+              "title": "Feed Ration",
+              "value": 1.58,
+              "unit": "kg",
+              "description": "The amount of feed given to shrimp per day."
+            },
+            {
+              "title": "Ration 1",
+              "value": 5,
+              "unit": "kg"
+            },
+            {
+              "title": "Ration 2",
+              "value": -1.14,
+              "unit": "kg"
+            },
+            {
+              "title": "Ration 3",
+              "value": -1.14,
+              "unit": "kg"
+            },
+            {
+              "title": "Ration 4",
+              "value": -1.14,
+              "unit": "kg"
+            }
+          ]
+        },
+        {
+          "title": "Realization",
+          "data": {
+            "doc": 20,
+            "ration": [
+              {
+                "title": "Ration 1",
+                "ration_number": "1",
+                "id": "63e3314f5951d3e2bec87f4a",
+                "value": [
+                  {
+                    "title": "Realization",
+                    "value": 5,
+                    "unit": "m"
+                  },
+                  {
+                    "title": "Leftover",
+                    "value": 5,
+                    "unit": "m"
+                  }
+                ]
+              },
+              {
+                "title": "Ration 2",
+                "ration_number": "2",
+                "id": "",
+                "value": [
+                  {
+                    "title": "Realization",
+                    "value": "",
+                    "unit": "m"
+                  },
+                  {
+                    "title": "Leftover",
+                    "value": "",
+                    "unit": "m"
+                  }
+                ]
+              },
+              {
+                "title": "Ration 2",
+                "ration_number": "2",
+                "id": "",
+                "value": [
+                  {
+                    "title": "Realization",
+                    "value": "",
+                    "unit": "m"
+                  },
+                  {
+                    "title": "Leftover",
+                    "value": "",
+                    "unit": "m"
+                  }
+                ]
+              },
+              {
+                "title": "Ration 2",
+                "ration_number": "2",
+                "id": "",
+                "value": [
+                  {
+                    "title": "Realization",
+                    "value": "",
+                    "unit": "m"
+                  },
+                  {
+                    "title": "Leftover",
+                    "value": "",
+                    "unit": "m"
+                  }
+                ]
+              }
+            ],
+            "feed_given": "12.45 kg"
+          }
+        }
+      ]
+    }
+  }
+}

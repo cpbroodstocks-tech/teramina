@@ -1,0 +1,263 @@
+[
+  {
+    "plot": {
+      "data": {
+        "title": {
+          "code": "amonia",
+          "text": "Amonium",
+          "left": "center"
+        },
+        "legend": {
+          "data": [
+            [
+              "origin",
+              "predicted"
+            ]
+          ],
+          "show": false,
+          "top": "10%"
+        },
+        "tooltip": {
+          "trigger": "axis"
+        },
+        "xAxis": {
+          "name": "DOC",
+          "type": "category",
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        },
+        "yAxis": {
+          "name": "sumbu y",
+          "type": "value"
+        },
+        "visualMap": {
+          "show": false,
+          "dimension": 0,
+          "pieces": [
+            {
+              "lte": 55,
+              "color": "#474DA4"
+            },
+            {
+              "gt": 55,
+              "lte": 59,
+              "color": "#FBBC05"
+            }
+          ]
+        },
+        "series": [
+          {
+            "name": [
+              "origin",
+              "predicted"
+            ],
+            "data": [
+              15,
+              17,
+              19,
+              22,
+              4
+            ],
+            "type": "line",
+            "symbol": "none",
+            "markArea": {
+              "itemStyle": {
+                "color": "#f4f5fb"
+              },
+              "data": [
+                [
+                  {
+                    "name": "forecast",
+                    "xAxis": 55
+                  },
+                  {
+                    "xAxis": 59
+                  }
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "plot": {
+      "data": {
+        "title": {
+          "code": "water_temperature",
+          "text": "Suhu Air",
+          "left": "center"
+        },
+        "legend": {
+          "data": [
+            [
+              "origin",
+              "predicted"
+            ]
+          ],
+          "show": false,
+          "top": "10%"
+        },
+        "tooltip": {
+          "trigger": "axis"
+        },
+        "xAxis": {
+          "name": "sumbu x",
+          "type": "category",
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        },
+        "yAxis": {
+          "name": "sumbu y",
+          "type": "value"
+        },
+        "visualMap": {
+          "show": false,
+          "dimension": 0,
+          "pieces": [
+            {
+              "lte": 55,
+              "color": "#474DA4"
+            },
+            {
+              "gt": 55,
+              "lte": 59,
+              "color": "#FBBC05"
+            }
+          ]
+        },
+        "series": [
+          {
+            "name": [
+              "origin",
+              "predicted"
+            ],
+            "data": [
+              15,
+              17,
+              19,
+              22,
+              4
+            ],
+            "type": "line",
+            "symbol": "none",
+            "markArea": {
+              "itemStyle": {
+                "color": "#f4f5fb"
+              },
+              "data": [
+                [
+                  {
+                    "name": "forecast",
+                    "xAxis": 55
+                  },
+                  {
+                    "xAxis": 59
+                  }
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "plot": {
+      "data": {
+        "title": {
+          "code": "pH_morning",
+          "text": "PH Pagi",
+          "left": "center"
+        },
+        "legend": {
+          "data": [
+            [
+              "origin",
+              "predicted"
+            ]
+          ],
+          "show": false,
+          "top": "10%"
+        },
+        "tooltip": {
+          "trigger": "axis"
+        },
+        "xAxis": {
+          "name": "sumbu x",
+          "type": "category",
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        },
+        "yAxis": {
+          "name": "sumbu y",
+          "type": "value"
+        },
+        "visualMap": {
+          "show": false,
+          "dimension": 0,
+          "pieces": [
+            {
+              "lte": 55,
+              "color": "#474DA4"
+            },
+            {
+              "gt": 55,
+              "lte": 59,
+              "color": "#FBBC05"
+            }
+          ]
+        },
+        "series": [
+          {
+            "name": [
+              "origin",
+              "predicted"
+            ],
+            "data": [
+              15,
+              17,
+              19,
+              22,
+              4
+            ],
+            "type": "line",
+            "symbol": "none",
+            "markArea": {
+              "itemStyle": {
+                "color": "#f4f5fb"
+              },
+              "data": [
+                [
+                  {
+                    "name": "forecast",
+                    "xAxis": 55
+                  },
+                  {
+                    "xAxis": 59
+                  }
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+]

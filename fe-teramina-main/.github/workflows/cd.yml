@@ -1,0 +1,44 @@
+name: CD FE Teramina
+
+on:
+  push:
+    tags:
+      - 'production-*'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Create .env file on server
+        run: |
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=120 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          echo "VITE_ENDPOINT=${{ secrets.VITE_ENDPOINT }}" > ~/teramina/fe-teramina/.env
+          echo "VITE_FIREBASE_PROJECT_ID=${{ secrets.VITE_FIREBASE_PROJECT_ID }}" >> ~/teramina/fe-teramina/.env
+          echo "VITE_FIREBASE_API_KEY=${{ secrets.VITE_FIREBASE_API_KEY }}" >> ~/teramina/fe-teramina/.env
+          echo "VITE_FIREBASE_STORAGE_BUCKET=${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}" >> ~/teramina/fe-teramina/.env
+          echo "VITE_FIREBASE_AUTH_DOMAIN=${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}" >> ~/teramina/fe-teramina/.env
+          echo "VITE_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}" >> ~/teramina/fe-teramina/.env
+          echo "VITE_FIREBASE_APP_ID=${{ secrets.VITE_FIREBASE_APP_ID }}" >> ~/teramina/fe-teramina/.env
+          echo "VITE_FIREBASE_MEASUREMENT_ID=${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}" >> ~/teramina/fe-teramina/.env
+          echo "VITE_TERAMINA_API_KEY=${{ secrets.VITE_TERAMINA_API_KEY }}" >> ~/teramina/fe-teramina/.env
+          echo "VITE_TERAMINA_LLM_API=${{ secrets.VITE_TERAMINA_LLM_API }}" >> ~/teramina/fe-teramina/.env
+          echo "VITE_SUMMARY_MODEL=${{ secrets.VITE_SUMMARY_MODEL }}" >> ~/teramina/fe-teramina/.env
+          EOF
+
+      - name: Deploy to Server
+        run: |
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=120 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          cd ~/teramina/fe-teramina/
+          git pull origin main
+          docker-compose down
+          docker-compose up -d --build
+          EOF

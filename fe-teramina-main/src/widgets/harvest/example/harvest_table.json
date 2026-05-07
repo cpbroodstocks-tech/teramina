@@ -1,0 +1,65 @@
+{
+    "code": 200,
+    "message": "success",
+    "payload": {
+        "fields": [
+            {
+                "column": "harvest_no",
+                "column_title": "Harvest No."
+            },
+            {
+                "column": "harvest_type",
+                "column_title": "Harvest Type"
+            },
+            {
+                "column": "doc",
+                "column_title": "DOC"
+            },
+            {
+                "column": "biomass_kg",
+                "column_title": "Biomass (Kg)"
+            },
+            {
+                "column": "size",
+                "column_title": "Size"
+            },
+            {
+                "column": "revenue",
+                "column_title": "Revenue"
+            },
+            {
+                "column": "profit",
+                "column_title": "Profit"
+            }
+        ],
+        "rows": [
+            {
+                "harvest_no": 1,
+                "harvest_type": "partial",
+                "doc": 60,
+                "biomass_kg": 180.02,
+                "size": 107,
+                "revenue": "IDR 100 M",
+                "profit": "IDR 100 M"
+            },
+            {
+                "harvest_no": 1,
+                "harvest_type": "partial",
+                "doc": 75,
+                "biomass_kg": 180.02,
+                "size": 90,
+                "revenue": "IDR 100 M",
+                "profit": "IDR 100 M"
+            },
+            {
+                "harvest_no": 1,
+                "harvest_type": "partial",
+                "doc": 95,
+                "biomass_kg": 180.02,
+                "size": 60,
+                "revenue": "IDR 100 M",
+                "profit": "IDR 100 M"
+            }
+        ]
+    }
+}

@@ -1,0 +1,36 @@
+no,field,description
+1,temperature,Temperature in the water
+2,do,Dissolve Oxygen in the water
+3,nh4,Concentration of ammonium ions (ionized ammonia)
+4,nh3,Unionized Ammonia
+5,tan,total ammonia
+6,ph,pH level in the pond
+7,alkalinity,Total alkalinity of the water
+8,salinity,Salinity of the water
+9,orp,Oxidation-Reduction Potential of the water
+10,ca,Concentration of calcium ions
+11,mg,Concentration of magnesium ions
+12,hardness,Total hardness of the water (ca + mg)
+13,po4,Concentration of phosphate ions
+14,no2,Concentration of nitrite ions
+15,no3,Concentration of nitrate ions
+16,plankton,Concentration of phytoplankton (plant-like microorganisms)
+17,ga,Percentage of Green Algae in the plankton
+18,bga,Percentage of Blue-Green Algae (Cyanobacteria) in the plankton
+19,diatom,Percentage of Diatoms in the plankton
+20,euglena,"Percentage of Euglena (microscopic, photosynthetic flagellates) in the plankton"
+21,dino,Percentage of Dinoflagellates in the plankton
+22,protozoa,Percentage of Protozoa (single-celled microorganisms) in the plankton
+23,zoo,Percentage of Zooplankton (animal-like microorganisms) in the plankton
+24,vibrio_yellow,Concentration of Yellow Vibrio bacteria
+25,vibrio_green,Concentration of Green Vibrio bacteria
+26,vibrio_black,Concentration of Black Vibrio bacteria
+27,total_vibrio,Total concentration of Vibrio bacteria
+28,total_bakteri,Total concentration of bacteria in the water
+29,percent_vibrio,Percentage of Vibrio bacteria in the total bacteria count
+30,cuaca,Weather conditions
+31,tss,TSS (Total Suspended Solids). Concentration of solid particles suspended in water.
+32,turbidity,"Measure of water clarity due to suspended particles, often in NTU."
+33,conductivity,"Measures water's ability to conduct electrical current, indicating ion concentration."
+34,luminescence,"Natural bioluminescence in some shrimp species, often for research or aesthetic purposes."
+35,settleable_solids,Larger suspended particles that settle to the pond or tank bottom over time.
