@@ -7,7 +7,6 @@ import {
   CardContent,
   Chip,
   CircularProgress,
-  Grid,
   List,
   ListItem,
   Typography,
@@ -211,9 +210,9 @@ const AiInsights = () => {
           {insight.metrics && insight.metrics.length > 0 && (
             <Box>
               <Typography variant="subtitle1" gutterBottom style={{ fontWeight: 600 }}>Metrics</Typography>
-              <Grid container spacing={2}>
+              <Box style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
                 {insight.metrics.map((m, i) => (
-                  <Grid item xs={12} sm={6} md={4} key={i}>
+                  <Box key={i}>
                     <Card variant="outlined">
                       <CardContent style={{ paddingBottom: "12px !important" }}>
                         <Typography variant="body2" color="textSecondary">{m.name}</Typography>
@@ -226,9 +225,9 @@ const AiInsights = () => {
                         )}
                       </CardContent>
                     </Card>
-                  </Grid>
+                  </Box>
                 ))}
-              </Grid>
+              </Box>
             </Box>
           )}
 

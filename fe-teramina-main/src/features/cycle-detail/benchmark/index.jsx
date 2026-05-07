@@ -9,7 +9,6 @@ import {
   Chip,
   CircularProgress,
   FormControlLabel,
-  Grid,
   Typography,
 } from "@mui/material";
 import { useToastStore } from "store/toast.store";
@@ -114,11 +113,11 @@ const BenchmarkSection = () => {
       <Box style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
         <Button variant="text" size="small" color="error" onClick={handleOptOut}>Opt Out</Button>
       </Box>
-      <Grid container spacing={2}>
+      <Box style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
         {Object.entries(metrics).map(([key, metric]) => {
           const aboveMedian = metric.my_value >= metric.p50;
           return (
-            <Grid item xs={12} sm={6} md={4} key={key}>
+            <Box key={key}>
               <Card variant="outlined">
                 <CardContent>
                   <Typography variant="subtitle2" style={{ textTransform: "capitalize", marginBottom: 4 }}>
@@ -134,10 +133,10 @@ const BenchmarkSection = () => {
                   <MetricBar myValue={metric.my_value} p25={metric.p25} p50={metric.p50} p75={metric.p75} cohortSize={metric.cohort_size} />
                 </CardContent>
               </Card>
-            </Grid>
+            </Box>
           );
         })}
-      </Grid>
+      </Box>
     </Box>
   );
 };

@@ -31,19 +31,29 @@ from google.oauth2 import service_account
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def env_list(name, default=""):
+    return [value.strip() for value in os.getenv(name, default).split(",") if value.strip()]
+
+
+def require_env(name):
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(f"{name} environment variable is not set")
+    return value
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
-if not SECRET_KEY:
-    raise RuntimeError("DJANGO_SECRET_KEY environment variable is not set")
+SECRET_KEY = require_env("DJANGO_SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DJANGO_DEBUG", "False") == "True"
 
-_allowed_hosts = os.getenv("DJANGO_ALLOWED_HOSTS", "")
-ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts.split(",") if h.strip()]
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "*" if DEBUG else "")
+if not DEBUG and not ALLOWED_HOSTS:
+    raise RuntimeError("DJANGO_ALLOWED_HOSTS must be set when DJANGO_DEBUG is False")
 
 
 # Application definition
@@ -106,11 +116,13 @@ WSGI_APPLICATION = "teramina.wsgi.application"
 # }
 
 
-user = os.getenv("MONGOATLAS_USER")
-password = os.getenv("MONGOATLAS_PASSWORD")
-host = os.getenv("MONGOATLAS_HOST")
-database = os.getenv("MONGOATLAS_DATABASE")
-HOST_MONGOATLAS = f"mongodb+srv://{user}:{password}@{host}/{database}?retryWrites=true&w=majority&connectTimeoutMS=30000"
+HOST_MONGOATLAS = os.getenv("MONGODB_URI")
+if not HOST_MONGOATLAS:
+    user = require_env("MONGOATLAS_USER")
+    password = require_env("MONGOATLAS_PASSWORD")
+    host = require_env("MONGOATLAS_HOST")
+    database = require_env("MONGOATLAS_DATABASE")
+    HOST_MONGOATLAS = f"mongodb+srv://{user}:{password}@{host}/{database}?retryWrites=true&w=majority&connectTimeoutMS=30000"
 
 mongoengine.connect(
     host=HOST_MONGOATLAS,
@@ -162,7 +174,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Production security settings (disabled in DEBUG mode so local dev still works)
 if not DEBUG:
+    require_env("JWT_SECRET_KEY")
     SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
@@ -184,8 +198,14 @@ CORS_ALLOW_METHODS = [
 
 CORS_ORIGIN_ALLOW_ALL = False
 
-_cors_origins = os.getenv("CORS_ALLOWED_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173")
-CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(",") if o.strip()]
+CORS_ALLOWED_ORIGINS = env_list(
+    "CORS_ALLOWED_ORIGINS",
+    "http://127.0.0.1:5173,http://localhost:5173" if DEBUG else "",
+)
+if not DEBUG and not CORS_ALLOWED_ORIGINS:
+    raise RuntimeError("CORS_ALLOWED_ORIGINS must be set when DJANGO_DEBUG is False")
+
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS")
 
 CORS_ALLOW_CREDENTIALS = True
 

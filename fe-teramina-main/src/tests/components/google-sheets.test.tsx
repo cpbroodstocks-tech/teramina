@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { act, render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -341,8 +341,8 @@ describe("GoogleSheets", () => {
       vi.useFakeTimers();
       fireEvent.click(syncBtn);
 
-      await vi.advanceTimersByTimeAsync(3000); // poll #1 → syncing, schedules poll #2
-      await vi.advanceTimersByTimeAsync(3000); // poll #2 → ok, clears syncing
+      await act(() => vi.advanceTimersByTimeAsync(3000)); // poll #1 → syncing, schedules poll #2
+      await act(() => vi.advanceTimersByTimeAsync(3000)); // poll #2 → ok, clears syncing
 
       expect(mockSetToast).toHaveBeenCalledWith(
         expect.objectContaining({ variant: "success", text: "Sync complete" })
@@ -368,7 +368,7 @@ describe("GoogleSheets", () => {
       vi.useFakeTimers();
       fireEvent.click(syncBtn);
 
-      await vi.advanceTimersByTimeAsync(3000); // poll #1 → error
+      await act(() => vi.advanceTimersByTimeAsync(3000)); // poll #1 → error
 
       expect(mockSetToast).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -395,7 +395,7 @@ describe("GoogleSheets", () => {
       vi.useFakeTimers();
       fireEvent.click(syncBtn);
 
-      await vi.advanceTimersByTimeAsync(3000); // poll #1 → partial
+      await act(() => vi.advanceTimersByTimeAsync(3000)); // poll #1 → partial
 
       expect(mockSetToast).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -423,9 +423,10 @@ describe("GoogleSheets", () => {
 
       vi.useFakeTimers();
       fireEvent.click(syncBtn);
+      await act(() => vi.advanceTimersByTimeAsync(0));
 
       for (let i = 0; i < 20; i++) {
-        await vi.advanceTimersByTimeAsync(3000);
+        await act(() => vi.advanceTimersByTimeAsync(3000));
       }
 
       expect(mockSetToast).toHaveBeenCalledWith(

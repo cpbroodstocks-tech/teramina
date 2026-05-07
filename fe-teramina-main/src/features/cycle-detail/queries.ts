@@ -48,6 +48,7 @@ export const useGoogleSheetsStatus = (cycle_id: string) =>
     enabled: !!cycle_id,
     refetchInterval: (query) =>
       (query.state.data as any)?.last_status === "syncing" ? 3000 : false,
+    refetchIntervalInBackground: true,
     retry: false,
   });
 

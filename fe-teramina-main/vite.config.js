@@ -36,6 +36,22 @@ const ALIAS = {
 const OUTPUT = {
   manualChunks: (id) => {
     if (id.includes("node_modules")) {
+      if (id.includes("react-router")) {
+        return "vendor_react_router";
+      }
+
+      if (id.includes("@tanstack")) {
+        return "vendor_tanstack";
+      }
+
+      if (id.includes("react-hook-form") || id.includes("@hookform") || id.includes("zod")) {
+        return "vendor_forms";
+      }
+
+      if (id.includes("i18next") || id.includes("react-i18next")) {
+        return "vendor_i18n";
+      }
+
       if (id.includes("@mui/icons-material")) {
         return "vendor_mui_icons_material";
       }
@@ -90,10 +106,6 @@ const OUTPUT = {
 
       if (id.includes("jss")) {
         return "vendor_jss";
-      }
-
-      if (id.includes("scheduler")) {
-        return "vendor_scheduler";
       }
 
       return "vendor";

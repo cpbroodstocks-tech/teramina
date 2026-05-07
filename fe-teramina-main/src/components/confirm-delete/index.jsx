@@ -5,7 +5,6 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogContentText,
   Typography,
 } from "@mui/material";
 import { useStyles } from "./styles";
@@ -29,11 +28,9 @@ const ConfirmDelete = ({
         aria-describedby="alert-dialog-description"
       >
         <DialogContent className={styles.dialogContent}>
-          <DialogContentText id="alert-dialog-description">
-            <Typography variant="h6" className={styles.dialogText}>
-              {t(message)}
-            </Typography>
-          </DialogContentText>
+          <Typography id="alert-dialog-description" variant="h6" className={styles.dialogText}>
+            {t(message)}
+          </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose}>{t("NO")}</Button>

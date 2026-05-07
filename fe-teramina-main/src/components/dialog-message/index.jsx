@@ -9,7 +9,7 @@ const DialogMessage = ({open, onClose, title, message}) => {
   return (
     <Dialog
       open={open}
-      TransitionComponent={Transition}
+      slots={{ transition: Transition }}
       keepMounted
       onClose={onClose}
       aria-labelledby="alert-dialog-title"

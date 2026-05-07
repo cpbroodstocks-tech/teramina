@@ -48,26 +48,45 @@ const GoogleSheets = () => {
   const prevStatusRef = useRef(null);
   const syncTriggeredRef = useRef(false);
   const pollCountRef = useRef(0);
+  const pollTimerRef = useRef(null);
 
-  const { data: status, isLoading, dataUpdatedAt } = useGoogleSheetsStatus(cycle_id);
+  const { data: status, isLoading, dataUpdatedAt, refetch: refetchStatus } = useGoogleSheetsStatus(cycle_id);
   const { mutate: connect, isPending: connecting } = useConnectSheets(cycle_id);
   const { mutate: createTemplate, isPending: creatingTemplate } = useCreateSheetsTemplate(cycle_id);
   const { mutate: sync, isPending: syncing } = useSyncSheets(cycle_id);
   const { mutate: disconnect, isPending: disconnecting } = useDisconnectSheets(cycle_id);
+
+  const clearPollTimer = () => {
+    if (pollTimerRef.current) {
+      clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  };
+
+  const pollStatus = async () => {
+    const result = await refetchStatus();
+    if (!syncTriggeredRef.current) return;
+
+    if (result.data?.last_status === "syncing") {
+      pollCountRef.current += 1;
+      if (pollCountRef.current >= MAX_POLL_ATTEMPTS) {
+        setToast({ open: true, variant: "warning", text: "Sync is taking longer than expected" });
+        syncTriggeredRef.current = false;
+        pollCountRef.current = 0;
+        clearPollTimer();
+        return;
+      }
+
+      pollTimerRef.current = setTimeout(pollStatus, 3000);
+    }
+  };
 
   useEffect(() => {
     const prev = prevStatusRef.current;
     const current = status?.last_status;
 
     if (syncTriggeredRef.current) {
-      if (current === "syncing") {
-        pollCountRef.current += 1;
-        if (pollCountRef.current >= MAX_POLL_ATTEMPTS) {
-          setToast({ open: true, variant: "warning", text: "Sync is taking longer than expected" });
-          syncTriggeredRef.current = false;
-          pollCountRef.current = 0;
-        }
-      } else if (prev !== null) {
+      if (current !== "syncing" && prev !== null) {
         if (current === "ok") {
           setToast({ open: true, variant: "success", text: "Sync complete" });
         } else if (current === "partial") {
@@ -77,11 +96,14 @@ const GoogleSheets = () => {
         }
         syncTriggeredRef.current = false;
         pollCountRef.current = 0;
+        clearPollTimer();
       }
     }
 
     prevStatusRef.current = current;
   }, [dataUpdatedAt]);
+
+  useEffect(() => () => clearPollTimer(), []);
 
   const handleConnect = () => {
     const spreadsheet_id = extractSpreadsheetId(spreadsheetInput);
@@ -108,6 +130,8 @@ const GoogleSheets = () => {
         syncTriggeredRef.current = true;
         pollCountRef.current = 0;
         setToast({ open: true, variant: "info", text: "Sync queued — checking status…" });
+        clearPollTimer();
+        pollTimerRef.current = setTimeout(pollStatus, 3000);
       },
       onError: () => setToast({ open: true, variant: "error", text: "Failed to queue sync" }),
     });

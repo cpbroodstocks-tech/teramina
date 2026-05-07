@@ -22,7 +22,7 @@ const ToastMessage = () => {
       className={styles.dialog}
       open={open}
       onClose={() => handleSetToast({ open: false })}
-      TransitionComponent={Transition}
+      slots={{ transition: Transition }}
       aria-labelledby="alert-dialog-title"
       aria-describedby="alert-dialog-description"
     >
