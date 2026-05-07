@@ -179,7 +179,7 @@ describe("AiInsights", () => {
     });
     const body =
       `data: {"type":"chunk","text":${JSON.stringify(insightJson)}}\n` +
-      `data: {"type":"done"}\n\n`;
+      "data: {\"type\":\"done\"}\n\n";
 
     server.use(
       http.get("*/summarize/insight/stream", () =>
@@ -195,7 +195,7 @@ describe("AiInsights", () => {
 
   it("shows error toast when streaming returns an error event", async () => {
     const user = userEvent.setup();
-    const body = `data: {"type":"error","message":"Stream unavailable"}\n\n`;
+    const body = "data: {\"type\":\"error\",\"message\":\"Stream unavailable\"}\n\n";
 
     server.use(
       http.get("*/summarize/insight/stream", () =>

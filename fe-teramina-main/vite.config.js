@@ -40,10 +40,6 @@ const OUTPUT = {
         return "vendor_mui_icons_material";
       }
 
-      if (id.includes("@mui/material")) {
-        return "vendor_mui_material";
-      }
-
       if (id.includes("@mui/styles")) {
         return "vendor_mui_styles";
       }
@@ -62,10 +58,6 @@ const OUTPUT = {
 
       if (id.includes("firebase")) {
         return "vendor_firebase";
-      }
-
-      if (id.includes("classnames")) {
-        return "vendor_classnames";
       }
 
       if (id.includes("zrender")) {

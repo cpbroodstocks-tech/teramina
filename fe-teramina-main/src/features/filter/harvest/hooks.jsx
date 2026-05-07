@@ -1,4 +1,4 @@
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { axios } from "helper/axios";
@@ -35,11 +35,11 @@ const useFilter = (api) => {
     error: false,
   }));
 
-  const { handleSubmit, reset, setValue, watch, getValues, formState } = useForm({
+  const { control, handleSubmit, reset, setValue, getValues, formState } = useForm({
     resolver: zodResolver(FILTER_SCHEMA),
     defaultValues: { farm_id: "", pond_id: "", cycle_id: "" },
   });
-  const formValues = watch();
+  const formValues = useWatch({ control });
 
   const fetchMVPWithFilter = async (values) => {
     setFilter((previousValue) => ({
