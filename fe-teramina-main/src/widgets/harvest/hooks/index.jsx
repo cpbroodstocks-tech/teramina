@@ -1,4 +1,4 @@
-import * as Yup from "yup";
+import { z } from "zod";
 
 const HARVEST_LENGTH = 4;
 const HARFEST_SCHEMA = {
@@ -73,6 +73,18 @@ const generateHarvestInitialValues = (current) => {
   return format;
 };
 
+const formatHarvestPropertyName = (property) => property.replace(/\d+/, match => ` ${match}`);
+
+const requiredNumber = () => z.preprocess(
+  (value) => (value === "" || value === null || value === undefined ? undefined : Number(value)),
+  z.number({ invalid_type_error: "Required", required_error: "Required" })
+);
+
+const harvestRowSchema = () => z.object({
+  doc: requiredNumber(),
+  biomass: requiredNumber(),
+});
+
 const useGenerateHarvestSimulationFormValidationSchema = (
   length,
   format,
@@ -83,100 +95,57 @@ const useGenerateHarvestSimulationFormValidationSchema = (
 
   for (const property in format) {
     if (property === "partial1") {
-      schema[property] = Yup.object().shape({
-        doc:
-          initialValues[property].doc !== ""
-            ? Yup.number().required()
-            : Yup.number()
-              .min(lastDOC + 1)
-              .required(),
-        biomass: Yup.number().required(),
+      schema[property] = harvestRowSchema().superRefine((value, ctx) => {
+        if (initialValues[property].doc === "" && value.doc < lastDOC + 1) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Number must be greater than or equal to ${lastDOC + 1}`,
+            path: ["doc"],
+          });
+        }
       });
     }
 
     if (property === "final") {
-      schema[property] = Yup.object({
-        doc: Yup.number(),
-        biomass: Yup.number(),
-      }).when(
-        [Object.keys(format)[length - 2]],
-        (value, _, { originalValue }) => {
-          const docBefore = parseInt(value.doc, 10);
-          const docAfter = originalValue.doc
-            ? parseInt(originalValue.doc, 10)
-            : 0;
-
-          if (initialValues[property].doc !== "") {
-            return Yup.object().shape({
-              doc:
-                docBefore > docAfter
-                  ? Yup.number()
-                    .min(docBefore + 1)
-                    .required()
-                  : Yup.number().required(),
-              biomass: Yup.number().required(),
-            });
-          }
-
-          return Yup.object().shape({
-            doc: Yup.number().test(
-              "isPreferedValue",
-              () => {
-                const propName = property.replace(/\d+/, match => ` ${match}`);
-                const lastDocPropName = Object.keys(format)[length - 2].replace(/\d+/, match => ` ${match}`);
-                return `${propName} must be greater than ${lastDocPropName} and greater than last doc`;
-              },
-              (value) => value > lastDOC && value > docBefore
-            ).required(),
-            biomass: Yup.number().required(),
-          });
-        }
-      );
+      schema[property] = harvestRowSchema();
     }
 
-    if (property !== "final" && property !== "partial1") {
-      const indexOfProperties = Object.keys(format).indexOf(property);
-
-      schema[property] = Yup.object({
-        doc: Yup.number().required(),
-        biomass: Yup.number().required(),
-      }).when(
-        [Object.keys(format)[indexOfProperties - 1]],
-        (value, _, { originalValue }) => {
-          const docBefore = parseInt(value.doc, 10);
-          const docAfter = originalValue.doc
-            ? parseInt(originalValue.doc, 10)
-            : 0;
-
-          if (initialValues[property].doc !== "") {
-            return Yup.object().shape({
-              doc:
-                docBefore > docAfter
-                  ? Yup.number()
-                    .min(docBefore + 1)
-                    .required()
-                  : Yup.number().required(),
-              biomass: Yup.number().required(),
-            });
-          }
-
-          return Yup.object().shape({
-            doc: Yup.number().test(
-              "isPreferedValue",
-              () => {
-                const propName = property.replace(/\d+/, match => ` ${match}`);
-                const lastDocPropName = Object.keys(format)[indexOfProperties - 1].replace(/\d+/, match => ` ${match}`);
-                return `${propName} must be greater than ${lastDocPropName} and greater than last doc`;
-              },
-              (value) => value > lastDOC && value > docBefore
-            ).required(),
-            biomass: Yup.number().required(),
-          });
-        }
-      );
+    if (property !== "partial1") {
+      schema[property] = harvestRowSchema();
     }
   }
-  return schema;
+
+  return z.object(schema).superRefine((values, ctx) => {
+    for (const property in format) {
+      if (property === "partial1") continue;
+
+      const indexOfProperties = Object.keys(format).indexOf(property);
+      const previousProperty = property === "final"
+        ? Object.keys(format)[length - 2]
+        : Object.keys(format)[indexOfProperties - 1];
+      const docBefore = parseInt(values[previousProperty]?.doc, 10);
+      const docAfter = values[property]?.doc ? parseInt(values[property].doc, 10) : 0;
+
+      if (initialValues[property].doc !== "") {
+        if (docBefore > docAfter && values[property].doc < docBefore + 1) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Number must be greater than or equal to ${docBefore + 1}`,
+            path: [property, "doc"],
+          });
+        }
+        continue;
+      }
+
+      if (!(values[property].doc > lastDOC && values[property].doc > docBefore)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${formatHarvestPropertyName(property)} must be greater than ${formatHarvestPropertyName(previousProperty)} and greater than last doc`,
+          path: [property, "doc"],
+        });
+      }
+    }
+  });
 };
 
 export {

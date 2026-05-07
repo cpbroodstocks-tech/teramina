@@ -34,8 +34,7 @@ import { useUserCheckData } from "hooks/useUserCheckData";
 import { useLineEchartsGenerateOptions } from "hooks/useLineEchartsGenerateOptions";
 import { Markdown } from "components/markdown";
 import { useToastStore } from "store/toast.store";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { axios } from "helper/axios";
+import { useCreateOverviewReport, useOverviewReportPoll } from "widgets/overview/queries";
 
 const OverviewWidget = () => {
   const { t } = useTranslation();
@@ -49,41 +48,8 @@ const OverviewWidget = () => {
   const { classes: styles } = useStyles();
   const { setToast: toast } = useToastStore();
 
-  const { mutate: createReport, isPending: creatingReport } = useMutation({
-    mutationFn: () => {
-      const farm_id = localStorage.getItem("farm_id");
-      const pond_id = localStorage.getItem("pond_id");
-      const cycle_id = localStorage.getItem("cycle_id");
-      const date = (localStorage.getItem("date") || "").replace(/"/g, "");
-      const token = localStorage.getItem("authentication");
-      return axios
-        .post("/dashboard/create-report", { farm_id, pond_id, cycle_id, date }, { headers: { Authorization: `Bearer ${token}` } })
-        .then((r) => r.task_id);
-    },
-    onSuccess: (id) => setReportTaskId(id),
-    onError: (err) => {
-      setDialogOpen(false);
-      toast({ open: true, variant: "error", text: err.message });
-    },
-  });
-
-  const { data: pollResponse } = useQuery({
-    queryKey: ["report-poll", reportTaskId],
-    enabled: !!reportTaskId,
-    queryFn: () => {
-      const token = localStorage.getItem("authentication") || "";
-      return axios.get(`/dashboard/get-report/${reportTaskId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        responseType: "blob",
-        validateStatus: () => true,
-      });
-    },
-    refetchInterval: (query) => {
-      const d = query.state.data;
-      if (!d) return 10000;
-      return d.type === "application/pdf" ? false : 10000;
-    },
-  });
+  const { mutate: createReport, isPending: creatingReport } = useCreateOverviewReport();
+  const { data: pollResponse } = useOverviewReportPoll(reportTaskId);
 
   useEffect(() => {
     if (!pollResponse) return;
@@ -121,7 +87,19 @@ const OverviewWidget = () => {
     setDialogTitle("Info");
     setDialogMessage("Report download in progress. This may take up to 1 minute...");
     setDialogOpen(true);
-    createReport();
+    createReport({
+      farm_id: localStorage.getItem("farm_id"),
+      pond_id: localStorage.getItem("pond_id"),
+      cycle_id: localStorage.getItem("cycle_id"),
+      date: (localStorage.getItem("date") || "").replace(/"/g, ""),
+      token: localStorage.getItem("authentication"),
+    }, {
+      onSuccess: (id) => setReportTaskId(id),
+      onError: (err) => {
+        setDialogOpen(false);
+        toast({ open: true, variant: "error", text: err.message });
+      },
+    });
   };
 
   const handleCloseDialog = () => {
