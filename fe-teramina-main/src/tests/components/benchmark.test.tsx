@@ -184,9 +184,7 @@ describe("BenchmarkSection", () => {
       const optOutBtn = await screen.findByRole("button", { name: /Opt Out/i });
       await user.click(optOutBtn);
 
-      await waitFor(() =>
-        expect(screen.getByText("Farm Performance Benchmarking")).toBeInTheDocument()
-      );
+      expect(await screen.findByText("Farm Performance Benchmarking")).toBeInTheDocument();
     });
 
     it("shows error toast when opt-out API fails", async () => {

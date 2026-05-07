@@ -30,7 +30,7 @@ beforeEach(() => {
   mockAxios.post.mockReset();
 });
 
-function wrapper({ children }: { children: React.ReactNode }) {
+function Wrapper({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
     () => new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   );
@@ -52,7 +52,7 @@ describe("useUserProfile", () => {
     const profile = { id: "u1", name: "Alice", email: "alice@example.com" };
     mockAxios.get.mockResolvedValue({ payload: profile });
 
-    const { result } = renderHook(() => useUserProfile(), { wrapper });
+    const { result } = renderHook(() => useUserProfile(), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(profile);
     expect(mockAxios.get).toHaveBeenCalledWith("/user/get-profile");
@@ -61,7 +61,7 @@ describe("useUserProfile", () => {
   it("surfaces error when endpoint fails", async () => {
     mockAxios.get.mockRejectedValue(new Error("Bad request"));
 
-    const { result } = renderHook(() => useUserProfile(), { wrapper });
+    const { result } = renderHook(() => useUserProfile(), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.isError).toBe(true));
   });
 });
@@ -76,7 +76,7 @@ describe("useUpdateProfile", () => {
       return Promise.resolve({ payload: { name: "Bob Updated" } });
     });
 
-    const { result } = renderHook(() => useUpdateProfile(), { wrapper });
+    const { result } = renderHook(() => useUpdateProfile(), { wrapper: Wrapper });
     const formData = new FormData();
     formData.append("name", "Bob Updated");
     result.current.mutate(formData);
@@ -93,7 +93,7 @@ describe("useUpdateProfile", () => {
   it("surfaces error when update fails", async () => {
     mockAxios.post.mockRejectedValue(new Error("Bad request"));
 
-    const { result } = renderHook(() => useUpdateProfile(), { wrapper });
+    const { result } = renderHook(() => useUpdateProfile(), { wrapper: Wrapper });
     result.current.mutate(new FormData());
 
     await waitFor(() => expect(result.current.isError).toBe(true));
@@ -106,7 +106,7 @@ describe("useUploadCostData", () => {
   it("POSTs file to /cost/add-single-cost-data with correct params", async () => {
     mockAxios.post.mockResolvedValue({ payload: {} });
 
-    const { result } = renderHook(() => useUploadCostData(), { wrapper });
+    const { result } = renderHook(() => useUploadCostData(), { wrapper: Wrapper });
     // Use Blob (not File) to avoid slow File serialization in Node.js/jsdom
     const file = new Blob(["cost data"], { type: "text/csv" }) as unknown as File;
     result.current.mutate({
@@ -134,7 +134,7 @@ describe("useUploadCostData", () => {
   it("surfaces error when upload fails", async () => {
     mockAxios.post.mockRejectedValue(new Error("Invalid file"));
 
-    const { result } = renderHook(() => useUploadCostData(), { wrapper });
+    const { result } = renderHook(() => useUploadCostData(), { wrapper: Wrapper });
     const file = new Blob(["bad data"], { type: "text/plain" }) as unknown as File;
     result.current.mutate({ farm_id: "f1", start_date: "2024-01-01", end_date: "2024-01-31", file });
 

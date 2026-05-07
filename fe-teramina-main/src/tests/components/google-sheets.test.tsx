@@ -1,4 +1,4 @@
-import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -148,8 +148,8 @@ describe("GoogleSheets", () => {
         http.get("*/sheets/status", () => HttpResponse.json(connectedPayload()))
       );
       renderComponent();
-      const link = await screen.findByText("Open Spreadsheet ↗");
-      expect(link.closest("a")).toHaveAttribute(
+      const link = await screen.findByRole("link", { name: "Open Spreadsheet ↗" });
+      expect(link).toHaveAttribute(
         "href",
         "https://docs.google.com/spreadsheets/d/sheet123/edit"
       );
@@ -203,7 +203,7 @@ describe("GoogleSheets", () => {
       await user.type(screen.getByLabelText(/Spreadsheet ID or URL/i), "rawSheetId");
       await user.click(screen.getByRole("button", { name: /^Connect$/i }));
 
-      await waitFor(() => expect(screen.getByText("Connected")).toBeInTheDocument());
+      expect(await screen.findByText("Connected")).toBeInTheDocument();
       expect(capturedBody.cycle_id).toBe(CYCLE_ID);
       expect(capturedBody.spreadsheet_id).toBe("rawSheetId");
       expect(mockSetToast).toHaveBeenCalledWith(
@@ -300,7 +300,7 @@ describe("GoogleSheets", () => {
       await screen.findByText("Connect Google Sheets");
       await user.click(screen.getByRole("button", { name: /Create Template/i }));
 
-      await waitFor(() => expect(screen.getByText("Connected")).toBeInTheDocument());
+      expect(await screen.findByText("Connected")).toBeInTheDocument();
       expect(window.open).toHaveBeenCalledWith(
         "https://docs.google.com/spreadsheets/d/new-sheet/edit",
         "_blank"
@@ -340,7 +340,6 @@ describe("GoogleSheets", () => {
       // setTimeout calls are captured as fake timers.
       vi.useFakeTimers();
       fireEvent.click(syncBtn);
-      await act(async () => {}); // flush POST + setSyncing(true) + startPolling()
 
       await vi.advanceTimersByTimeAsync(3000); // poll #1 → syncing, schedules poll #2
       await vi.advanceTimersByTimeAsync(3000); // poll #2 → ok, clears syncing
@@ -368,7 +367,6 @@ describe("GoogleSheets", () => {
 
       vi.useFakeTimers();
       fireEvent.click(syncBtn);
-      await act(async () => {});
 
       await vi.advanceTimersByTimeAsync(3000); // poll #1 → error
 
@@ -396,7 +394,6 @@ describe("GoogleSheets", () => {
 
       vi.useFakeTimers();
       fireEvent.click(syncBtn);
-      await act(async () => {});
 
       await vi.advanceTimersByTimeAsync(3000); // poll #1 → partial
 
@@ -426,7 +423,6 @@ describe("GoogleSheets", () => {
 
       vi.useFakeTimers();
       fireEvent.click(syncBtn);
-      await act(async () => {});
 
       for (let i = 0; i < 20; i++) {
         await vi.advanceTimersByTimeAsync(3000);
@@ -460,9 +456,7 @@ describe("GoogleSheets", () => {
 
       await user.click(screen.getByRole("button", { name: /Disconnect/i }));
 
-      await waitFor(() =>
-        expect(screen.getByText("Connect Google Sheets")).toBeInTheDocument()
-      );
+      expect(await screen.findByText("Connect Google Sheets")).toBeInTheDocument();
       expect(mockSetToast).toHaveBeenCalledWith(
         expect.objectContaining({ variant: "success", text: "Disconnected" })
       );

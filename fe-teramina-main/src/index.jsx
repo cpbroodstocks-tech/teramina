@@ -1,9 +1,8 @@
-import { Fragment, Suspense } from "react";
+import { Fragment, Suspense, lazy } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { routes } from "routes";
 import { theme } from "theme";
 import { queryClient } from "lib/queryClient";
@@ -25,6 +24,14 @@ import "@fontsource/lato";
 import "locales/i18n";
 
 ReactGA.initialize("G-5RMKKEF1WM"); // initialize react-ga
+
+const ReactQueryDevtools = import.meta.env.DEV
+  ? lazy(() =>
+    import("@tanstack/react-query-devtools").then((module) => ({
+      default: module.ReactQueryDevtools,
+    }))
+  )
+  : null;
 
 const APP = () => {
   useFirebase();
@@ -79,7 +86,11 @@ root.render(
       </ErrorBoundary>
     </BrowserRouter>
     <ToastMessage />
-    <ReactQueryDevtools initialIsOpen={false} />
+    {ReactQueryDevtools && (
+      <Suspense fallback={null}>
+        <ReactQueryDevtools initialIsOpen={false} />
+      </Suspense>
+    )}
   </QueryClientProvider>
 );
 

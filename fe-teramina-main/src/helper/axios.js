@@ -11,7 +11,7 @@ const AXIOS = axios.create({
   }
 });
 
-const DEV_TOKEN = import.meta.env.VITE_DEV_TOKEN;
+const DEV_TOKEN = import.meta.env.DEV ? import.meta.env.VITE_DEV_TOKEN : undefined;
 
 AXIOS.interceptors.request.use(
   (config) => {

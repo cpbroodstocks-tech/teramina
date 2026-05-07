@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
@@ -16,6 +16,7 @@ import {
   usePopulateCycleData,
   useDownloadCycleData,
 } from "features/cycle-detail/queries";
+import { axios } from "helper/axios";
 
 vi.mock("firebase/auth", () => ({
   getAuth: vi.fn(),
@@ -23,6 +24,10 @@ vi.mock("firebase/auth", () => ({
 }));
 
 const CYCLE_ID = "cycle-detail-q-001";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const queryClient = new QueryClient({
@@ -202,21 +207,18 @@ describe("useLoadCachedInsight", () => {
 
 describe("usePopulateCycleData", () => {
   it("POSTs file as multipart/form-data to populate-cycle-data", async () => {
-    let capturedUrl = "";
-    server.use(
-      http.post("*/cycle-data/populate-cycle-data", ({ request }) => {
-        capturedUrl = request.url;
-        return HttpResponse.json({ payload: { rows_inserted: 100 } });
-      })
-    );
+    const postSpy = vi.spyOn(axios, "post").mockResolvedValue({ payload: { rows_inserted: 100 } });
 
     const { result } = renderHook(() => usePopulateCycleData(CYCLE_ID), { wrapper });
-    const file = new File(["a,b\n1,2"], "data.csv", { type: "text/csv" });
+    const file = new Blob(["a,b\n1,2"], { type: "text/csv" }) as unknown as File;
     result.current.mutate({ file, source_type: "csv" });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(capturedUrl).toContain(`cycle_id=${CYCLE_ID}`);
-    expect(capturedUrl).toContain("source_type=csv");
+    expect(postSpy).toHaveBeenCalledWith(
+      `/cycle-data/populate-cycle-data?cycle_id=${CYCLE_ID}&source_type=csv`,
+      expect.any(FormData),
+      expect.objectContaining({ headers: { "Content-Type": "multipart/form-data" } })
+    );
   });
 });
 

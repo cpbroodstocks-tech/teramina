@@ -2,17 +2,27 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { http, HttpResponse } from "msw";
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
-import { server } from "../mocks/server";
 import ModalPopulateAdd from "features/cycle-detail/modal-add-populate/index";
 import ButtonDownloadData from "features/cycle-detail/download-data/index";
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
+const queryMocks = vi.hoisted(() => ({
+  populate: vi.fn(),
+  downloadDummy: vi.fn(),
+  downloadCycleData: vi.fn(),
+}));
+
 vi.mock("firebase/auth", () => ({
   getAuth: vi.fn(),
   signOut: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("features/cycle-detail/queries", () => ({
+  usePopulateCycleData: () => ({ mutate: queryMocks.populate, isPending: false }),
+  useDownloadDummyData: () => ({ mutate: queryMocks.downloadDummy, isPending: false }),
+  useDownloadCycleData: () => ({ mutate: queryMocks.downloadCycleData, isPending: false }),
 }));
 
 const mockSetToast = vi.fn();
@@ -72,11 +82,18 @@ function renderDownloadButton() {
 
 describe("ModalPopulateAdd", () => {
   beforeEach(() => {
+    queryMocks.populate.mockImplementation((_variables, options) => options?.onSuccess?.({}));
+    queryMocks.downloadDummy.mockImplementation((_startDate, options) => options?.onSuccess?.("dummy data"));
+    queryMocks.downloadCycleData.mockImplementation((_variables, options) => options?.onSuccess?.("cycle data"));
     mockSetToast.mockClear();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    queryMocks.populate.mockReset();
+    queryMocks.downloadDummy.mockReset();
+    queryMocks.downloadCycleData.mockReset();
+    localStorage.clear();
   });
 
   it("renders the open button", () => {
@@ -106,9 +123,6 @@ describe("ModalPopulateAdd", () => {
 
   it("successful upload closes dialog and shows success toast", async () => {
     const user = userEvent.setup();
-    server.use(
-      http.post("*/cycle-data/populate-cycle-data", () => HttpResponse.json({ payload: {} }))
-    );
 
     renderModal();
     await user.click(screen.getByRole("button", { name: /ADD_CYCLE_POPULATION/i }));
@@ -127,10 +141,8 @@ describe("ModalPopulateAdd", () => {
 
   it("upload failure shows error toast", async () => {
     const user = userEvent.setup();
-    server.use(
-      http.post("*/cycle-data/populate-cycle-data", () =>
-        HttpResponse.json({ message: "Invalid file format" }, { status: 400 })
-      )
+    queryMocks.populate.mockImplementation((_variables, options) =>
+      options?.onError?.({ response: { data: { message: "Invalid file format" } } })
     );
 
     renderModal();
@@ -150,16 +162,18 @@ describe("ModalPopulateAdd", () => {
 
   it("download dummy data button triggers GET and downloads file", async () => {
     const user = userEvent.setup();
-    const blob = new Blob(["dummy data"], { type: "text/csv" });
-    server.use(
-      http.get("*/dashboard/download-dummy", () => HttpResponse.arrayBuffer(new ArrayBuffer(8)))
-    );
 
     const mockCreateObjectURL = vi.fn().mockReturnValue("blob:http://localhost/dummy");
     const mockRevokeObjectURL = vi.fn();
-    const mockAppendChild = vi.spyOn(document.body, "appendChild").mockImplementation((el) => el);
-    const mockRemoveChild = vi.spyOn(document.body, "removeChild").mockImplementation((el) => el);
-    vi.stubGlobal("URL", { ...URL, createObjectURL: mockCreateObjectURL, revokeObjectURL: mockRevokeObjectURL });
+    const mockClick = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    Object.defineProperty(window.URL, "createObjectURL", {
+      writable: true,
+      value: mockCreateObjectURL,
+    });
+    Object.defineProperty(window.URL, "revokeObjectURL", {
+      writable: true,
+      value: mockRevokeObjectURL,
+    });
 
     localStorage.setItem("selectedCycleStartDate", "2024-01-01");
 
@@ -169,20 +183,21 @@ describe("ModalPopulateAdd", () => {
     await user.click(screen.getByText("DOWNLOAD_EXAMPLE_DATA"));
 
     await waitFor(() => expect(mockCreateObjectURL).toHaveBeenCalled());
-
-    mockAppendChild.mockRestore();
-    mockRemoveChild.mockRestore();
-    localStorage.removeItem("selectedCycleStartDate");
+    expect(mockClick).toHaveBeenCalled();
   });
 });
 
 describe("ButtonDownloadData", () => {
   beforeEach(() => {
+    queryMocks.downloadCycleData.mockImplementation((_variables, options) => options?.onSuccess?.("cycle data"));
     mockSetToast.mockClear();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    queryMocks.populate.mockReset();
+    queryMocks.downloadDummy.mockReset();
+    queryMocks.downloadCycleData.mockReset();
   });
 
   it("renders the download button", () => {
@@ -192,21 +207,17 @@ describe("ButtonDownloadData", () => {
 
   it("clicking download button triggers GET and downloads file", async () => {
     const user = userEvent.setup();
-    server.use(
-      http.get("*/cycle-data/download-cycle_data", () =>
-        HttpResponse.arrayBuffer(new ArrayBuffer(8))
-      )
-    );
 
     const mockCreateObjectURL = vi.fn().mockReturnValue("blob:http://localhost/data");
     const mockRevokeObjectURL = vi.fn();
-    const mockClick = vi.fn();
-
-    vi.stubGlobal("URL", { ...URL, createObjectURL: mockCreateObjectURL, revokeObjectURL: mockRevokeObjectURL });
-    const createElementSpy = vi.spyOn(document, "createElement").mockImplementation((tag) => {
-      const el = document.createElement.call(document, tag) as HTMLAnchorElement;
-      if (tag === "a") el.click = mockClick;
-      return el;
+    const mockClick = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    Object.defineProperty(window.URL, "createObjectURL", {
+      writable: true,
+      value: mockCreateObjectURL,
+    });
+    Object.defineProperty(window.URL, "revokeObjectURL", {
+      writable: true,
+      value: mockRevokeObjectURL,
     });
 
     renderDownloadButton();
@@ -214,17 +225,11 @@ describe("ButtonDownloadData", () => {
 
     await waitFor(() => expect(mockCreateObjectURL).toHaveBeenCalled());
     expect(mockClick).toHaveBeenCalled();
-
-    createElementSpy.mockRestore();
   });
 
   it("shows error toast when download fails", async () => {
     const user = userEvent.setup();
-    server.use(
-      http.get("*/cycle-data/download-cycle_data", () =>
-        HttpResponse.json({ message: "error" }, { status: 500 })
-      )
-    );
+    queryMocks.downloadCycleData.mockImplementation((_variables, options) => options?.onError?.());
 
     renderDownloadButton();
     await user.click(screen.getByRole("button", { name: /DOWNLOAD_DATA/i }));

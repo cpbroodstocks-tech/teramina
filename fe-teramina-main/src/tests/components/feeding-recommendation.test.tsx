@@ -120,9 +120,7 @@ describe("FeedingRecommendation", () => {
     await user.type(screen.getByLabelText(/Reason/i), "Pond conditions");
     await user.click(screen.getByRole("button", { name: /Submit/i }));
 
-    await waitFor(() =>
-      expect(screen.getByText("Override recorded")).toBeInTheDocument()
-    );
+    expect(await screen.findByText("Override recorded")).toBeInTheDocument();
     expect(mockSetToast).toHaveBeenCalledWith(
       expect.objectContaining({ variant: "success", text: "Override recorded" })
     );

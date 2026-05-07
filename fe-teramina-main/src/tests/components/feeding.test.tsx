@@ -34,7 +34,7 @@ function renderForm({
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  const { container } = render(
+  render(
     <QueryClientProvider client={queryClient}>
       <NewRationForm
         initialValue={{
@@ -48,11 +48,11 @@ function renderForm({
       />
     </QueryClientProvider>
   );
+  const [rationNumberInput, feedGivenInput, feedLeftoverInput] = screen.getAllByRole("textbox") as HTMLInputElement[];
   return {
-    container,
-    feedGivenInput: container.querySelector('input[name="feed_given"]') as HTMLInputElement,
-    feedLeftoverInput: container.querySelector('input[name="feed_leftover"]') as HTMLInputElement,
-    rationNumberInput: container.querySelector('input[name="ration_number"]') as HTMLInputElement,
+    feedGivenInput,
+    feedLeftoverInput,
+    rationNumberInput,
     submitButton: screen.getByRole("button", { name: /SUBMIT/i }),
   };
 }
