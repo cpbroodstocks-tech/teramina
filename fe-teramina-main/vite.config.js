@@ -26,7 +26,7 @@ const ALIAS = {
   theme: resolve(__dirname, "./src/theme"),
   libraries: resolve(__dirname, "./src/libraries"),
   helper: resolve(__dirname, "./src/helper"),
-  widgets: resolve(__dirname, "./src/widgets"),
+  widgets: resolve(__dirname, "./src/features/dashboard"),
   hooks: resolve(__dirname, "./src/hooks"),
   store: resolve(__dirname, "./src/store"),
   locales: resolve(__dirname, "./src/locales"),

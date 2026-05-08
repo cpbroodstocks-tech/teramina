@@ -6,6 +6,7 @@ import iconTotalRevenue from "/assets/images/icons/total-revenue.svg";
 import iconTotalProfit from "/assets/images/icons/total-profit.svg";
 import iconCostPerKilo from "/assets/images/icons/cost-per-kilo.svg";
 import { useFilter } from "features/filter/default/hooks";
+import { useEconomicsDashboard } from "widgets/economics/queries";
 import Filter from "features/filter/summary";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, Typography, Avatar, Tooltip } from "@mui/material";
@@ -22,18 +23,20 @@ import { useLineEchartsGenerateOptions } from "hooks/useLineEchartsGenerateOptio
 
 const Economics = () => {
   const { t } = useTranslation();
-  const { loading, filter, data, error, formik, onFilterChange } = useFilter("/dashboard/economics");
+  const { loading: filterLoading, filter, form, onFilterChange, submittedParams } = useFilter();
+  const { data, isLoading: dataLoading, isError: error } = useEconomicsDashboard(submittedParams);
+  const loading = filterLoading || dataLoading;
   const { classes: styles } = useStyles();
   const { generateOptionsDefault } = useLineEchartsGenerateOptions();
 
   return (
     <Fragment>
       <Typography variant="h1" sx={{ mb: "15px", fontSize: 40, textTransform: "uppercase" }}>{t("MENU.COST_ACCOUNTING")}</Typography>
-      <Filter filter={filter} formik={formik} onFilterChange={onFilterChange} />
+      <Filter filter={filter} form={form} onFilterChange={onFilterChange} />
       {loading && <Loader />}
       {error && <Error />}
-      {!loading && !error && !Object.keys(data).length && <Empty />}
-      {!loading && !error && Object.keys(data).length > 0 && (
+      {!loading && !error && (!data || !Object.keys(data).length) && <Empty />}
+      {!loading && !error && data && Object.keys(data).length > 0 && (
         Object(data).production_status.data.length > 3 ? (
           <Fragment>
             <section className={styles.sectionWrapper}>

@@ -43,22 +43,7 @@ os.environ.setdefault("CELERY_RESULT_BACKEND", "cache+memory://")
 # them with MagicMock prevents ImportError without affecting the logic we test.
 # ---------------------------------------------------------------------------
 for _mod in [
-    "langchain",
-    "langchain.vectorstores",
-    "langchain.vectorstores.pinecone",
-    "langchain.vectorstores.faiss",
-    "langchain.embeddings",
-    "langchain.embeddings.openai",
-    "langchain.chat_models",
-    "langchain.agents",
-    "langchain.agents.openai_functions_agent",
-    "langchain.agents.openai_functions_agent.base",
-    "langchain.agents.agent_toolkits",
-    "langchain.document_loaders",
-    "langchain.chains",
     "pinecone",
-    "pinecone_client",
-    "faiss",
     "tiktoken",
     "openai",
     "fpdf",

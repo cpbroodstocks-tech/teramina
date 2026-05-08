@@ -38,7 +38,7 @@ import { useCreateOverviewReport, useOverviewReportPoll } from "widgets/overview
 
 const OverviewWidget = () => {
   const { t } = useTranslation();
-  const { loading, filter, data, error, formik, onFilterChange } = useFilter("/dashboard/overview");
+  const { loading, filter, data, error, form, onFilterChange } = useFilter("/dashboard/overview");
   const { generateOptionsDefault, generateOptionsScatterOverview } = useLineEchartsGenerateOptions();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogTitle, setDialogTitle] = useState("");
@@ -109,7 +109,7 @@ const OverviewWidget = () => {
   return (
     <Fragment>
       <Typography variant="h1" sx={{ mb: "15px", fontSize: 40, textTransform: "uppercase" }}>{t("MENU.OVERVIEW").toUpperCase()}</Typography>
-      <Filter filter={filter} formik={formik} onFilterChange={onFilterChange} />
+      <Filter filter={filter} form={form} onFilterChange={onFilterChange} />
       {loading && <Loader />}
       {error && <Error />}
       {!loading && !error && !Object.keys(data || {}).length && <Empty />}

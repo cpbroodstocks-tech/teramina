@@ -308,15 +308,15 @@ CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
 CELERY_BEAT_SCHEDULE = {
     "sync-all-active-sheets": {
-        "task": "teramina.google_sheets.tasks.sync_tasks.sync_all_active_sheets",
+        "task": "google_sheets.sync_all_active_sheets",
         "schedule": 1800,  # every 30 minutes
     },
     "recompute-benchmark-cohorts": {
-        "task": "teramina.benchmark.tasks.benchmark_tasks.recompute_cohorts",
+        "task": "benchmark.recompute_cohorts",
         "schedule": 86400,  # every 24 hours
     },
     "monitor-active-cycles": {
-        "task": "teramina.agent.tasks.monitoring_tasks.monitor_all_active_cycles",
+        "task": "agent.monitor_all_active_cycles",
         "schedule": 21600,  # every 6 hours
     },
     "retrain-feeding-model": {

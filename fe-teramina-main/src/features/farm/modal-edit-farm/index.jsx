@@ -68,7 +68,7 @@ const FarmEdit = ({ data, onClose }) => {
     }
   };
 
-  const formik = useNewFarmForm({
+  const form = useNewFarmForm({
     onSubmit: handleSubmit,
     defaultValues: { name: data.name, provinsi: "", kabupaten: "", kecamatan: "", kelurahan: "" },
   });
@@ -77,7 +77,7 @@ const FarmEdit = ({ data, onClose }) => {
     <NewFarm
       formTitle="EDIT_FARM_DATA"
       actionText="SAVE"
-      formik={formik}
+      form={form}
       isModalComponent
     />
   );

@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import { useFilter } from "features/filter/feeding/hooks";
+import { useFeedingDashboard } from "widgets/feeding/queries";
 import Filter from "features/filter/default";
 import { useTranslation } from "react-i18next";
 import {
@@ -28,18 +29,20 @@ import { useLineEchartsGenerateOptions } from "hooks/useLineEchartsGenerateOptio
 
 const Feeding = () => {
   const { t } = useTranslation();
-  const { loading, filter, data, error, formik, selectedFilter, refetch, onFilterChange } = useFilter("/dashboard/feeding");
+  const { loading: filterLoading, filter, form, selectedFilter, onFilterChange, submittedParams } = useFilter();
+  const { data, isLoading: dataLoading, isError: error, refetch } = useFeedingDashboard(submittedParams);
+  const loading = filterLoading || dataLoading;
   const { classes: styles } = useStyles();
   const { generateOptionsDefault } = useLineEchartsGenerateOptions();
 
   return (
     <Fragment>
       <Typography variant="h1" sx={{ mb: "15px", fontSize: 40, textTransform: "uppercase" }}>{t("MENU.FEEDING")}</Typography>
-      <Filter data={data} filter={filter} formik={formik} onFilterChange={onFilterChange} />
+      <Filter data={data} filter={filter} form={form} onFilterChange={onFilterChange} />
       {loading && <Loader />}
       {error && <Error />}
-      {!loading && !error && !Object.keys(data).length && <Empty />}
-      {!loading && !error && Object.keys(data).length > 0 && (
+      {!loading && !error && (!data || !Object.keys(data).length) && <Empty />}
+      {!loading && !error && data && Object.keys(data).length > 0 && (
         <Fragment>
           <section className={styles.sectionContainer}>
             <Typography variant="h2" className={styles.sectionTitle}>

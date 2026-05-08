@@ -84,7 +84,7 @@ const useFilter = (api) => {
     }
   };
 
-  const formik = {
+  const form = {
     values: formValues,
     handleSubmit: handleSubmit((values) => {
       setSelectedFilter({
@@ -229,7 +229,7 @@ const useFilter = (api) => {
 
   return {
     ...filterList,
-    formik,
+    form,
     onFilterChange: handleFilterChange,
     selectedFilter: selectedFilter,
     refetch: refetch,

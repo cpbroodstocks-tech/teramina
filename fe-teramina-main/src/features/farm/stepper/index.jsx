@@ -143,7 +143,7 @@ const FarmWizard = ({ onDoneSubmit }) => {
           )}
         >
           <StepLabel classes={{ iconContainer: styles.iconStepper }}>
-            <NewFarm handleBack={handlePreviousStep} formik={formikFarm} />
+            <NewFarm handleBack={handlePreviousStep} form={formikFarm} />
           </StepLabel>
         </Step>
         <Step
@@ -153,7 +153,7 @@ const FarmWizard = ({ onDoneSubmit }) => {
           )}
         >
           <StepLabel classes={{ iconContainer: styles.iconStepper }}>
-            <NewPond handleBack={handlePreviousStep} formik={formikPond} />
+            <NewPond handleBack={handlePreviousStep} form={formikPond} />
           </StepLabel>
         </Step>
         <Step
@@ -166,7 +166,7 @@ const FarmWizard = ({ onDoneSubmit }) => {
             <NewCycle
               loading={loading}
               handleBack={handlePreviousStep}
-              formik={formikCycle}
+              form={formikCycle}
             />
           </StepLabel>
         </Step>

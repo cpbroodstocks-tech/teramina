@@ -15,7 +15,7 @@ import { useTranslation } from "react-i18next";
 
 const NewPond = (props) => {
   const {
-    formik,
+    form,
     formTitle = "CREATE_NEW_POND",
     actionText = "SUBMIT",
     isModalComponent = false,
@@ -27,7 +27,7 @@ const NewPond = (props) => {
 
   return (
     <Fragment>
-      <form className={styles.container} onSubmit={formik.handleSubmit}>
+      <form className={styles.container} onSubmit={form.handleSubmit}>
         <Typography variant="h5" className={styles.title}>
           {t(formTitle)}
         </Typography>
@@ -40,9 +40,9 @@ const NewPond = (props) => {
         <TextField
           variant="outlined"
           className={styles.input}
-          error={!!formik.formState.errors.name}
-          helperText={formik.formState.errors.name?.message}
-          {...formik.register("name")}
+          error={!!form.formState.errors.name}
+          helperText={form.formState.errors.name?.message}
+          {...form.register("name")}
         />
         <Typography
           variant="h6"
@@ -53,10 +53,10 @@ const NewPond = (props) => {
         <TextField
           variant="outlined"
           className={styles.input}
-          error={!!formik.formState.errors.size}
-          helperText={formik.formState.errors.size?.message}
+          error={!!form.formState.errors.size}
+          helperText={form.formState.errors.size?.message}
           type="number"
-          {...formik.register("size")}
+          {...form.register("size")}
         />
         <Typography
           variant="h6"
@@ -74,13 +74,13 @@ const NewPond = (props) => {
                 (construction) => construction.value === target.value
               );
               if (target.value !== "other")
-                formik.setValue("otherConstructionLabel", "");
-              formik.setValue("construction", {
+                form.setValue("otherConstructionLabel", "");
+              form.setValue("construction", {
                 label: selectedLabel[0].label,
                 value: target.value,
               });
             }}
-            value={formik.watch("construction").value}
+            value={form.watch("construction").value}
           >
             {constructionList.map((list, key) => {
               if (list.value === "other") {
@@ -95,10 +95,10 @@ const NewPond = (props) => {
                       <TextField
                         variant="outlined"
                         className={styles.input}
-                        error={!!formik.formState.errors.otherConstructionLabel}
-                        helperText={formik.formState.errors.otherConstructionLabel?.message}
-                        disabled={formik.watch("construction").value !== "other"}
-                        {...formik.register("otherConstructionLabel")}
+                        error={!!form.formState.errors.otherConstructionLabel}
+                        helperText={form.formState.errors.otherConstructionLabel?.message}
+                        disabled={form.watch("construction").value !== "other"}
+                        {...form.register("otherConstructionLabel")}
                       />
                     </div>
                   </div>
@@ -131,14 +131,14 @@ const NewPond = (props) => {
                 (shape) => shape.value === target.value
               );
               if (target.value !== "other") {
-                formik.setValue("otherShapeLabel", "");
+                form.setValue("otherShapeLabel", "");
               }
-              formik.setValue("shape", {
+              form.setValue("shape", {
                 label: selectedLabel[0].label,
                 value: target.value,
               });
             }}
-            value={formik.watch("shape").value}
+            value={form.watch("shape").value}
           >
             {shapeList.map((list, key) => {
               if (list.value === "other") {
@@ -153,10 +153,10 @@ const NewPond = (props) => {
                       <TextField
                         variant="outlined"
                         className={styles.input}
-                        error={!!formik.formState.errors.otherShapeLabel}
-                        helperText={formik.formState.errors.otherShapeLabel?.message}
-                        disabled={formik.watch("shape").value !== "other"}
-                        {...formik.register("otherShapeLabel")}
+                        error={!!form.formState.errors.otherShapeLabel}
+                        helperText={form.formState.errors.otherShapeLabel?.message}
+                        disabled={form.watch("shape").value !== "other"}
+                        {...form.register("otherShapeLabel")}
                       />
                     </div>
                   </div>
@@ -190,9 +190,9 @@ const NewPond = (props) => {
               type="submit"
               variant="contained"
               className={styles.btnSubmit}
-              disabled={formik.formState.isSubmitting}
+              disabled={form.formState.isSubmitting}
             >
-              {formik.formState.isSubmitting ? (
+              {form.formState.isSubmitting ? (
                 <CircularProgress
                   color="inherit"
                   classes={{ root: styles.circular }}

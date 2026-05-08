@@ -28,7 +28,7 @@ import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import { useTranslation } from "react-i18next";
 
-const FilterKualitasAir = ({ filter, formik, onFilterChange }) => {
+const FilterKualitasAir = ({ filter, form, onFilterChange }) => {
   const { t } = useTranslation();
   const { classes: styles } = useStyles();
   const { farms, ponds, cycles, daterange } = filter;
@@ -87,7 +87,7 @@ const FilterKualitasAir = ({ filter, formik, onFilterChange }) => {
   return (
     <Fragment>
       <form
-        onSubmit={formik.handleSubmit}
+        onSubmit={form.handleSubmit}
         className={styles.wrapperToolbarFilter}
       >
         <div className={styles.filterWrapper}>
@@ -97,7 +97,7 @@ const FilterKualitasAir = ({ filter, formik, onFilterChange }) => {
               name="farm_id"
               defaultValue={""}
               variant="outlined"
-              value={formik.values.farm_id}
+              value={form.values.farm_id}
               onChange={(e) => onFilterChange("farm_id", e.target.value)}
               className={styles.filterSelectOption}
               classes={{ select: styles.filterSelectOptionCustom }}
@@ -117,7 +117,7 @@ const FilterKualitasAir = ({ filter, formik, onFilterChange }) => {
           <FormControl className={styles.filterFormControl} size="small">
             <Select
               displayEmpty
-              value={formik.values.pond_id}
+              value={form.values.pond_id}
               onChange={(e) => onFilterChange("pond_id", e.target.value)}
               className={styles.filterSelectOption}
               classes={{ select: styles.filterSelectOptionCustom }}
@@ -184,7 +184,7 @@ const FilterKualitasAir = ({ filter, formik, onFilterChange }) => {
               </div>
             </Popover>
           </FormControl>
-          <DatePickerPopUp formik={formik} daterange={daterange} />
+          <DatePickerPopUp form={form} daterange={daterange} />
           <FormControl className={styles.filterFormControl} size="small">
             <Select
               displayEmpty

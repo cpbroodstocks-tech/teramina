@@ -24,20 +24,20 @@ vi.mock("store/toast.store", () => ({
 
 // Mock the complex NewFarm component with its cascading region selects
 vi.mock("features/farm/new-farm", () => ({
-  default: ({ formik }: { formik: any }) => (
-    <form onSubmit={formik.handleSubmit}>
+  default: ({ form }: { form: any }) => (
+    <form onSubmit={form.handleSubmit}>
       <input
         aria-label="Farm Name"
-        {...formik.register("name")}
+        {...form.register("name")}
       />
       <button
         type="button"
         data-testid="set-region"
         onClick={() => {
-          formik.setValue("provinsi", JSON.stringify({ id: "11", name: "Aceh" }));
-          formik.setValue("kabupaten", JSON.stringify({ id: "1101", name: "Simeulue" }));
-          formik.setValue("kecamatan", JSON.stringify({ id: "1101010", name: "Teupah Selatan" }));
-          formik.setValue("kelurahan", JSON.stringify({ id: "1101010001", name: "Latiung" }));
+          form.setValue("provinsi", JSON.stringify({ id: "11", name: "Aceh" }));
+          form.setValue("kabupaten", JSON.stringify({ id: "1101", name: "Simeulue" }));
+          form.setValue("kecamatan", JSON.stringify({ id: "1101010", name: "Teupah Selatan" }));
+          form.setValue("kelurahan", JSON.stringify({ id: "1101010001", name: "Latiung" }));
         }}
       >
         set-region

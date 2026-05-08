@@ -13,7 +13,7 @@ const NewRationForm = ({ initialValue, onSubmit, selectedFilter, onClose }) => {
   const { setToast: toast } = useToastStore();
   const { mutateAsync } = useSaveFeedingRation();
 
-  const formik = useRationForm({
+  const form = useRationForm({
     initialValues: {
       ration_id: initialValue.id,
       realized: initialValue.value[0].value,
@@ -42,7 +42,7 @@ const NewRationForm = ({ initialValue, onSubmit, selectedFilter, onClose }) => {
 
   return (
     <Fragment>
-      <form className={styles.formContainer} onSubmit={formik.handleSubmit}>
+      <form className={styles.formContainer} onSubmit={form.handleSubmit}>
         <Typography className={styles.titleForm} variant="h3">
           {t("INPUT_FEEDING_DATA")}
         </Typography>
@@ -54,9 +54,9 @@ const NewRationForm = ({ initialValue, onSubmit, selectedFilter, onClose }) => {
             fullWidth
             disabled
             variant="outlined"
-            error={!!formik.formState.errors.ration_number}
-            helperText={formik.formState.errors.ration_number?.message}
-            {...formik.register("ration_number")}
+            error={!!form.formState.errors.ration_number}
+            helperText={form.formState.errors.ration_number?.message}
+            {...form.register("ration_number")}
           />
         </FormControl>
         <FormControl fullWidth>
@@ -68,9 +68,9 @@ const NewRationForm = ({ initialValue, onSubmit, selectedFilter, onClose }) => {
           <TextField
             fullWidth
             variant="outlined"
-            error={!!formik.formState.errors.feed_given}
-            helperText={formik.formState.errors.feed_given?.message}
-            {...formik.register("feed_given")}
+            error={!!form.formState.errors.feed_given}
+            helperText={form.formState.errors.feed_given?.message}
+            {...form.register("feed_given")}
           />
         </FormControl>
         <FormControl fullWidth>
@@ -81,9 +81,9 @@ const NewRationForm = ({ initialValue, onSubmit, selectedFilter, onClose }) => {
             fullWidth
             variant="outlined"
             placeholder={t("OPTIONAL")}
-            error={!!formik.formState.errors.feed_leftover}
-            helperText={formik.formState.errors.feed_leftover?.message}
-            {...formik.register("feed_leftover")}
+            error={!!form.formState.errors.feed_leftover}
+            helperText={form.formState.errors.feed_leftover?.message}
+            {...form.register("feed_leftover")}
           />
         </FormControl>
         <FormControl fullWidth>
@@ -91,9 +91,9 @@ const NewRationForm = ({ initialValue, onSubmit, selectedFilter, onClose }) => {
             fullWidth
             className={styles.buttonAction}
             type="submit"
-            disabled={formik.formState.isSubmitting}
+            disabled={form.formState.isSubmitting}
           >
-            {formik.formState.isSubmitting ? t("LOADING") : t("SUBMIT")}
+            {form.formState.isSubmitting ? t("LOADING") : t("SUBMIT")}
           </Button>
         </FormControl>
       </form>

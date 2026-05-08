@@ -13,21 +13,21 @@ import {
 } from "features/filter/water-quality/components/datepicker-popup";
 import { useTranslation } from "react-i18next";
 
-const Filter = ({ filter, formik, onFilterChange }) => {
+const Filter = ({ filter, form, onFilterChange }) => {
   const { t } = useTranslation();
   const { classes: styles } = useStyles();
   const { farms, ponds, cycles, daterange, variables } = filter;
 
   return (
     <Fragment>
-      <form onSubmit={formik.handleSubmit}>
+      <form onSubmit={form.handleSubmit}>
         <div className={styles.filterWrapper}>
           <FormControl className={styles.filterFormControl} size="small">
             <Select
               displayEmpty
               name="farm_id"
               defaultValue={""}
-              value={formik.values.farm_id}
+              value={form.values.farm_id}
               onChange={(e) => onFilterChange("farm_id", e.target.value)}
               className={styles.filterSelectOption}
             >
@@ -45,7 +45,7 @@ const Filter = ({ filter, formik, onFilterChange }) => {
           <FormControl className={styles.filterFormControl} size="small">
             <Select
               displayEmpty
-              value={formik.values.pond_id}
+              value={form.values.pond_id}
               onChange={(e) => onFilterChange("pond_id", e.target.value)}
               className={styles.filterSelectOption}
             >
@@ -62,7 +62,7 @@ const Filter = ({ filter, formik, onFilterChange }) => {
           </FormControl>
           <FormControl className={styles.filterFormControl} size="small">
             <Select
-              value={formik.values.cycle_id}
+              value={form.values.cycle_id}
               onChange={(event) =>
                 onFilterChange(
                   "cycle_id",
@@ -96,11 +96,11 @@ const Filter = ({ filter, formik, onFilterChange }) => {
                 ))}
             </Select>
           </FormControl>
-          <StartDatePickerPopUp formik={formik} daterange={daterange} />
-          <EndDatePickerPopUp formik={formik} daterange={daterange} />
+          <StartDatePickerPopUp form={form} daterange={daterange} />
+          <EndDatePickerPopUp form={form} daterange={daterange} />
           <FormControl className={styles.filterFormControl} size="small">
             <Select
-              value={formik.values.variables}
+              value={form.values.variables}
               onChange={(event) =>
                 onFilterChange(
                   "variables",
@@ -135,7 +135,7 @@ const Filter = ({ filter, formik, onFilterChange }) => {
             </Select>
           </FormControl>
           <Button
-            disabled={!formik.dirty || Object.keys(formik.errors).length > 0}
+            disabled={!form.dirty || Object.keys(form.errors).length > 0}
             type="submit"
             classes={{
               disabled: styles.filterButtonDisabled,
@@ -145,7 +145,7 @@ const Filter = ({ filter, formik, onFilterChange }) => {
             {t("APPLY_FILTER")}
           </Button>
           <Button
-            onClick={formik.handleReset}
+            onClick={form.handleReset}
             type="reset"
             className={styles.filterButton}
           >

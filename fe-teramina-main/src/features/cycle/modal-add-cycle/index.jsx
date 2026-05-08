@@ -26,11 +26,11 @@ const CycleAdd = ({ onClose }) => {
     }
   };
 
-  const formik = useNewCycleForm({
+  const form = useNewCycleForm({
     onSubmit: handleSubmit,
   });
 
-  return <NewCycle isModalComponent formik={formik} />;
+  return <NewCycle isModalComponent form={form} />;
 };
 
 const ModalCycleAdd = (props) => {

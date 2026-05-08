@@ -90,7 +90,7 @@ const useFilter = (api) => {
     }
   };
 
-  const formik = {
+  const form = {
     values: formValues,
     handleSubmit: handleSubmit((values) => {
       fetchMVPWithFilter(values);
@@ -248,7 +248,7 @@ const useFilter = (api) => {
 
   return {
     ...filterList,
-    formik,
+    form,
     onFilterChange: handleFilterChange,
   };
 };

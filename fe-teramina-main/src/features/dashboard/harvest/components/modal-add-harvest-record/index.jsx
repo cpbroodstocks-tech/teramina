@@ -29,7 +29,7 @@ const AddHarvest = ({ currentData, selectedFilter, refetch }) => {
   const { classes: styles } = useStyles();
   const { setToast: toast } = useToastStore();
   const { mutateAsync } = useAddHarvestRecord(selectedFilter.cycle_id);
-  const formik = useAddHarvestRecordForm({
+  const form = useAddHarvestRecordForm({
     onSubmit: async (values) => {
       try {
         const harvestInitialValues = generateHarvestInitialValues(currentData.rows);
@@ -46,7 +46,7 @@ const AddHarvest = ({ currentData, selectedFilter, refetch }) => {
 
   return (
     <Box className={styles.formContainer}>
-      <form onSubmit={formik.handleSubmit}>
+      <form onSubmit={form.handleSubmit}>
         <FormGroup>
           <Typography variant="h5" className={styles.title}>
             {t("ADD_HARVEST_DATA")}
@@ -58,8 +58,8 @@ const AddHarvest = ({ currentData, selectedFilter, refetch }) => {
             <RadioGroup
               aria-labelledby="harvest-radio-buttons-group-label"
               name="harvest_type"
-              onChange={(e) => formik.setValue("harvest_type", e.target.value)}
-              value={formik.watch("harvest_type")}
+              onChange={(e) => form.setValue("harvest_type", e.target.value)}
+              value={form.watch("harvest_type")}
             >
               <FormControlLabel
                 value="partial"
@@ -86,7 +86,7 @@ const AddHarvest = ({ currentData, selectedFilter, refetch }) => {
           >
             DOC
           </Typography>
-          <TextField {...formik.register("harvest_doc")} />
+          <TextField {...form.register("harvest_doc")} />
         </FormGroup>
         <FormGroup className={styles.formInput}>
           <Typography
@@ -94,7 +94,7 @@ const AddHarvest = ({ currentData, selectedFilter, refetch }) => {
           >
             {t("HARVEST_BIOMASS")}
           </Typography>
-          <TextField {...formik.register("harvest_biomass")} />
+          <TextField {...form.register("harvest_biomass")} />
         </FormGroup>
         <FormGroup className={styles.formInput}>
           <Typography
@@ -102,7 +102,7 @@ const AddHarvest = ({ currentData, selectedFilter, refetch }) => {
           >
             {t("HARVEST_REVENUE")}
           </Typography>
-          <TextField {...formik.register("harvest_revenue")} />
+          <TextField {...form.register("harvest_revenue")} />
         </FormGroup>
         <div className={styles.btnContainer}>
           <Button fullWidth type="submit" className={styles.buttonAction}>

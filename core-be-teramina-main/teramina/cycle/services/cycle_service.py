@@ -20,7 +20,6 @@ from teramina.harvest.models.harvest_record_model import HarvestRecord
 from teramina.cycle.schemas.cycle_schema import CreateCycleSchema, UpdateCycleSchema
 from teramina.schemas.general_schema import DataErrorSchema, DataSuccessSchema
 
-# from teramina.helpers.data_indexing import delete_from_gcs
 from teramina.helpers.pinecone_data_indexing import PineconeIndexing
 
 

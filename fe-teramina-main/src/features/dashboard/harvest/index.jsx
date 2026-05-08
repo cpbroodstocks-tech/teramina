@@ -13,13 +13,13 @@ import HarvestSimulation from "widgets/harvest/components/harvest-simulation";
 
 const Harvest = () => {
   const { t } = useTranslation();
-  const { loading, filter, data, error, formik, selectedFilter, refetch, onFilterChange } = useFilter(["/harvest/harvest-record-data", "/harvest/harvest-recommendation"]);
+  const { loading, filter, data, error, form, selectedFilter, refetch, onFilterChange } = useFilter(["/harvest/harvest-record-data", "/harvest/harvest-recommendation"]);
   const { classes: styles } = useStyles();
 
   return (
     <Fragment>
       <Typography variant="h1" sx={{ mb: "15px", fontSize: 40, textTransform: "uppercase" }}>{t("MENU.HARVEST")}</Typography>
-      <Filter data={data} filter={filter} formik={formik} onFilterChange={onFilterChange} />
+      <Filter data={data} filter={filter} form={form} onFilterChange={onFilterChange} />
       {loading && <Loader />}
       {error && <Error />}
       {!loading && !error && !Object.keys(data).length && <Empty />}

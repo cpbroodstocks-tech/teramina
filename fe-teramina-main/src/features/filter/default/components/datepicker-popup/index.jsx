@@ -8,7 +8,7 @@ import dayjs from "dayjs";
 import { Fragment, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-const DatePickerPopUp = ({ formik, daterange }) => {
+const DatePickerPopUp = ({ form, daterange }) => {
   const { t } = useTranslation();
   const { classes: styles } = useStyles();
   const [anchorEl, setAnchorEl] = useState(() => null);
@@ -23,7 +23,7 @@ const DatePickerPopUp = ({ formik, daterange }) => {
 
   const handleChangePicker = (newDate) => {
     const date = dayjs(newDate).format("MM/DD/YYYY");
-    formik.setFieldValue("date", date);
+    form.setFieldValue("date", date);
     handleClose();
   };
 
@@ -40,7 +40,7 @@ const DatePickerPopUp = ({ formik, daterange }) => {
         className={styles.button}
       >
         <Typography variant="h6">
-          {formik.values.date ? formik.values.date : t("DATE")}
+          {form.values.date ? form.values.date : t("DATE")}
         </Typography>
         <ArrowDropDownIcon className={styles.buttonIcon} />
       </div>
@@ -69,7 +69,7 @@ const DatePickerPopUp = ({ formik, daterange }) => {
               handleChangePicker(newDate);
             }}
             className={styles.calendar}
-            value={formik.values.date ? dayjs(formik.values.date) : null}
+            value={form.values.date ? dayjs(form.values.date) : null}
             renderInput={(params) => <TextField {...params} />}
           />
         </LocalizationProvider>

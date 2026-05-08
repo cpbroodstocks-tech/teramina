@@ -21,7 +21,7 @@ const fetchCityRegion = async (url) => {
 
 const NewFarm = (props) => {
   const {
-    formik,
+    form,
     formTitle = "CREATE_NEW_FARM",
     actionText = "SUBMIT",
     isModalComponent = false,
@@ -63,7 +63,7 @@ const NewFarm = (props) => {
     if (indexToExclude > -1) fields.splice(indexToExclude, 1);
 
     for (let field of fields) {
-      formik.setValue(field, "");
+      form.setValue(field, "");
     }
 
     if (fields[0]) {
@@ -90,7 +90,7 @@ const NewFarm = (props) => {
       }
     }
 
-    formik.setValue(
+    form.setValue(
       key,
       id && name ? JSON.stringify({ id: id, name: name }) : ""
     );
@@ -107,7 +107,7 @@ const NewFarm = (props) => {
 
   return (
     <Fragment>
-      <form className={styles.container} onSubmit={formik.handleSubmit}>
+      <form className={styles.container} onSubmit={form.handleSubmit}>
         <Typography variant="h5" className={styles.title}>
           {t(formTitle)}
         </Typography>
@@ -120,9 +120,9 @@ const NewFarm = (props) => {
         <TextField
           variant="outlined"
           className={styles.input}
-          error={!!formik.formState.errors.name}
-          helperText={formik.formState.errors.name?.message}
-          {...formik.register("name")}
+          error={!!form.formState.errors.name}
+          helperText={form.formState.errors.name?.message}
+          {...form.register("name")}
         />
         <Typography
           variant="h6"
@@ -135,12 +135,12 @@ const NewFarm = (props) => {
           select
           variant="outlined"
           className={styles.input}
-          value={formik.watch("provinsi")}
+          value={form.watch("provinsi")}
           onChange={({ target: { value } }) =>
             handleCityRegionFormChange("provinsi", value)
           }
-          error={!!formik.formState.errors.provinsi}
-          helperText={formik.formState.errors.provinsi?.message}
+          error={!!form.formState.errors.provinsi}
+          helperText={form.formState.errors.provinsi?.message}
           disabled={!cityRegion?.provinsi?.length}
         >
           <MenuItem disabled value="">
@@ -169,12 +169,12 @@ const NewFarm = (props) => {
           select
           variant="outlined"
           className={styles.input}
-          value={formik.watch("kabupaten")}
+          value={form.watch("kabupaten")}
           onChange={({ target: { value } }) =>
             handleCityRegionFormChange("kabupaten", value)
           }
-          error={!!formik.formState.errors.kabupaten}
-          helperText={formik.formState.errors.kabupaten?.message}
+          error={!!form.formState.errors.kabupaten}
+          helperText={form.formState.errors.kabupaten?.message}
           disabled={!cityRegion?.kabupaten?.length}
         >
           <MenuItem disabled value="">
@@ -203,12 +203,12 @@ const NewFarm = (props) => {
           select
           variant="outlined"
           className={styles.input}
-          value={formik.watch("kecamatan")}
+          value={form.watch("kecamatan")}
           onChange={({ target: { value } }) =>
             handleCityRegionFormChange("kecamatan", value)
           }
-          error={!!formik.formState.errors.kecamatan}
-          helperText={formik.formState.errors.kecamatan?.message}
+          error={!!form.formState.errors.kecamatan}
+          helperText={form.formState.errors.kecamatan?.message}
           disabled={!cityRegion?.kecamatan?.length}
         >
           <MenuItem disabled value="">
@@ -237,12 +237,12 @@ const NewFarm = (props) => {
           select
           variant="outlined"
           className={styles.input}
-          value={formik.watch("kelurahan")}
+          value={form.watch("kelurahan")}
           onChange={({ target: { value } }) =>
             handleCityRegionFormChange("kelurahan", value)
           }
-          error={!!formik.formState.errors.kelurahan}
-          helperText={formik.formState.errors.kelurahan?.message}
+          error={!!form.formState.errors.kelurahan}
+          helperText={form.formState.errors.kelurahan?.message}
           disabled={!cityRegion?.kelurahan?.length}
         >
           <MenuItem disabled value="">
@@ -277,9 +277,9 @@ const NewFarm = (props) => {
               type="submit"
               variant="contained"
               className={styles.btnSubmit}
-              disabled={formik.formState.isSubmitting}
+              disabled={form.formState.isSubmitting}
             >
-              {formik.formState.isSubmitting ? (
+              {form.formState.isSubmitting ? (
                 <CircularProgress
                   color="inherit"
                   classes={{ root: styles.circular }}

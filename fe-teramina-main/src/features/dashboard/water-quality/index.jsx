@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import { useFilter } from "features/filter/water-quality/hooks";
+import { useWaterQualityDashboard } from "widgets/water-quality/queries";
 import Filter from "features/filter/water-quality/index2";
 import { useTranslation } from "react-i18next";
 import { Typography } from "@mui/material";
@@ -20,7 +21,9 @@ import Paper from "@mui/material/Paper";
 
 const WaterQuality = () => {
   const { t } = useTranslation();
-  const { loading, filter, data, error, formik, onFilterChange } = useFilter("/water_quality/get-water-quality-dashboard");
+  const { loading: filterLoading, filter, form, onFilterChange, submittedParams } = useFilter();
+  const { data, isLoading: dataLoading, isError: error } = useWaterQualityDashboard(submittedParams);
+  const loading = filterLoading || dataLoading;
   const [value, setValue] = useState(0);
 
   const handleChange = (_event, newValue) => {
@@ -31,12 +34,12 @@ const WaterQuality = () => {
     <Fragment>
       <div>
         <Typography variant="h1" sx={{ mb: "15px", fontSize: 40, textTransform: "capitalize", fontWeight: 700 }}>{t("WATER_QUALITY_ANALYSIS")}</Typography>
-        <Filter data={data} filter={filter} formik={formik} onFilterChange={onFilterChange} />
+        <Filter data={data} filter={filter} form={form} onFilterChange={onFilterChange} />
       </div>
       {loading && <Loader />}
       {error && <Error />}
-      {!loading && !error && !Object.keys(data).length && <Empty />}
-      {!loading && !error && Object.keys(data).length > 0 && (
+      {!loading && !error && (!data || !Object.keys(data).length) && <Empty />}
+      {!loading && !error && data && Object.keys(data).length > 0 && (
         <Box>
           <Box>
             <Tabs value={value} onChange={handleChange}>

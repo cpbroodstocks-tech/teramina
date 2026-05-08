@@ -8,7 +8,7 @@ import { useStyles } from "features/filter/default/components/datepicker-popup/s
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 
-const StartDatePickerPopUp = ({ formik, daterange }) => {
+const StartDatePickerPopUp = ({ form, daterange }) => {
   const { t } = useTranslation();
   const { classes: styles } = useStyles();
   const [anchorEl, setAnchorEl] = useState(() => null);
@@ -23,7 +23,7 @@ const StartDatePickerPopUp = ({ formik, daterange }) => {
 
   const handleChangePicker = (newDate) => {
     const date = dayjs(newDate).format("MM/DD/YYYY");
-    formik.setFieldValue("start_date", date);
+    form.setFieldValue("start_date", date);
     handleClose();
   };
 
@@ -40,8 +40,8 @@ const StartDatePickerPopUp = ({ formik, daterange }) => {
         className={styles.button}
       >
         <Typography variant="h6">
-          {formik.values.start_date
-            ? formik.values.start_date
+          {form.values.start_date
+            ? form.values.start_date
             : t("START_DATE")}
         </Typography>
         <ArrowDropDownIcon className={styles.buttonIcon} />
@@ -71,7 +71,7 @@ const StartDatePickerPopUp = ({ formik, daterange }) => {
               handleChangePicker(newDate);
             }}
             className={styles.calendar}
-            value={formik.values.start_date ? dayjs(formik.values.start_date) : null}
+            value={form.values.start_date ? dayjs(form.values.start_date) : null}
             renderInput={(params) => <TextField {...params} />}
           />
         </LocalizationProvider>
@@ -80,7 +80,7 @@ const StartDatePickerPopUp = ({ formik, daterange }) => {
   );
 };
 
-const EndDatePickerPopUp = ({ formik, daterange }) => {
+const EndDatePickerPopUp = ({ form, daterange }) => {
   const { t } = useTranslation();
   const { classes: styles } = useStyles();
   const [anchorEl, setAnchorEl] = useState(() => null);
@@ -95,7 +95,7 @@ const EndDatePickerPopUp = ({ formik, daterange }) => {
 
   const handleChangePicker = (newDate) => {
     const date = dayjs(newDate).format("MM/DD/YYYY");
-    formik.setFieldValue("end_date", date);
+    form.setFieldValue("end_date", date);
     handleClose();
   };
 
@@ -112,7 +112,7 @@ const EndDatePickerPopUp = ({ formik, daterange }) => {
         className={styles.button}
       >
         <Typography variant="h6">
-          {formik.values.end_date ? formik.values.end_date : t("END_DATE")}
+          {form.values.end_date ? form.values.end_date : t("END_DATE")}
         </Typography>
         <ArrowDropDownIcon className={styles.buttonIcon} />
       </div>
@@ -141,7 +141,7 @@ const EndDatePickerPopUp = ({ formik, daterange }) => {
               handleChangePicker(newDate);
             }}
             className={styles.calendar}
-            value={formik.values.end_date ? dayjs(formik.values.end_date) : null}
+            value={form.values.end_date ? dayjs(form.values.end_date) : null}
             renderInput={(params) => <TextField {...params} />}
           />
         </LocalizationProvider>

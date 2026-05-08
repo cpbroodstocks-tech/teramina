@@ -32,7 +32,6 @@ from ...helpers.data_preprocessor import (
 from .data_validator import validate_cycle_data
 from ...helpers.farm_data_collecting import combine_with_df
 
-# from ...helpers.data_indexing import store_to_gcs
 from ...helpers.pinecone_data_indexing import PineconeIndexing
 
 def get_list_data_main(user_id: str=None, farm_id=None, pond_id=None):
@@ -271,7 +270,6 @@ class CycleService:
             # indexing and store to gcs
             historical_df = combine_with_df(cycle_id=cycle_id, df=historical_df)
 
-            # store_to_gcs(cycle_id=cycle_id, user_id=user_id, df=historical_df)
 
             cycle = Cycle.objects(id=cycle_id).first()
             try:

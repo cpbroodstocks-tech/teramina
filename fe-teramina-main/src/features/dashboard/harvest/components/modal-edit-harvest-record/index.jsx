@@ -33,7 +33,7 @@ const EditHarvest = ({ currentData, selectedFilter, refetch, harvestKey }) => {
     return `${data.harvest_type}${data.harvest_no}` === harvestKey;
   })[0];
 
-  const formik = useEditHarvestRecordForm({
+  const form = useEditHarvestRecordForm({
     initialValues: initialValues,
     onSubmit: async (values) => {
       try {
@@ -61,7 +61,7 @@ const EditHarvest = ({ currentData, selectedFilter, refetch, harvestKey }) => {
         {t("ADD_HARVEST_DATA")}
       </Typography>
       <div className={styles.formWrapper}>
-        <form onSubmit={formik.handleSubmit}>
+        <form onSubmit={form.handleSubmit}>
           <FormGroup>
             <Typography
               variant="h6"
@@ -73,19 +73,19 @@ const EditHarvest = ({ currentData, selectedFilter, refetch, harvestKey }) => {
               <RadioGroup
                 aria-labelledby="harvest-radio-buttons-group-label"
                 name="harvest_type"
-                onChange={(e) => formik.setValue("harvest_type", e.target.value)}
-                value={formik.watch("harvest_type")}
+                onChange={(e) => form.setValue("harvest_type", e.target.value)}
+                value={form.watch("harvest_type")}
               >
                 <FormControlLabel
                   value="partial"
                   label="Partial"
-                  disabled={formik.watch("harvest_type") !== "partial"}
+                  disabled={form.watch("harvest_type") !== "partial"}
                   control={<Radio />}
                 />
                 <FormControlLabel
                   value="final"
                   label="Final"
-                  disabled={formik.watch("harvest_type") !== "final"}
+                  disabled={form.watch("harvest_type") !== "final"}
                   control={<Radio />}
                 />
               </RadioGroup>
@@ -98,7 +98,7 @@ const EditHarvest = ({ currentData, selectedFilter, refetch, harvestKey }) => {
             >
               DOC
             </Typography>
-            <TextField {...formik.register("harvest_doc")} />
+            <TextField {...form.register("harvest_doc")} />
           </FormGroup>
           <FormGroup className={styles.formInput}>
             <Typography
@@ -107,7 +107,7 @@ const EditHarvest = ({ currentData, selectedFilter, refetch, harvestKey }) => {
             >
               {t("HARVEST_BIOMASS")}
             </Typography>
-            <TextField {...formik.register("harvest_biomass")} />
+            <TextField {...form.register("harvest_biomass")} />
           </FormGroup>
           <FormGroup className={styles.formInput}>
             <Typography
@@ -116,15 +116,15 @@ const EditHarvest = ({ currentData, selectedFilter, refetch, harvestKey }) => {
             >
               {t("HARVEST_REVENUE")}
             </Typography>
-            <TextField {...formik.register("harvest_revenue")} />
+            <TextField {...form.register("harvest_revenue")} />
           </FormGroup>
           <Button
             fullWidth
             type="submit"
             className={styles.buttonAction}
-            disabled={formik.formState.isSubmitting}
+            disabled={form.formState.isSubmitting}
           >
-            {formik.formState.isSubmitting ? t("LOADING") : t("SUBMIT")}
+            {form.formState.isSubmitting ? t("LOADING") : t("SUBMIT")}
           </Button>
         </form>
       </div>

@@ -22,7 +22,7 @@ import { useConfidenceBands, useProphetForecast } from "widgets/forecast/queries
 
 const Forecast = () => {
   const { t } = useTranslation();
-  const { loading, filter, data, error, formik, onFilterChange } = useFilter("/dashboard/forecast");
+  const { loading, filter, data, error, form, onFilterChange } = useFilter("/dashboard/forecast");
   const { classes: styles } = useStyles();
   const { generateOptionsDefault, generateOptionsWithMoneyFormatYAxis } =
     useLineEchartsGenerateOptions();
@@ -62,7 +62,7 @@ const Forecast = () => {
   return (
     <Fragment>
       <Typography variant="h1" sx={{ mb: "15px", fontSize: 40, textTransform: "uppercase" }}>{t("MENU.FORECAST")}</Typography>
-      <Filter data={data} filter={filter} formik={formik} onFilterChange={onFilterChange} />
+      <Filter data={data} filter={filter} form={form} onFilterChange={onFilterChange} />
       {loading && <Loader />}
       {error && <Error />}
       {!loading && !error && !Object.keys(data).length && <Empty />}

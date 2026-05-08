@@ -33,8 +33,8 @@ const FarmAdd = ({ onClose }) => {
     }
   };
 
-  const formik = useNewFarmForm({ onSubmit: handleSubmit });
-  return <NewFarm isModalComponent formik={formik} />;
+  const form = useNewFarmForm({ onSubmit: handleSubmit });
+  return <NewFarm isModalComponent form={form} />;
 };
 
 const ModalFarmAdd = (props) => {
