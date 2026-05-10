@@ -46,8 +46,8 @@ const CompletenessBar = ({ byDoc }) => {
             d.completeness_pct >= 80
               ? "#4caf50"
               : d.completeness_pct > 0
-              ? "#ff9800"
-              : "#e0e0e0";
+                ? "#ff9800"
+                : "#e0e0e0";
           return (
             <Tooltip
               key={d.doc}
