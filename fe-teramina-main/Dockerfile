@@ -1,7 +1,6 @@
 # Build stage
 FROM node:18 AS build
 
-# Define build arguments (no need for ENV here)
 ARG VITE_ENDPOINT
 ARG VITE_FIREBASE_PROJECT_ID
 ARG VITE_FIREBASE_API_KEY
@@ -13,21 +12,16 @@ ARG VITE_FIREBASE_MEASUREMENT_ID
 ARG VITE_TERAMINA_API_KEY
 ARG VITE_TERAMINA_LLM_API
 ARG VITE_SUMMARY_MODEL
-
-# Debug: Print the value of VITE_ENDPOINT
-RUN echo "VITE_ENDPOINT is set to: $VITE_ENDPOINT"
-RUN echo "VITE_FIREBASE_PROJECT_ID is set to: $VITE_FIREBASE_PROJECT_ID"
+ARG VITE_SENTRY_DSN
 
 RUN /bin/sh -c 'if [ -z "$VITE_ENDPOINT" ]; then echo "Error: VITE_ENDPOINT is empty"; exit 1; fi'
 RUN /bin/sh -c 'if [ -z "$VITE_FIREBASE_PROJECT_ID" ]; then echo "Error: VITE_FIREBASE_PROJECT_ID is empty"; exit 1; fi'
-RUN /bin/sh -c 'if [ "$VITE_ENDPOINT" = "\$VITE_ENDPOINT" ]; then echo "Error: VITE_ENDPOINT is not resolved"; exit 1; fi'
 
 WORKDIR /app
 COPY package.json yarn.lock ./
-RUN yarn install
+RUN yarn install --frozen-lockfile
 COPY . .
 
-# Pass the build args into the build process
 ENV VITE_ENDPOINT=$VITE_ENDPOINT
 ENV VITE_FIREBASE_PROJECT_ID=$VITE_FIREBASE_PROJECT_ID
 ENV VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY
@@ -39,17 +33,16 @@ ENV VITE_FIREBASE_MEASUREMENT_ID=$VITE_FIREBASE_MEASUREMENT_ID
 ENV VITE_TERAMINA_API_KEY=$VITE_TERAMINA_API_KEY
 ENV VITE_TERAMINA_LLM_API=$VITE_TERAMINA_LLM_API
 ENV VITE_SUMMARY_MODEL=$VITE_SUMMARY_MODEL
+ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
 
 RUN yarn build
 
-# Production stage
-FROM nginx:alpine
+# Production stage — nginx-unprivileged runs as uid 101, never root
+FROM nginxinc/nginx-unprivileged:alpine
 WORKDIR /usr/share/nginx/html
 
-RUN rm -rf ./*
 COPY --from=build /app/dist .
-
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 5173
+EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]

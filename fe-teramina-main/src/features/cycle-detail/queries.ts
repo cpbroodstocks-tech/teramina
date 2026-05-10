@@ -35,6 +35,7 @@ export const useOptOutBenchmark = (cycle_id: string) => {
 
 export const sheetsKeys = {
   status: (cycle_id: string) => ["sheets-status", cycle_id] as const,
+  syncLog: (cycle_id: string) => ["sheets-sync-log", cycle_id] as const,
 };
 
 export const useGoogleSheetsStatus = (cycle_id: string) =>
@@ -85,6 +86,39 @@ export const useDisconnectSheets = (cycle_id: string) => {
     mutationFn: () =>
       axios.delete(`/sheets/disconnect?cycle_id=${cycle_id}`).then((r: any) => r.payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: sheetsKeys.status(cycle_id) }),
+  });
+};
+
+export const useSyncLog = (cycle_id: string) =>
+  useQuery({
+    queryKey: sheetsKeys.syncLog(cycle_id),
+    queryFn: () =>
+      axios
+        .get("/sheets/sync-log", { params: { cycle_id } })
+        .then((r: any) => r?.payload ?? null)
+        .catch(() => null),
+    enabled: !!cycle_id,
+  });
+
+export const usePreviewSync = (cycle_id: string) =>
+  useMutation({
+    mutationFn: () =>
+      axios
+        .post("/sheets/preview-sync", null, { params: { cycle_id } })
+        .then((r: any) => r?.payload),
+  });
+
+export const useConfirmSync = (cycle_id: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (preview_id: string) =>
+      axios
+        .post("/sheets/confirm-sync", null, { params: { preview_id } })
+        .then((r: any) => r?.payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: sheetsKeys.status(cycle_id) });
+      queryClient.invalidateQueries({ queryKey: sheetsKeys.syncLog(cycle_id) });
+    },
   });
 };
 

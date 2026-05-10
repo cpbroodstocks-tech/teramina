@@ -41,9 +41,10 @@ class TestNormalizeDate:
         assert _normalize_date(None) is None
         assert _normalize_date("N/A") is None
 
-    def test_preserves_unparseable(self):
-        result = _normalize_date("not-a-date")
-        assert result == "not-a-date"
+    def test_unparseable_returns_none(self):
+        # Unparseable dates are rejected (None), not passed through silently.
+        assert _normalize_date("not-a-date") is None
+        assert _normalize_date("32/13/2024") is None
 
 
 class TestSafeConversions:
@@ -204,8 +205,9 @@ class TestGetStatus:
         assert code == 200
         assert body.payload["is_active"] is False
 
+    @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
     @patch("teramina.google_sheets.services.sheet_service.SheetIntegration")
-    def test_status_active(self, MockIntegration):
+    def test_status_active(self, MockIntegration, MockSyncLog):
         integration = MagicMock()
         integration.spreadsheet_id = SPREADSHEET_ID
         integration.spreadsheet_url = SPREADSHEET_URL
@@ -214,7 +216,9 @@ class TestGetStatus:
         integration.last_status = "ok"
         integration.last_error = ""
         integration.rows_synced = 42
+        integration.last_sync_log_id = None
         MockIntegration.objects.return_value.first.return_value = integration
+        MockSyncLog.objects.return_value.first.return_value = None
 
         code, body = SheetService.get_status(CYCLE_ID)
         assert code == 200
@@ -224,6 +228,20 @@ class TestGetStatus:
 
 # ── SyncCycle tests ───────────────────────────────────────────────────────
 
+def _base_sync_patches():
+    """Common set of patches for sync_cycle tests."""
+    return [
+        patch("teramina.google_sheets.services.sheet_service.SheetSyncLog"),
+        patch("teramina.google_sheets.services.sheet_service.FeedRealization"),
+        patch("teramina.google_sheets.services.sheet_service.HarvestRecord"),
+        patch("teramina.google_sheets.services.sheet_service.CostData"),
+        patch("teramina.google_sheets.services.sheet_service.CycleData"),
+        patch("teramina.google_sheets.services.sheet_service.Cycle"),
+        patch("teramina.google_sheets.services.sheet_service.SheetIntegration"),
+        patch("teramina.google_sheets.services.sheet_service._get_sheets_service"),
+    ]
+
+
 class TestSyncCycle:
     def _make_integration(self):
         i = MagicMock()
@@ -231,6 +249,7 @@ class TestSyncCycle:
         i.is_active = True
         i.last_status = "pending"
         i.rows_synced = 0
+        i.last_sync_log_id = None
         return i
 
     def _make_cycle(self):
@@ -240,6 +259,18 @@ class TestSyncCycle:
         c.pond_id = "pond1"
         return c
 
+    def _make_empty_db(self, MockCycleData, MockCostData, MockHarvest, MockFeed):
+        MockCycleData.objects.return_value.first.return_value = None
+        cd_new = MagicMock()
+        cd_new.result_data = []
+        cd_new.save.return_value = cd_new
+        MockCycleData.return_value = cd_new
+        MockCostData.objects.return_value.first.return_value = None
+        MockCostData.return_value = MagicMock()
+        MockHarvest.objects.return_value = []
+        MockFeed.objects.return_value.only.return_value = []
+
+    @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
     @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
     @patch("teramina.google_sheets.services.sheet_service.HarvestRecord")
     @patch("teramina.google_sheets.services.sheet_service.CostData")
@@ -248,7 +279,7 @@ class TestSyncCycle:
     @patch("teramina.google_sheets.services.sheet_service.SheetIntegration")
     @patch("teramina.google_sheets.services.sheet_service._get_sheets_service")
     def test_full_sync(self, mock_get_svc, MockIntegration, MockCycle,
-                       MockCycleData, MockCostData, MockHarvest, MockFeed):
+                       MockCycleData, MockCostData, MockHarvest, MockFeed, MockSyncLog):
         svc = _build_sheets_service({
             "DAILY_LOG": _daily_log_rows(),
             "ABW_SAMPLING": _abw_rows(),
@@ -260,36 +291,20 @@ class TestSyncCycle:
 
         integration = self._make_integration()
         MockIntegration.objects.return_value.first.return_value = integration
+        MockCycle.objects.return_value.first.return_value = self._make_cycle()
+        self._make_empty_db(MockCycleData, MockCostData, MockHarvest, MockFeed)
+        MockSyncLog.return_value.save.return_value = MockSyncLog.return_value
 
-        cycle = self._make_cycle()
-        MockCycle.objects.return_value.first.return_value = cycle
+        result = SheetService.sync_cycle(CYCLE_ID)
+        summary = result["summary"]
 
-        # Empty existing data
-        MockCycleData.objects.return_value.first.return_value = None
-        cd_new = MagicMock()
-        cd_new.result_data = []
-        cd_new.save.return_value = cd_new
-        MockCycleData.return_value = cd_new
-
-        MockCostData.objects.return_value.first.return_value = None
-        MockCostData.return_value = MagicMock()
-
-        MockHarvest.objects.return_value = []
-        MockFeed.objects.return_value.only.return_value = []
-
-        summary = SheetService.sync_cycle(CYCLE_ID)
-
-        assert "DAILY_LOG" in summary
         assert summary["DAILY_LOG"]["inserted"] == 3
         assert summary["DAILY_LOG"]["rejected"] == 0
-        assert "ABW_SAMPLING" in summary
         assert summary["ABW_SAMPLING"]["inserted"] == 2
-        assert "COST" in summary
         assert summary["COST"]["inserted"] == 2
-        assert "HARVEST" in summary
         assert summary["HARVEST"]["inserted"] == 2
-        assert "MORTALITY" in summary
         assert summary["MORTALITY"]["inserted"] == 2
+        assert result["status"] == "ok"
         assert integration.last_status == "ok"
 
     @patch("teramina.google_sheets.services.sheet_service.Cycle")
@@ -307,6 +322,7 @@ class TestSyncCycle:
         result = SheetService.sync_cycle(CYCLE_ID)
         assert "error" in result
 
+    @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
     @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
     @patch("teramina.google_sheets.services.sheet_service.HarvestRecord")
     @patch("teramina.google_sheets.services.sheet_service.CostData")
@@ -316,32 +332,24 @@ class TestSyncCycle:
     @patch("teramina.google_sheets.services.sheet_service._get_sheets_service")
     def test_sync_date_normalization(self, mock_get_svc, MockIntegration,
                                      MockCycle, MockCycleData, MockCostData,
-                                     MockHarvest, MockFeed):
+                                     MockHarvest, MockFeed, MockSyncLog):
         """DD/MM/YYYY format should be normalized."""
         svc = _build_sheets_service({
             "DAILY_LOG": [["15/01/2024", "", "5.0", "6.0"]],
             "ABW_SAMPLING": [], "COST": [], "HARVEST": [], "MORTALITY": [],
         })
         mock_get_svc.return_value = svc
-
         integration = self._make_integration()
         MockIntegration.objects.return_value.first.return_value = integration
         MockCycle.objects.return_value.first.return_value = self._make_cycle()
+        self._make_empty_db(MockCycleData, MockCostData, MockHarvest, MockFeed)
+        MockSyncLog.return_value.save.return_value = MockSyncLog.return_value
 
-        cd = MagicMock()
-        cd.result_data = []
-        cd.save.return_value = cd
-        MockCycleData.objects.return_value.first.return_value = None
-        MockCycleData.return_value = cd
+        result = SheetService.sync_cycle(CYCLE_ID)
+        assert result["summary"]["DAILY_LOG"]["inserted"] == 1
+        assert result["summary"]["DAILY_LOG"]["rejected"] == 0
 
-        MockCostData.objects.return_value.first.return_value = None
-        MockHarvest.objects.return_value = []
-        MockFeed.objects.return_value.only.return_value = []
-
-        summary = SheetService.sync_cycle(CYCLE_ID)
-        assert summary["DAILY_LOG"]["inserted"] == 1
-        assert summary["DAILY_LOG"]["rejected"] == 0
-
+    @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
     @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
     @patch("teramina.google_sheets.services.sheet_service.HarvestRecord")
     @patch("teramina.google_sheets.services.sheet_service.CostData")
@@ -351,23 +359,18 @@ class TestSyncCycle:
     @patch("teramina.google_sheets.services.sheet_service._get_sheets_service")
     def test_sync_auto_doc_computation(self, mock_get_svc, MockIntegration,
                                        MockCycle, MockCycleData, MockCostData,
-                                       MockHarvest, MockFeed):
+                                       MockHarvest, MockFeed, MockSyncLog):
         """DOC should be auto-computed when missing."""
         svc = _build_sheets_service({
             "DAILY_LOG": [["2024-01-10", "", "5.0"]],
             "ABW_SAMPLING": [], "COST": [], "HARVEST": [], "MORTALITY": [],
         })
         mock_get_svc.return_value = svc
-
         integration = self._make_integration()
         MockIntegration.objects.return_value.first.return_value = integration
         MockCycle.objects.return_value.first.return_value = self._make_cycle()
 
         saved_rows = []
-        cd = MagicMock()
-        cd.result_data = []
-        cd.save.return_value = cd
-        MockCycleData.objects.return_value.first.return_value = None
 
         def capture_init(**kwargs):
             saved_rows.append(kwargs.get("result_data", []))
@@ -375,16 +378,19 @@ class TestSyncCycle:
             m.result_data = kwargs.get("result_data", [])
             m.save.return_value = m
             return m
-        MockCycleData.side_effect = capture_init
 
+        MockCycleData.objects.return_value.first.return_value = None
+        MockCycleData.side_effect = capture_init
         MockCostData.objects.return_value.first.return_value = None
         MockHarvest.objects.return_value = []
         MockFeed.objects.return_value.only.return_value = []
+        MockSyncLog.return_value.save.return_value = MockSyncLog.return_value
 
         SheetService.sync_cycle(CYCLE_ID)
         assert len(saved_rows) > 0
         assert saved_rows[0][0]["doc"] == 10  # Jan 10 - Jan 1 + 1
 
+    @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
     @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
     @patch("teramina.google_sheets.services.sheet_service.HarvestRecord")
     @patch("teramina.google_sheets.services.sheet_service.CostData")
@@ -393,23 +399,226 @@ class TestSyncCycle:
     @patch("teramina.google_sheets.services.sheet_service.SheetIntegration")
     @patch("teramina.google_sheets.services.sheet_service._get_sheets_service")
     def test_sync_empty_sheet(self, mock_get_svc, MockIntegration, MockCycle,
-                              MockCycleData, MockCostData, MockHarvest, MockFeed):
+                              MockCycleData, MockCostData, MockHarvest, MockFeed, MockSyncLog):
         """Empty sheet should result in zero rows and status ok."""
         svc = _build_sheets_service({})
         mock_get_svc.return_value = svc
-
         integration = self._make_integration()
         MockIntegration.objects.return_value.first.return_value = integration
         MockCycle.objects.return_value.first.return_value = self._make_cycle()
-        MockCycleData.objects.return_value.first.return_value = None
-        MockCostData.objects.return_value.first.return_value = None
-        MockHarvest.objects.return_value = []
-        MockFeed.objects.return_value.only.return_value = []
+        self._make_empty_db(MockCycleData, MockCostData, MockHarvest, MockFeed)
+        MockSyncLog.return_value.save.return_value = MockSyncLog.return_value
 
-        summary = SheetService.sync_cycle(CYCLE_ID)
+        result = SheetService.sync_cycle(CYCLE_ID)
         for tab in ["DAILY_LOG", "ABW_SAMPLING", "COST", "HARVEST", "MORTALITY"]:
-            assert tab in summary
-            assert summary[tab].get("rejected", 0) == 0
+            assert tab in result["summary"]
+            assert result["summary"][tab].get("rejected", 0) == 0
+
+    # ── New edge case tests (Task 6) ──────────────────────────────────────
+
+    @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
+    @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
+    @patch("teramina.google_sheets.services.sheet_service.HarvestRecord")
+    @patch("teramina.google_sheets.services.sheet_service.CostData")
+    @patch("teramina.google_sheets.services.sheet_service.CycleData")
+    @patch("teramina.google_sheets.services.sheet_service.Cycle")
+    @patch("teramina.google_sheets.services.sheet_service.SheetIntegration")
+    @patch("teramina.google_sheets.services.sheet_service._get_sheets_service")
+    def test_malformed_date_produces_rejected_row(
+        self, mock_get_svc, MockIntegration, MockCycle,
+        MockCycleData, MockCostData, MockHarvest, MockFeed, MockSyncLog
+    ):
+        """A row with an unparseable date must appear in rejected_rows with reason=invalid_date."""
+        svc = _build_sheets_service({
+            "DAILY_LOG": [
+                ["not-a-date", "1", "5.0", "6.0"],   # malformed
+                ["2024-01-02", "2", "5.5", "6.5"],   # valid
+            ],
+            "ABW_SAMPLING": [], "COST": [], "HARVEST": [], "MORTALITY": [],
+        })
+        mock_get_svc.return_value = svc
+        integration = self._make_integration()
+        MockIntegration.objects.return_value.first.return_value = integration
+        MockCycle.objects.return_value.first.return_value = self._make_cycle()
+        self._make_empty_db(MockCycleData, MockCostData, MockHarvest, MockFeed)
+        MockSyncLog.return_value.save.return_value = MockSyncLog.return_value
+
+        result = SheetService.sync_cycle(CYCLE_ID)
+
+        assert result["summary"]["DAILY_LOG"]["rejected"] == 1
+        assert result["summary"]["DAILY_LOG"]["inserted"] == 1
+
+        rejected = result["rejected_rows"]
+        assert len(rejected) >= 1
+        date_rejections = [r for r in rejected if r["reason"] == "invalid_date"]
+        assert len(date_rejections) == 1
+        assert date_rejections[0]["tab"] == "DAILY_LOG"
+        assert date_rejections[0]["field"] == "date"
+        assert date_rejections[0]["raw_value"] == "not-a-date"
+        assert date_rejections[0]["row_number"] == 3  # row 1-2 are headers
+
+    @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
+    @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
+    @patch("teramina.google_sheets.services.sheet_service.HarvestRecord")
+    @patch("teramina.google_sheets.services.sheet_service.CostData")
+    @patch("teramina.google_sheets.services.sheet_service.CycleData")
+    @patch("teramina.google_sheets.services.sheet_service.Cycle")
+    @patch("teramina.google_sheets.services.sheet_service.SheetIntegration")
+    @patch("teramina.google_sheets.services.sheet_service._get_sheets_service")
+    def test_nh3_hard_failure_produces_rejected_row(
+        self, mock_get_svc, MockIntegration, MockCycle,
+        MockCycleData, MockCostData, MockHarvest, MockFeed, MockSyncLog
+    ):
+        """NH3=99 (above hard_max=50) must be rejected with reason hard_failure:nh3."""
+        # A full DAILY_LOG row: date, doc, do_m, do_a, do_avg, temp_m, temp_a, temp_avg,
+        # ph_m, ph_a, salinity, nh3, turbidity, feed_kg, leftover, type, prot%, freq, notes
+        bad_row = ["2024-01-01", "1", "5.0", "6.0", "", "28", "30", "",
+                   "7.5", "7.8", "15", "99.0", "35", "10", "0.5",
+                   "Starter", "40", "4", ""]
+        good_row = ["2024-01-02", "2", "5.5", "6.5", "", "27", "29", "",
+                    "7.6", "7.9", "16", "0.2", "30", "12", "1.0",
+                    "Grower", "38", "3", ""]
+        svc = _build_sheets_service({
+            "DAILY_LOG": [bad_row, good_row],
+            "ABW_SAMPLING": [], "COST": [], "HARVEST": [], "MORTALITY": [],
+        })
+        mock_get_svc.return_value = svc
+        integration = self._make_integration()
+        MockIntegration.objects.return_value.first.return_value = integration
+        MockCycle.objects.return_value.first.return_value = self._make_cycle()
+        self._make_empty_db(MockCycleData, MockCostData, MockHarvest, MockFeed)
+        MockSyncLog.return_value.save.return_value = MockSyncLog.return_value
+
+        result = SheetService.sync_cycle(CYCLE_ID)
+
+        # Bad row should be rejected; good row inserted
+        assert result["summary"]["DAILY_LOG"]["rejected"] == 1
+        assert result["summary"]["DAILY_LOG"]["inserted"] == 1
+
+        rejected = result["rejected_rows"]
+        nh3_failures = [r for r in rejected if "hard_failure:nh3" in r.get("reason", "")]
+        assert len(nh3_failures) == 1
+        assert nh3_failures[0]["tab"] == "DAILY_LOG"
+        assert nh3_failures[0]["field"] == "nh3"
+        assert float(nh3_failures[0]["raw_value"]) == 99.0
+
+    @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
+    @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
+    @patch("teramina.google_sheets.services.sheet_service.HarvestRecord")
+    @patch("teramina.google_sheets.services.sheet_service.CostData")
+    @patch("teramina.google_sheets.services.sheet_service.CycleData")
+    @patch("teramina.google_sheets.services.sheet_service.Cycle")
+    @patch("teramina.google_sheets.services.sheet_service.SheetIntegration")
+    @patch("teramina.google_sheets.services.sheet_service._get_sheets_service")
+    def test_partial_sync_on_tab_exception(
+        self, mock_get_svc, MockIntegration, MockCycle,
+        MockCycleData, MockCostData, MockHarvest, MockFeed, MockSyncLog
+    ):
+        """If one tab raises an exception, status=partial; other tabs still processed."""
+        svc = _build_sheets_service({
+            "DAILY_LOG": _daily_log_rows(),
+            "ABW_SAMPLING": _abw_rows(),
+            "COST": _cost_rows(),
+            "HARVEST": _harvest_rows(),
+            "MORTALITY": _mortality_rows(),
+        })
+        mock_get_svc.return_value = svc
+        integration = self._make_integration()
+        MockIntegration.objects.return_value.first.return_value = integration
+        MockCycle.objects.return_value.first.return_value = self._make_cycle()
+        self._make_empty_db(MockCycleData, MockCostData, MockHarvest, MockFeed)
+        MockSyncLog.return_value.save.return_value = MockSyncLog.return_value
+
+        # Make CostData raise during save to simulate a tab error
+        MockCostData.side_effect = RuntimeError("DB unavailable")
+
+        result = SheetService.sync_cycle(CYCLE_ID)
+
+        # COST should have error; others should succeed
+        assert "error" in result["summary"]["COST"]
+        assert "error" not in result["summary"]["DAILY_LOG"]
+        assert result["status"] in ("partial", "error")
+
+    @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
+    @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
+    @patch("teramina.google_sheets.services.sheet_service.HarvestRecord")
+    @patch("teramina.google_sheets.services.sheet_service.CostData")
+    @patch("teramina.google_sheets.services.sheet_service.CycleData")
+    @patch("teramina.google_sheets.services.sheet_service.Cycle")
+    @patch("teramina.google_sheets.services.sheet_service.SheetIntegration")
+    @patch("teramina.google_sheets.services.sheet_service._get_sheets_service")
+    def test_cost_invalid_price_flagged(
+        self, mock_get_svc, MockIntegration, MockCycle,
+        MockCycleData, MockCostData, MockHarvest, MockFeed, MockSyncLog
+    ):
+        """A COST row with a non-numeric unit_price is flagged in rejected_rows (row still imported)."""
+        cost_rows = [
+            # date, category, description, qty, unit, unit_price, total, vendor, notes
+            # "fifteen thousand" is a genuine user error (intended number, wrong format)
+            ["2024-01-01", "Feed", "Starter feed", "100", "kg", "fifteen thousand", "1500000", "PT Feed", ""],
+            ["2024-01-05", "Chemical", "Probiotics", "5", "L", "50000", "250000", "CV Bio", ""],
+        ]
+        svc = _build_sheets_service({
+            "DAILY_LOG": [], "ABW_SAMPLING": [], "HARVEST": [], "MORTALITY": [],
+            "COST": cost_rows,
+        })
+        mock_get_svc.return_value = svc
+        integration = self._make_integration()
+        MockIntegration.objects.return_value.first.return_value = integration
+        MockCycle.objects.return_value.first.return_value = self._make_cycle()
+        self._make_empty_db(MockCycleData, MockCostData, MockHarvest, MockFeed)
+        MockSyncLog.return_value.save.return_value = MockSyncLog.return_value
+
+        result = SheetService.sync_cycle(CYCLE_ID)
+
+        # Both rows inserted (invalid price doesn't block the row)
+        assert result["summary"]["COST"]["inserted"] == 2
+
+        # But the bad price is flagged in rejected_rows
+        rejected = result["rejected_rows"]
+        price_issues = [r for r in rejected if r.get("reason") == "invalid_number:unit_price"]
+        assert len(price_issues) == 1
+        assert price_issues[0]["tab"] == "COST"
+        assert price_issues[0]["field"] == "unit_price"
+        assert price_issues[0]["raw_value"] == "fifteen thousand"
+
+    @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
+    @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
+    @patch("teramina.google_sheets.services.sheet_service.HarvestRecord")
+    @patch("teramina.google_sheets.services.sheet_service.CostData")
+    @patch("teramina.google_sheets.services.sheet_service.CycleData")
+    @patch("teramina.google_sheets.services.sheet_service.Cycle")
+    @patch("teramina.google_sheets.services.sheet_service.SheetIntegration")
+    @patch("teramina.google_sheets.services.sheet_service._get_sheets_service")
+    def test_dry_run_writes_nothing(
+        self, mock_get_svc, MockIntegration, MockCycle,
+        MockCycleData, MockCostData, MockHarvest, MockFeed, MockSyncLog
+    ):
+        """dry_run=True must not save any DB documents or SheetSyncLog."""
+        svc = _build_sheets_service({
+            "DAILY_LOG": _daily_log_rows(),
+            "ABW_SAMPLING": _abw_rows(),
+            "COST": _cost_rows(),
+            "HARVEST": _harvest_rows(),
+            "MORTALITY": _mortality_rows(),
+        })
+        mock_get_svc.return_value = svc
+        integration = self._make_integration()
+        MockIntegration.objects.return_value.first.return_value = integration
+        MockCycle.objects.return_value.first.return_value = self._make_cycle()
+        self._make_empty_db(MockCycleData, MockCostData, MockHarvest, MockFeed)
+
+        result = SheetService.sync_cycle(CYCLE_ID, dry_run=True)
+
+        # SheetSyncLog.save() must not be called in dry_run
+        MockSyncLog.return_value.save.assert_not_called()
+
+        # integration.save() must not be called
+        integration.save.assert_not_called()
+
+        # But summary should still reflect what would happen
+        assert result["summary"]["DAILY_LOG"]["inserted"] == 3
+        assert result["status"] == "ok"
 
 
 # ── CreateTemplate tests ──────────────────────────────────────────────────
@@ -461,11 +670,14 @@ class TestCreateTemplate:
 class TestSyncTasks:
     @patch("teramina.google_sheets.tasks.sync_tasks.SheetService")
     def test_sync_single(self, MockService):
-        MockService.sync_cycle.return_value = {"DAILY_LOG": {"inserted": 1}}
+        MockService.sync_cycle.return_value = {
+            "summary": {"DAILY_LOG": {"inserted": 1}},
+            "status": "ok",
+        }
         from teramina.google_sheets.tasks.sync_tasks import sync_single_cycle
         result = sync_single_cycle(CYCLE_ID)
         MockService.sync_cycle.assert_called_once_with(CYCLE_ID)
-        assert "DAILY_LOG" in result
+        assert "summary" in result
 
     @patch("teramina.google_sheets.tasks.sync_tasks.SheetService")
     @patch("teramina.google_sheets.tasks.sync_tasks.SheetIntegration")

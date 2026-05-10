@@ -9,6 +9,7 @@ from teramina.authentication.auth_bearer import AuthBearer
 from teramina.authentication.services.authentication_service import get_signed_in_user
 from ...schemas.general_schema import DataSuccessSchema, DataErrorSchema
 from ..services.cycle_data_service import CycleService
+from ..services.quality_report_service import get_quality_report
 from ...helpers.ownership import verify_cycle_owner, verify_farm_owner
 from ...helpers.file_validation import validate_csv_file
 
@@ -68,6 +69,17 @@ def get_last_data(request, cycle_id):
     if not verify_cycle_owner(cycle_id, str(user.id)):
         return 401, DataErrorSchema(code=401, message="Unauthorized")
     return CycleService().get_last_data(cycle_id)
+
+
+@router.get("/quality-report", response=response_schema, auth=AuthBearer())
+def quality_report(request, cycle_id: str):
+    user = get_signed_in_user(request)
+    if not verify_cycle_owner(cycle_id, str(user.id)):
+        return 401, DataErrorSchema(code=401, message="Unauthorized")
+    result = get_quality_report(cycle_id)
+    if "error" in result:
+        return 400, DataErrorSchema(code=400, message=result["error"])
+    return 200, DataSuccessSchema(code=200, message="OK", payload=result)
 
 
 # @router.get("/download-cycle-data-xlsx")

@@ -9,6 +9,7 @@ import { queryClient } from "lib/queryClient";
 import { useFirebase } from "hooks/useFirebase";
 import ToastMessage from "components/toast-message";
 import ReactGA from "react-ga4"; // import react-ga
+import * as Sentry from "@sentry/react";
 
 import reportWebVitals from "./reportWebVitals";
 import Loader from "components/loader";
@@ -24,6 +25,15 @@ import "@fontsource/lato";
 import "locales/i18n";
 
 ReactGA.initialize("G-5RMKKEF1WM"); // initialize react-ga
+
+if (import.meta.env.VITE_SENTRY_DSN) {
+  Sentry.init({
+    dsn: import.meta.env.VITE_SENTRY_DSN,
+    integrations: [Sentry.browserTracingIntegration()],
+    tracesSampleRate: 0.2,
+    environment: import.meta.env.MODE,
+  });
+}
 
 const ReactQueryDevtools = import.meta.env.DEV
   ? lazy(() =>

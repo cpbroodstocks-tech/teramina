@@ -108,7 +108,6 @@ describe("GoogleSheets", () => {
       renderComponent();
       expect(await screen.findByText("Connected")).toBeInTheDocument();
       expect(screen.getByText("Synced")).toBeInTheDocument();
-      expect(screen.getByText("Total rows synced: 42")).toBeInTheDocument();
     });
 
     it("shows Partial chip for partial status", async () => {
@@ -400,7 +399,7 @@ describe("GoogleSheets", () => {
       expect(mockSetToast).toHaveBeenCalledWith(
         expect.objectContaining({
           variant: "warning",
-          text: "Sync finished with some errors",
+          text: "Sync finished with some errors — check issues below",
         })
       );
     });

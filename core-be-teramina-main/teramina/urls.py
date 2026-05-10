@@ -25,7 +25,7 @@ from teramina.api import api
 def health(request):
     """Liveness/readiness probe for Cloud Run and load balancers."""
     try:
-        mongoengine.connection.get_db()
+        mongoengine.connection.get_db().command("ping")
         return JsonResponse({"status": "ok", "db": "connected"})
     except pymongo.errors.PyMongoError:
         return JsonResponse({"status": "error", "db": "disconnected"}, status=503)

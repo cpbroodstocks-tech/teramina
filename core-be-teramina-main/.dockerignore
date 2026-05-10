@@ -1,0 +1,56 @@
+# Secrets — must never enter any image
+.env
+.env.*
+!.env.example
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Dev tooling
+.git/
+.gitignore
+*.md
+Dockerfile*
+.dockerignore
+
+# Test / data artifacts
+tests/
+*.faiss
+index.faiss
+sample_data/
+generate_dummy_data.py
+seed_dummy_data.py
+setup_demo_seed.py
+data_generator/
+
+# IDE
+.vscode/
+.idea/
+
+# Misc
+*.log
+*.png
+*.jpg
+*.jpeg
+pie_plot.png
+image*.png
+header-2.png
+AGENTS.md
+CLAUDE.md
+FE_DEV_PLAN.md
+PLATFORM_ALGORITHMS.md
+google_sheet_data_input_design.md
+examples/

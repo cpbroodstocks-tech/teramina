@@ -16,6 +16,7 @@ from pathlib import Path
 
 import os
 import mongoengine
+import sentry_sdk
 from dotenv import load_dotenv
 
 # Load .env before reading any env vars so local dev works without shell exports
@@ -185,6 +186,20 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
 
+# Sentry — activates only when SENTRY_DSN is provided (prod/staging)
+_sentry_dsn = os.getenv("SENTRY_DSN")
+if _sentry_dsn:
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        traces_sample_rate=0.2,
+        send_default_pii=False,
+    )
+
+# Request size limits — protects workers from large payloads
+# Override via env: DATA_UPLOAD_MAX_MB / FILE_UPLOAD_MAX_MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("DATA_UPLOAD_MAX_MB", "10")) * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("FILE_UPLOAD_MAX_MB", "10")) * 1024 * 1024
+
 X_FRAME_OPTIONS = "DENY"
 
 CORS_ALLOW_METHODS = [
@@ -206,6 +221,8 @@ if not DEBUG and not CORS_ALLOWED_ORIGINS:
     raise RuntimeError("CORS_ALLOWED_ORIGINS must be set when DJANGO_DEBUG is False")
 
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS")
+if not DEBUG and not CSRF_TRUSTED_ORIGINS:
+    raise RuntimeError("CSRF_TRUSTED_ORIGINS must be set when DJANGO_DEBUG is False")
 
 CORS_ALLOW_CREDENTIALS = True
 

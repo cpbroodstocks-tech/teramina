@@ -20,3 +20,15 @@ export const useCycleDataList = () => {
       axios.get(`/cycle-data/list-cycle-data?${queryString}`).then((r: any) => r.payload),
   });
 };
+
+export const useQualityReport = (cycle_id: string) =>
+  useQuery({
+    queryKey: ["quality-report", cycle_id],
+    queryFn: () =>
+      axios
+        .get("/cycle-data/quality-report", { params: { cycle_id } })
+        .then((r: any) => r?.payload ?? null)
+        .catch(() => null),
+    enabled: !!cycle_id,
+    staleTime: 5 * 60 * 1000,  // 5 min — not real-time
+  });

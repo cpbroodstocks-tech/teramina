@@ -25,3 +25,16 @@ index.faiss
 *.png
 *.jpg
 *.jpeg
+
+# Dev / demo data artifacts
+generate_dummy_data.py
+sample_data/
+seed_dummy_data.py
+setup_demo_seed.py
+
+# Planning / design docs (keep out of release)
+AGENTS.md
+CLAUDE.md
+FE_DEV_PLAN.md
+PLATFORM_ALGORITHMS.md
+google_sheet_data_input_design.md
