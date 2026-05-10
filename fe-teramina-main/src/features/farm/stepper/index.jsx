@@ -122,7 +122,7 @@ const FarmWizard = ({ onDoneSubmit }) => {
             className={styles.btnYesModal}
             variant="contained"
             onClick={() => handleSubmitAllForm()}
-          ></Button>
+          >{t("YES")}</Button>
         </DialogActions>
       </Dialog>
       <Stepper activeStep={activeStep} label={null} connector={null}>

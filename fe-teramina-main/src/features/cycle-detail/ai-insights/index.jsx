@@ -12,7 +12,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useToastStore } from "store/toast.store";
-import { useGenerateInsight, useLoadCachedInsight } from "features/cycle-detail/queries";
+import { useLoadCachedInsight } from "features/cycle-detail/queries";
 
 const TYPES = ["performance", "water_quality", "feeding", "harvest", "economics", "weekly"];
 
@@ -44,21 +44,9 @@ const AiInsights = () => {
   const [streamStatus, setStreamStatus] = useState("");
   const esRef = useRef(null);
 
-  const { mutateAsync: generateInsight, isPending: generating } = useGenerateInsight();
   const { mutateAsync: loadCached, isPending: loadingCached } = useLoadCachedInsight();
 
-  const loading = generating || loadingCached || streamLoading;
-
-  const handleGenerate = async () => {
-    try {
-      setInsight(null);
-      setCached(false);
-      const result = await generateInsight({ cycle_id, type });
-      setInsight(result);
-    } catch {
-      setToast({ open: true, variant: "error", text: "Failed to load insight" });
-    }
-  };
+  const loading = loadingCached || streamLoading;
 
   const handleLoadCached = async () => {
     try {
@@ -163,10 +151,7 @@ const AiInsights = () => {
               <CircularProgress size={14} style={{ marginRight: 6, color: "#fff" }} />
               {streamStatus}
             </>
-          ) : "Generate (Live)"}
-        </Button>
-        <Button variant="outlined" onClick={handleGenerate} disabled={loading}>
-          Generate
+          ) : "Generate"}
         </Button>
         <Button variant="outlined" onClick={handleLoadCached} disabled={loading}>
           Load Cached

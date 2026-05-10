@@ -81,6 +81,8 @@ const PondList = ({ data }) => {
                       className={styles.btnViewMore}
                       onClick={() => {
                         localStorage.setItem("selectedCycleStartDate", cycle.start_date);
+                        localStorage.setItem("cycle_id", cycle._id);
+                        localStorage.setItem("cycle_name", cycle.name);
                         navigate(`/dashboard/cycle/detail/${cycle._id}`);
                       }}
                     >

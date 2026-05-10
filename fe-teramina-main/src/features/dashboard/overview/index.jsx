@@ -1,4 +1,5 @@
 import { Fragment, useState, useEffect } from "react";
+import { Box } from "@mui/material";
 import { ReactSVG } from "react-svg";
 import { useFilter } from "features/filter/default/hooks";
 import Filter from "features/filter/overview";
@@ -380,6 +381,7 @@ const OverviewWidget = () => {
                   onClose={handleCloseDialog}
                   title={dialogTitle}
                   message={dialogMessage}
+                  loading={button_loading}
                 />
               </Fragment>
             );
@@ -395,7 +397,11 @@ const Overview = () => {
 
   if (loading) return <Loader />;
   if (error) return <Error />;
-  if (!data) return <Stepper />;
+  if (!data) return (
+    <Box sx={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", bgcolor: "background.default", zIndex: 1200, overflowY: "auto", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <Stepper />
+    </Box>
+  );
   return <OverviewWidget />;
 };
 

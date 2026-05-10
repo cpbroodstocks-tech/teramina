@@ -97,6 +97,11 @@ const Header = (props) => {
             open={Boolean(anchorElUser)}
             onClose={handleCloseUserMenu}
           >
+            <MenuItem key="profile" onClick={() => { handleCloseUserMenu(); navigate("/dashboard/profile"); }}>
+              <Typography textAlign="center" className={styles.labelMenu}>
+                {t("MENU.PROFILE")}
+              </Typography>
+            </MenuItem>
             <MenuItem key="logout" onClick={handleLogout}>
               <Typography textAlign="center" className={styles.labelMenu}>
                 {t("LOGOUT")}

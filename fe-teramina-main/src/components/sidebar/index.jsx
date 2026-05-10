@@ -25,6 +25,39 @@ function getActiveLabelKey(path) {
   return null;
 }
 
+const MenuList = ({ menus, activeLabelKey, styles }) => (
+  <>
+    <div className={styles.sidebarHeader}>
+      <Typography variant="h2">
+        <i>
+          <img src="/logo.png" alt="Teramina" />
+        </i>
+        Teramina
+      </Typography>
+    </div>
+    <div className={styles.sidebarContent}>
+      {menus.map((menu, key) => {
+        const isActive = menu.labelKey === activeLabelKey;
+        return (
+          <Link
+            to={menu.path}
+            key={key}
+            className={classNames(
+              styles.sidebarMenu,
+              isActive ? styles.sidebarMenuActive : ""
+            )}
+          >
+            <Button fullWidth>
+              {menu.icon}
+              {menu.label}
+            </Button>
+          </Link>
+        );
+      })}
+    </div>
+  </>
+);
+
 const Sidebar = ({ open, setOpen, activePath }) => {
   const { t } = useTranslation();
   const { classes: styles } = useStyles();
@@ -50,64 +83,10 @@ const Sidebar = ({ open, setOpen, activePath }) => {
           paper: styles.sidebarDrawer,
         }}
       >
-        <div className={styles.sidebarHeader}>
-          <Typography variant="h2">
-            <i>
-              <img src="/logo.png" alt="Teramina" />
-            </i>
-            Teramina
-          </Typography>
-        </div>
-        <div className={styles.sidebarContent}>
-          {menus.map((menu, key) => {
-            const isActive = menu.labelKey === activeLabelKey;
-            return (
-              <Link
-                to={menu.path}
-                key={key}
-                className={classNames(
-                  styles.sidebarMenu,
-                  isActive ? styles.sidebarMenuActive : ""
-                )}
-              >
-                <Button fullWidth>
-                  {menu.icon}
-                  {menu.label}
-                </Button>
-              </Link>
-            );
-          })}
-        </div>
+        <MenuList menus={menus} activeLabelKey={activeLabelKey} styles={styles} />
       </SwipeableDrawer>
       <div className={styles.sidebar}>
-        <div className={styles.sidebarHeader}>
-          <Typography variant="h2">
-            <i>
-              <img src="/logo.png" alt="Teramina" />
-            </i>
-            Teramina
-          </Typography>
-        </div>
-        <div className={styles.sidebarContent}>
-          {menus.map((menu, key) => {
-            const isActive = menu.labelKey === activeLabelKey;
-            return (
-              <Link
-                to={menu.path}
-                key={key}
-                className={classNames(
-                  styles.sidebarMenu,
-                  isActive ? styles.sidebarMenuActive : ""
-                )}
-              >
-                <Button fullWidth>
-                  {menu.icon}
-                  {menu.label}
-                </Button>
-              </Link>
-            );
-          })}
-        </div>
+        <MenuList menus={menus} activeLabelKey={activeLabelKey} styles={styles} />
       </div>
     </>
   );
