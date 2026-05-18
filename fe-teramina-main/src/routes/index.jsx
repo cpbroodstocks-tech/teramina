@@ -3,6 +3,9 @@ import { lazy } from "react";
 import { ReactSVG } from "react-svg";
 import { Navigate } from "react-router-dom";
 import OpacityIcon from "@mui/icons-material/Opacity";
+import PsychologyIcon from "@mui/icons-material/Psychology";
+import TodayIcon from "@mui/icons-material/Today";
+import TimelineIcon from "@mui/icons-material/Timeline";
 import PrivateRoute from "routes/private";
 import iconEconomics from "/assets/images/icons/economics.svg";
 import iconFarm from "/assets/images/icons/farm.svg";
@@ -32,6 +35,9 @@ const WaterQuality = lazy(() => import("widgets/water-quality"));
 const HarvestSimulator = lazy(() => import("widgets/harvest-simulator"));
 const PLReport = lazy(() => import("pages/dashboard/pl_report"));
 const FarmPLReport = lazy(() => import("pages/dashboard/farm_pl_report"));
+const Memory = lazy(() => import("pages/dashboard/memory"));
+const TodayView = lazy(() => import("pages/dashboard/today"));
+const PondTimeline = lazy(() => import("pages/dashboard/pond-timeline"));
 const SharePage = lazy(() => import("pages/share"));
 
 const routes = [
@@ -132,6 +138,27 @@ const routes = [
         element: <WaterQuality />,
         icon: <OpacityIcon fontSize="small" />,
         category: "parrent",
+      },
+      {
+        path: "today",
+        label: "MENU.TODAY",
+        element: <TodayView />,
+        icon: <TodayIcon fontSize="small" />,
+        category: "parrent",
+      },
+      {
+        path: "memory",
+        label: "MENU.MEMORY",
+        element: <Memory />,
+        icon: <PsychologyIcon fontSize="small" />,
+        category: "parrent",
+      },
+      {
+        path: "pond-timeline/:cycle_id",
+        label: "MENU.POND_TIMELINE",
+        element: <PondTimeline />,
+        icon: <TimelineIcon fontSize="small" />,
+        category: "children",
       },
       {
         path: "profile",

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useStyles } from "components/header/styles";
 import { GiHamburgerMenu } from "react-icons/gi";
 import { Button, Tooltip, Badge, IconButton } from "@mui/material";
@@ -19,9 +19,19 @@ const Header = (props) => {
   const [anchorElUser, setAnchorElUser] = useState(() => null);
   const [agentOpen, setAgentOpen] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
+  const [pendingMessage, setPendingMessage] = useState("");
   const { user } = useUserStore();
   const { classes: styles } = useStyles();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.message) setPendingMessage(e.detail.message);
+      setAgentOpen(true);
+    };
+    window.addEventListener("open-agent-chat", handler);
+    return () => window.removeEventListener("open-agent-chat", handler);
+  }, []);
 
   const handleOpenUserMenu = (event) => {
     setAnchorElUser(event.currentTarget);
@@ -58,6 +68,8 @@ const Header = (props) => {
             open={agentOpen}
             onClose={() => setAgentOpen(false)}
             onAlertsLoaded={setAlertCount}
+            initialMessage={pendingMessage}
+            onInitialMessageConsumed={() => setPendingMessage("")}
           />
           <Tooltip title={t("OPEN_SETTINGS")}>
             <Button className={styles.userButton} onClick={handleOpenUserMenu}>

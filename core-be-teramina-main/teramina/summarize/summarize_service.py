@@ -28,8 +28,10 @@ class SingleChat:
         self.async_client = anthropic.AsyncAnthropic(api_key=_ANTHROPIC_KEY)
         self.model_id = "claude-sonnet-4-6"
 
-    def _get_context(self, question: str, namespace: str = "default") -> str:
-        """Query Pinecone for relevant context documents."""
+    def _get_context(self, question: str, user_id: str = "") -> str:
+        """Query Pinecone for relevant context documents in the user's namespace."""
+        if not user_id:
+            return ""
         try:
             import openai
             from pinecone import Pinecone as PineconeClient
@@ -41,7 +43,7 @@ class SingleChat:
 
             index = PineconeClient(api_key=_PINECONE_API_KEY).Index(_PINECONE_INDEX)
             results = index.query(
-                vector=embedding, top_k=4, namespace=namespace, include_metadata=True
+                vector=embedding, top_k=4, namespace=user_id, include_metadata=True
             )
             docs = [m.metadata.get("text", "") for m in results.matches if m.metadata]
             return "\n\n".join(docs) if docs else ""
@@ -49,13 +51,13 @@ class SingleChat:
             logger.warning("Context retrieval failed: %s", exc)
             return ""
 
-    def ask(self, question: str, language: str = None) -> dict | None:
+    def ask(self, question: str, language: str = None, user_id: str = "") -> dict | None:
         """ask a question (synchronous)"""
         if len(question) > MAX_QUESTION_LENGTH:
             question = question[:MAX_QUESTION_LENGTH]
 
         language = language or "english"
-        context = self._get_context(question)
+        context = self._get_context(question, user_id=user_id)
         system_prompt = Prompt.prompt_report(language, context)
 
         last_exc = None
@@ -76,13 +78,13 @@ class SingleChat:
         logger.error("Anthropic ask failed after %d retries: %s", _MAX_RETRIES, last_exc)
         return None
 
-    async def stream_ask(self, question: str, language: str = None) -> str | None:
+    async def stream_ask(self, question: str, language: str = None, user_id: str = "") -> str | None:
         """ask a question (async)"""
         if len(question) > MAX_QUESTION_LENGTH:
             question = question[:MAX_QUESTION_LENGTH]
 
         language = language or "english"
-        context = self._get_context(question)
+        context = self._get_context(question, user_id=user_id)
         system_prompt = Prompt.prompt_report(language, context)
 
         try:

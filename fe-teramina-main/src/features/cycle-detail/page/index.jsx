@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Box, Breadcrumbs, Button, IconButton, Tab, Tabs, Tooltip, Typography } from "@mui/material";
 import BarChartIcon from "@mui/icons-material/BarChart";
+import TimelineIcon from "@mui/icons-material/Timeline";
 import { SiGooglesheets } from "react-icons/si";
 import Loader from "components/loader";
 import PopulateList from "features/cycle-detail/populate-list";
@@ -48,6 +49,15 @@ const CycleDetail = () => {
           <Tab label="Feeding" />
           <Tab label="Benchmark" />
         </Tabs>
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<TimelineIcon />}
+          onClick={() => navigate(`/dashboard/pond-timeline/${cycle_id}`)}
+          sx={{ mr: 1, fontSize: 12 }}
+        >
+          Timeline
+        </Button>
         <Button
           size="small"
           variant="outlined"

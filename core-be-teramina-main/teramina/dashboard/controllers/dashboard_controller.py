@@ -76,8 +76,10 @@ def wq_filter_data(request, farm_id=None, pond_id=None, cycle_id=None):
 
 @router.get("/download-pdf-report", auth=AuthBearer())
 async def download_pdf_report(request, farm_id, pond_id=None, cycle_id=None, date=None):
+    user = get_signed_in_user(request)
     dashboard = DashboardOverview(
-        farm_id=farm_id, pond_id=pond_id, cycle_id=cycle_id, date=date
+        farm_id=farm_id, pond_id=pond_id, cycle_id=cycle_id, date=date,
+        user_id=str(user.id),
     )
 
     async def run_process():

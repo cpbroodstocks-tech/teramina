@@ -340,4 +340,8 @@ CELERY_BEAT_SCHEDULE = {
         "task": "teramina.feeding.tasks.feeding_ml_tasks.retrain_feeding_model",
         "schedule": 604800,  # every 7 days
     },
+    "weekly-farm-summary": {
+        "task": "agent.weekly_farm_summary",
+        "schedule": 604800,  # every 7 days
+    },
 }

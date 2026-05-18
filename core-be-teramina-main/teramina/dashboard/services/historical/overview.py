@@ -28,11 +28,12 @@ from teramina.water_quality_dashboard.services.variable_management import (
 class DashboardOverview:
     """Dashboard service that leads to provide data for dashboard view"""
 
-    def __init__(self, farm_id, pond_id=None, cycle_id=None, date=None) -> None:
+    def __init__(self, farm_id, pond_id=None, cycle_id=None, date=None, user_id=None) -> None:
         self.farm_id = farm_id
         self.pond_id = pond_id
         self.cycle_id = cycle_id
         self.date = date
+        self.user_id = user_id or ""
 
         # get the list of data
         self.pond_list = get_list_pond_id(farm_id) if farm_id else []
@@ -557,7 +558,7 @@ class DashboardOverview:
         data_to_interprete.update(wq_data)
 
         result = await asyncio.wait_for(
-            SingleChat('openai').stream_ask(self.__get_report_prompt(data_to_interprete)),
+            SingleChat('openai').stream_ask(self.__get_report_prompt(data_to_interprete), user_id=self.user_id),
             timeout=90
         )
 

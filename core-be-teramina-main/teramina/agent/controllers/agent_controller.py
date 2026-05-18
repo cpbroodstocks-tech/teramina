@@ -1,11 +1,12 @@
 # pylint: disable=missing-function-docstring, unused-argument
 
+from django.http import StreamingHttpResponse
 from ninja import Router, Body
 from teramina.authentication.auth_bearer import AuthBearer
 from teramina.authentication.services.authentication_service import get_signed_in_user
 from teramina.schemas.general_schema import DataErrorSchema, DataSuccessSchema
 
-from ..schemas.agent_schema import ChatMessageSchema
+from ..schemas.agent_schema import ChatMessageSchema, ExplainSchema, MemoryCreateSchema
 from ..services.agent_service import AgentService
 
 router = Router(tags=["Farm Assistant"])
@@ -21,6 +22,7 @@ def chat(request, data: ChatMessageSchema = Body(...)):
         message=data.message,
         session_id=data.session_id,
         farm_id=data.farm_id or "",
+        pond_id=data.pond_id or "",
         cycle_id=data.cycle_id or "",
     )
 
@@ -55,7 +57,94 @@ def dismiss_alert(request, alert_id: str):
     return AgentService.dismiss_alert(alert_id, str(user.id))
 
 
+@router.patch("/alerts/{alert_id}/resolve", response=response_schema, auth=AuthBearer())
+def resolve_alert(request, alert_id: str, resolution_note: str = ""):
+    user = get_signed_in_user(request)
+    return AgentService.resolve_alert(alert_id, str(user.id), resolution_note)
+
+
 @router.get("/alerts/summary", response=response_schema, auth=AuthBearer())
 def get_alerts_summary(request):
     user = get_signed_in_user(request)
     return AgentService.get_alerts_summary(str(user.id))
+
+
+@router.get("/tasks", response=response_schema, auth=AuthBearer())
+def get_tasks(request, include_completed: bool = False):
+    user = get_signed_in_user(request)
+    return AgentService.get_tasks(str(user.id), include_completed)
+
+
+@router.patch("/tasks/{task_id}/complete", response=response_schema, auth=AuthBearer())
+def complete_task(request, task_id: str):
+    user = get_signed_in_user(request)
+    return AgentService.complete_task(task_id, str(user.id))
+
+
+@router.get("/memories", response=response_schema, auth=AuthBearer())
+def get_memories(request, farm_id: str = "", pond_id: str = "", limit: int = 20):
+    user = get_signed_in_user(request)
+    return AgentService.get_memories(str(user.id), farm_id, pond_id, limit)
+
+
+@router.get("/memories/graph", response=response_schema, auth=AuthBearer())
+def get_memory_graph(request, farm_id: str = "", pond_id: str = "", limit: int = 50):
+    user = get_signed_in_user(request)
+    return AgentService.get_memory_graph(str(user.id), farm_id, pond_id, limit)
+
+
+@router.post("/memories", response=response_schema, auth=AuthBearer())
+def add_memory(request, data: MemoryCreateSchema = Body(...)):
+    user = get_signed_in_user(request)
+    return AgentService.add_memory(
+        str(user.id), data.farm_id, data.memory_type, data.content,
+        data.pond_id or "", data.cycle_id or "", data.tags or [],
+        confidence=data.confidence,
+    )
+
+
+@router.delete("/memories/{memory_id}", response=response_schema, auth=AuthBearer())
+def delete_memory(request, memory_id: str):
+    user = get_signed_in_user(request)
+    return AgentService.delete_memory(memory_id, str(user.id))
+
+
+@router.post("/chat/stream", auth=AuthBearer())
+def stream_chat(request, data: ChatMessageSchema = Body(...)):
+    user = get_signed_in_user(request)
+    gen = AgentService.stream_chat_generator(
+        user_id=str(user.id),
+        message=data.message,
+        session_id=data.session_id or "",
+        farm_id=data.farm_id or "",
+        pond_id=data.pond_id or "",
+        cycle_id=data.cycle_id or "",
+    )
+    response = StreamingHttpResponse(gen, content_type="text/event-stream")
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    response["Access-Control-Allow-Origin"] = "*"
+    return response
+
+
+@router.post("/explain", response=response_schema, auth=AuthBearer())
+def explain_for_team(request, data: ExplainSchema = Body(...)):
+    user = get_signed_in_user(request)
+    return AgentService.explain_for_team(
+        user_id=str(user.id),
+        farm_id=data.farm_id,
+        cycle_id=data.cycle_id or "",
+        pond_id=data.pond_id or "",
+    )
+
+
+@router.get("/today", response=response_schema, auth=AuthBearer())
+def get_today_summary(request, farm_id: str):
+    user = get_signed_in_user(request)
+    return AgentService.get_today_summary(str(user.id), farm_id)
+
+
+@router.get("/pond-timeline", response=response_schema, auth=AuthBearer())
+def get_pond_timeline(request, cycle_id: str, limit: int = 50):
+    user = get_signed_in_user(request)
+    return AgentService.get_pond_timeline(str(user.id), cycle_id, limit)
