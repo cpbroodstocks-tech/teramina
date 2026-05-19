@@ -9,9 +9,9 @@ Move Mnemon from MVP-complete to beta-ready without mixing in voice notes, daily
 - [x] Keep the pushed MongoEngine Mnemon MVP isolated from experimental local work.
 - [x] Add a runnable Mnemon eval command for CI/manual answer-set checks.
 - [x] Add focused tests for the eval command.
-- [ ] Create an authenticated smoke-test checklist for farmer chat and memory review.
-- [ ] Add beta rollout notes for the memory backfill command and Celery pattern jobs.
-- [ ] Decide whether low-confidence memory review needs an internal admin UI or whether the farmer-facing review tab is enough for beta.
+- [x] Create an authenticated smoke-test checklist for farmer chat and memory review.
+- [x] Add beta rollout notes for the memory backfill command and Celery pattern jobs.
+- [x] Decide whether low-confidence memory review needs an internal admin UI or whether the farmer-facing review tab is enough for beta.
 - [ ] After beta checks pass, open/refresh the PR for `feature/second-brain-production-readiness`.
 
 ## Completed Execution Slice
@@ -24,7 +24,16 @@ Move Mnemon from MVP-complete to beta-ready without mixing in voice notes, daily
 
 ## Next Execution Slice
 
-1. Create an authenticated smoke-test checklist for farmer chat and memory review.
-2. Add rollout notes for `backfill_agent_memory_graph --apply`.
-3. Add rollout notes for enabling periodic pattern jobs.
-4. Decide whether to keep the experimental voice/daily-log work in this branch or move it to a separate branch.
+1. [x] Create an authenticated smoke-test checklist for farmer chat and memory review.
+2. [x] Add rollout notes for `backfill_agent_memory_graph --apply`.
+3. [x] Add rollout notes for enabling periodic pattern jobs.
+4. [x] Decide whether low-confidence review needs internal admin UI for beta.
+5. [ ] Move or park experimental voice/daily-log/Postgres work before PR refresh.
+6. [ ] Run the authenticated smoke checklist with real Firebase session and seeded farmer data.
+7. [ ] Open/refresh the PR for `feature/second-brain-production-readiness`.
+
+## Beta Readiness Decision
+
+For beta, the farmer-facing Memory review page is enough for low-confidence memory review. An internal admin queue should wait until beta usage shows real support-team review volume or false-positive pattern memory pressure.
+
+Detailed runbook: `MNEMON_BETA_RUNBOOK.md`.
