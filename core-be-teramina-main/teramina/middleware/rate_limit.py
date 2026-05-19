@@ -42,7 +42,12 @@ class RateLimitMiddleware:
         bucket = int(time.time() // window)
         key = f"rl:{ip}:{bucket}"
 
-        count = cache.get(key, 0)
+        try:
+            count = cache.get(key, 0)
+        except Exception as exc:  # pragma: no cover - depends on cache backend availability
+            logger.warning("Rate limit skipped because cache is unavailable: %s", exc)
+            return self.get_response(request)
+
         if count >= max_requests:
             logger.warning("Rate limit exceeded: ip=%s path=%s", ip, path)
             return JsonResponse(
@@ -50,5 +55,8 @@ class RateLimitMiddleware:
                 status=429,
             )
 
-        cache.set(key, count + 1, timeout=window * 2)
+        try:
+            cache.set(key, count + 1, timeout=window * 2)
+        except Exception as exc:  # pragma: no cover - depends on cache backend availability
+            logger.warning("Rate limit counter not saved because cache is unavailable: %s", exc)
         return self.get_response(request)

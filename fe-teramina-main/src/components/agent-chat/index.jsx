@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useLocation, useParams } from "react-router-dom";
 import {
   Drawer,
   Box,
@@ -25,7 +26,9 @@ import {
   useGetAgentTasks,
   useCompleteAgentTask,
   useExplainForTeam,
+  useCreateAgentMemory,
 } from "components/agent-chat/queries";
+import { buildAgentContext } from "components/agent-chat/context";
 
 const SESSION_KEY = "agent_session_id";
 
@@ -36,8 +39,27 @@ const severityColor = (severity) => {
   return "default";
 };
 
+const extractMemoryCandidate = (message) => {
+  const trimmed = message.trim();
+  const patterns = [
+    /^please remember(?: that)?\s+/i,
+    /^remember(?: that)?\s+/i,
+    /^ingat(?: bahwa)?\s+/i,
+    /^tolong ingat(?: bahwa)?\s+/i,
+  ];
+  for (const pattern of patterns) {
+    const content = trimmed.replace(pattern, "").trim();
+    if (content !== trimmed && content.length > 5) {
+      return { content, memory_type: "note", tags: ["chat_confirmation"] };
+    }
+  }
+  return null;
+};
+
 const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMessageConsumed }) => {
   const { setToast } = useToastStore();
+  const params = useParams();
+  const location = useLocation();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -53,6 +75,7 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
   const { mutateAsync: resolveAlert } = useResolveAlert();
   const { mutateAsync: completeTask } = useCompleteAgentTask();
   const { mutateAsync: explainForTeam, isPending: explaining } = useExplainForTeam();
+  const { mutateAsync: createMemory, isPending: savingMemory } = useCreateAgentMemory();
 
   useEffect(() => {
     if (onAlertsLoaded) onAlertsLoaded(alerts.length);
@@ -73,13 +96,36 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
   const sendPrompt = async (rawMessage) => {
     if (!rawMessage.trim() || sending) return;
     const userMessage = rawMessage.trim();
-    const farmId = localStorage.getItem("farm_id") || "";
-    const pondId = localStorage.getItem("pond_id") || "";
-    const cycleId = localStorage.getItem("cycle_id") || "";
+    const context = buildAgentContext({
+      params,
+      search: location.search,
+      pathname: location.pathname,
+    });
     const token = localStorage.getItem("authentication") || "";
     const baseURL = import.meta.env.VITE_ENDPOINT || "";
+    const memoryCandidate = extractMemoryCandidate(userMessage);
 
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
+    if (memoryCandidate) {
+      if (!context.farm_id) {
+        setToast({ open: true, variant: "warning", text: "Select a farm before saving memory" });
+        return;
+      }
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `Should I remember this for future recommendations?\n\n${memoryCandidate.content}`,
+          memoryCandidate: {
+            ...memoryCandidate,
+            farm_id: context.farm_id,
+            pond_id: context.pond_id,
+            cycle_id: context.cycle_id,
+          },
+        },
+      ]);
+      return;
+    }
     setMessages((prev) => [...prev, { role: "assistant", content: "", streaming: true }]);
     setSending(true);
 
@@ -96,9 +142,10 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
         body: JSON.stringify({
           message: userMessage,
           session_id: sessionId || "",
-          farm_id: farmId,
-          pond_id: pondId,
-          cycle_id: cycleId,
+          farm_id: context.farm_id,
+          pond_id: context.pond_id,
+          cycle_id: context.cycle_id,
+          page_context: context.page_context,
         }),
         signal: controller.signal,
       });
@@ -240,6 +287,33 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
       await completeTask(taskId);
     } catch {
       setToast({ open: true, variant: "error", text: "Failed to complete task" });
+    }
+  };
+
+  const handleMemoryDecision = async (messageIndex, shouldSave) => {
+    const candidate = messages[messageIndex]?.memoryCandidate;
+    if (!candidate) return;
+    if (!shouldSave) {
+      setMessages((prev) => prev.map((msg, i) => (
+        i === messageIndex ? { ...msg, memoryCandidate: null, content: "Okay, I will not save that memory." } : msg
+      )));
+      return;
+    }
+    try {
+      await createMemory({
+        farm_id: candidate.farm_id,
+        pond_id: candidate.pond_id,
+        cycle_id: candidate.cycle_id,
+        memory_type: candidate.memory_type,
+        content: candidate.content,
+        tags: candidate.tags,
+        confidence: 0.9,
+      });
+      setMessages((prev) => prev.map((msg, i) => (
+        i === messageIndex ? { ...msg, memoryCandidate: null, content: `Remembered: ${candidate.content}` } : msg
+      )));
+    } catch {
+      setToast({ open: true, variant: "error", text: "Failed to save memory" });
     }
   };
 
@@ -499,6 +573,26 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
                   ) : null}
                   {msg.streaming && msg.content && (
                     <span style={{ color: "#474DA4", fontWeight: "bold", fontSize: 14 }}>▋</span>
+                  )}
+                  {msg.memoryCandidate && (
+                    <Box style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={() => handleMemoryDecision(i, true)}
+                        disabled={savingMemory}
+                      >
+                        Remember
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => handleMemoryDecision(i, false)}
+                        disabled={savingMemory}
+                      >
+                        Not now
+                      </Button>
+                    </Box>
                   )}
                 </Box>
               ) : (

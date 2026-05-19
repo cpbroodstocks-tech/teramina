@@ -2,6 +2,7 @@
 
 from django.http import StreamingHttpResponse
 from ninja import Router, Body
+from typing import Optional
 from teramina.authentication.auth_bearer import AuthBearer
 from teramina.authentication.services.authentication_service import get_signed_in_user
 from teramina.schemas.general_schema import DataErrorSchema, DataSuccessSchema
@@ -17,6 +18,7 @@ response_schema = {200: DataSuccessSchema, 400: DataErrorSchema, 401: DataErrorS
 @router.post("/chat", response=response_schema, auth=AuthBearer())
 def chat(request, data: ChatMessageSchema = Body(...)):
     user = get_signed_in_user(request)
+    page_context = data.page_context.dict() if data.page_context else {}
     return AgentService.chat(
         user_id=str(user.id),
         message=data.message,
@@ -24,6 +26,7 @@ def chat(request, data: ChatMessageSchema = Body(...)):
         farm_id=data.farm_id or "",
         pond_id=data.pond_id or "",
         cycle_id=data.cycle_id or "",
+        page_context=page_context,
     )
 
 
@@ -82,9 +85,10 @@ def complete_task(request, task_id: str):
 
 
 @router.get("/memories", response=response_schema, auth=AuthBearer())
-def get_memories(request, farm_id: str = "", pond_id: str = "", limit: int = 20):
+def get_memories(request, farm_id: str = "", pond_id: str = "", limit: int = 20,
+                 max_confidence: Optional[float] = None):
     user = get_signed_in_user(request)
-    return AgentService.get_memories(str(user.id), farm_id, pond_id, limit)
+    return AgentService.get_memories(str(user.id), farm_id, pond_id, limit, max_confidence=max_confidence)
 
 
 @router.get("/memories/graph", response=response_schema, auth=AuthBearer())
@@ -109,9 +113,16 @@ def delete_memory(request, memory_id: str):
     return AgentService.delete_memory(memory_id, str(user.id))
 
 
+@router.patch("/memories/{memory_id}/verify", response=response_schema, auth=AuthBearer())
+def verify_memory(request, memory_id: str):
+    user = get_signed_in_user(request)
+    return AgentService.verify_memory(memory_id, str(user.id))
+
+
 @router.post("/chat/stream", auth=AuthBearer())
 def stream_chat(request, data: ChatMessageSchema = Body(...)):
     user = get_signed_in_user(request)
+    page_context = data.page_context.dict() if data.page_context else {}
     gen = AgentService.stream_chat_generator(
         user_id=str(user.id),
         message=data.message,
@@ -119,6 +130,7 @@ def stream_chat(request, data: ChatMessageSchema = Body(...)):
         farm_id=data.farm_id or "",
         pond_id=data.pond_id or "",
         cycle_id=data.cycle_id or "",
+        page_context=page_context,
     )
     response = StreamingHttpResponse(gen, content_type="text/event-stream")
     response["Cache-Control"] = "no-cache"

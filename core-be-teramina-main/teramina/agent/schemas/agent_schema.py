@@ -4,12 +4,22 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+class PageContextSchema(BaseModel):
+    route: Optional[str] = ""
+    page_type: Optional[str] = ""
+    farm_id: Optional[str] = ""
+    pond_id: Optional[str] = ""
+    cycle_id: Optional[str] = ""
+    filters: dict[str, str] = Field(default_factory=dict)
+
+
 class ChatMessageSchema(BaseModel):
     message: str
     session_id: Optional[str] = None
     farm_id: Optional[str] = ""
     pond_id: Optional[str] = ""
     cycle_id: Optional[str] = ""
+    page_context: Optional[PageContextSchema] = None
 
 
 class MemoryCreateSchema(BaseModel):

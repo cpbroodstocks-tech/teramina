@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { axios } from "helper/axios";
-import type { AgentAlert, AgentMemory, AgentMemoryGraph, AgentMessage, AgentTask, ChatPayload } from "components/agent-chat/types";
+import type { AgentAlert, AgentMemory, AgentMemoryGraph, AgentMessage, AgentPageContext, AgentTask, ChatPayload } from "components/agent-chat/types";
 
 export const useAgentAlerts = (enabled: boolean) =>
   useQuery<AgentAlert[]>({
@@ -29,9 +29,10 @@ export const useSendAgentMessage = () =>
     farm_id?: string;
     pond_id?: string;
     cycle_id?: string;
+    page_context?: AgentPageContext;
   }>({
-    mutationFn: ({ message, session_id, farm_id, pond_id, cycle_id }) =>
-      axios.post("/agent/chat", { message, session_id, farm_id, pond_id, cycle_id }).then((r: any) => r?.payload),
+    mutationFn: ({ message, session_id, farm_id, pond_id, cycle_id, page_context }) =>
+      axios.post("/agent/chat", { message, session_id, farm_id, pond_id, cycle_id, page_context }).then((r: any) => r?.payload),
   });
 
 export const useDeleteAgentSession = () =>
@@ -123,6 +124,14 @@ export const useDeleteAgentMemory = () => {
   const invalidate = useInvalidateAgentMemories();
   return useMutation<void, Error, string>({
     mutationFn: (memoryId) => axios.delete(`/agent/memories/${memoryId}`),
+    onSuccess: () => invalidate(),
+  });
+};
+
+export const useVerifyAgentMemory = () => {
+  const invalidate = useInvalidateAgentMemories();
+  return useMutation<void, Error, string>({
+    mutationFn: (memoryId) => axios.patch(`/agent/memories/${memoryId}/verify`),
     onSuccess: () => invalidate(),
   });
 };

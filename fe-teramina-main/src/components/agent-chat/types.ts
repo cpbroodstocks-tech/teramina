@@ -80,12 +80,22 @@ export interface AgentMemoryGraph {
   observations: AgentMemoryObservation[];
 }
 
+export interface AgentPageContext {
+  route: string;
+  page_type: string;
+  farm_id: string;
+  pond_id: string;
+  cycle_id: string;
+  filters: Record<string, string>;
+}
+
 export interface ChatPayload {
   session_id: string;
   response: string;
   farm_id: string;
   pond_id: string;
   cycle_id: string;
+  page_context?: AgentPageContext;
 }
 
 export interface StreamEvent {

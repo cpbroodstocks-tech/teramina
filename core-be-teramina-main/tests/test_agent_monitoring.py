@@ -214,6 +214,70 @@ class TestMonitoringTaskTriggers:
         assert FarmAlert.objects(cycle_id=CYCLE_ID).count() == 0
 
 
+class TestPatternDetectionJobs:
+
+    def setup_method(self):
+        _clear()
+
+    def _run_detector(self, detector, cycle_data=None, feed_rows=None, forecast_rows=None, cost_rows=None):
+        farm, pond = _make_farm_and_pond()
+        cycle = _make_cycle()
+        with (
+            patch("teramina.agent.tasks.monitoring_tasks.Cycle") as MockCycle,
+            patch("teramina.agent.tasks.monitoring_tasks.Pond") as MockPond,
+            patch("teramina.agent.tasks.monitoring_tasks.Farm") as MockFarm,
+            patch("teramina.agent.tasks.monitoring_tasks.CycleData") as MockCD,
+            patch("teramina.agent.tasks.monitoring_tasks.FeedRealization") as MockFeed,
+            patch("teramina.agent.tasks.monitoring_tasks.ForecastData") as MockForecast,
+            patch("teramina.agent.tasks.monitoring_tasks.CostData") as MockCost,
+        ):
+            MockCycle.objects.return_value = [cycle]
+            MockPond.objects.return_value.first.return_value = pond
+            MockFarm.objects.return_value.first.return_value = farm
+            MockCD.objects.return_value.first.return_value = _make_cycle_data(cycle_data or [])
+            MockFeed.objects.return_value.order_by.return_value.limit.return_value = feed_rows or []
+            forecast = MagicMock()
+            forecast.result_data = forecast_rows or []
+            MockForecast.objects.return_value.first.return_value = forecast
+            cost = MagicMock()
+            cost.data = cost_rows or []
+            MockCost.objects.return_value.first.return_value = cost
+            return detector()
+
+    def test_detect_recurring_low_do_patterns_creates_graph_memory(self):
+        from teramina.agent.tasks.monitoring_tasks import detect_recurring_low_do_patterns
+
+        result = self._run_detector(
+            detect_recurring_low_do_patterns,
+            cycle_data=[
+                {"doc": 40, "do_avg": 3.0},
+                {"doc": 41, "do_avg": 3.2},
+                {"doc": 42, "do_avg": 5.0},
+            ],
+        )
+
+        assert result["created"] == 1
+        memory = AgentMemory.objects(tags__all=["pattern", "low_DO_after_DOC_40"]).first()
+        assert memory is not None
+        observation = MemoryObservation.objects(source_ref=f"agent_memory:{memory.id}").first()
+        assert observation.observation_type == "risk_pattern"
+        assert observation.structured_data["risk_level"] == "medium"
+
+    def test_detect_high_feed_leftover_patterns_creates_graph_memory(self):
+        from teramina.agent.tasks.monitoring_tasks import detect_high_feed_leftover_patterns
+
+        feed_row = MagicMock()
+        feed_row.feed_given = 100
+        feed_row.feed_leftover = 30
+
+        result = self._run_detector(detect_high_feed_leftover_patterns, feed_rows=[feed_row])
+
+        assert result["created"] == 1
+        memory = AgentMemory.objects(tags__all=["pattern", "high_feed_leftover"]).first()
+        assert memory is not None
+        assert "feed leftover" in memory.content.lower()
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # AgentService: get_today_summary
 # ──────────────────────────────────────────────────────────────────────────────

@@ -9,15 +9,18 @@ import {
   MenuItem,
   Paper,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Typography,
 } from "@mui/material";
-import { MdDeleteOutline, MdRefresh } from "react-icons/md";
+import { MdCheckCircleOutline, MdDeleteOutline, MdRefresh } from "react-icons/md";
 import {
   useAgentMemoryGraph,
   useAgentMemories,
   useCreateAgentMemory,
   useDeleteAgentMemory,
+  useVerifyAgentMemory,
 } from "components/agent-chat/queries";
 import { useToastStore } from "store/toast.store";
 
@@ -28,8 +31,75 @@ const formatDate = (value) => {
   return new Date(value).toLocaleString();
 };
 
+const confidenceColor = (c) => {
+  if (c >= 0.8) return { color: "#2e7d32", borderColor: "#66bb6a" };
+  if (c >= 0.6) return { color: "#e65100", borderColor: "#ffa726" };
+  return { color: "#616161", borderColor: "#bdbdbd" };
+};
+
+const MemoryCard = ({ memory, deleting, verifying, onDelete, onVerify }) => (
+  <Paper key={memory.id} variant="outlined" sx={{ p: 2 }}>
+    <Stack direction="row" gap={1.5} sx={{ alignItems: "flex-start" }}>
+      <Box flex={1}>
+        <Stack direction="row" gap={1} sx={{ flexWrap: "wrap", mb: 1 }}>
+          <Chip size="small" label={memory.memory_type} />
+          <Chip
+            size="small"
+            color={memory.is_verified ? "success" : "warning"}
+            label={memory.is_verified ? "verified" : "needs review"}
+          />
+          <Chip size="small" variant="outlined" label={memory.source} />
+          {memory.confidence != null && (
+            <Chip
+              size="small"
+              variant="outlined"
+              label={`${Math.round(memory.confidence * 100)}%`}
+              sx={confidenceColor(memory.confidence)}
+            />
+          )}
+        </Stack>
+        <Typography variant="body1" mb={1}>
+          {memory.content}
+        </Typography>
+        {memory.tags.length > 0 && (
+          <Stack direction="row" gap={0.5} sx={{ flexWrap: "wrap", mb: 1 }}>
+            {memory.tags.map((tag) => (
+              <Chip key={tag} size="small" variant="outlined" label={tag} />
+            ))}
+          </Stack>
+        )}
+        <Typography variant="caption" color="text.secondary">
+          Created {formatDate(memory.created_at)}
+        </Typography>
+      </Box>
+      <Stack direction="row" gap={0.5}>
+        {!memory.is_verified && (
+          <IconButton
+            size="small"
+            disabled={verifying}
+            onClick={() => onVerify(memory.id)}
+            title="Verify memory"
+            color="success"
+          >
+            <MdCheckCircleOutline />
+          </IconButton>
+        )}
+        <IconButton
+          size="small"
+          disabled={deleting}
+          onClick={() => onDelete(memory.id)}
+          title="Delete memory"
+        >
+          <MdDeleteOutline />
+        </IconButton>
+      </Stack>
+    </Stack>
+  </Paper>
+);
+
 const MemoryPage = () => {
   const { setToast } = useToastStore();
+  const [tab, setTab] = useState(0);
   const [type, setType] = useState("all");
   const [query, setQuery] = useState("");
   const [useCurrentContext, setUseCurrentContext] = useState(true);
@@ -61,6 +131,7 @@ const MemoryPage = () => {
     pond_id: pondId,
   });
   const { mutateAsync: deleteMemory, isPending: deleting } = useDeleteAgentMemory();
+  const { mutateAsync: verifyMemory, isPending: verifying } = useVerifyAgentMemory();
   const { mutateAsync: createMemory, isPending: creating } = useCreateAgentMemory();
 
   const filtered = useMemo(() => {
@@ -78,6 +149,11 @@ const MemoryPage = () => {
     });
   }, [memories, query, type]);
 
+  const needsReview = useMemo(
+    () => memories.filter((m) => !m.is_verified || m.confidence < 0.7),
+    [memories],
+  );
+
   const recentGraphObservations = useMemo(() => graph.observations.slice(0, 3), [graph.observations]);
 
   const handleDelete = async (memoryId) => {
@@ -86,6 +162,15 @@ const MemoryPage = () => {
       setToast({ open: true, variant: "success", text: "Memory deleted" });
     } catch {
       setToast({ open: true, variant: "error", text: "Failed to delete memory" });
+    }
+  };
+
+  const handleVerify = async (memoryId) => {
+    try {
+      await verifyMemory(memoryId);
+      setToast({ open: true, variant: "success", text: "Memory verified" });
+    } catch {
+      setToast({ open: true, variant: "error", text: "Failed to verify memory" });
     }
   };
 
@@ -204,59 +289,15 @@ const MemoryPage = () => {
 
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="subtitle1" fontWeight={600} mb={1.5}>
-          Review memories
+          Graph memory
         </Typography>
-        <Stack direction={{ xs: "column", md: "row" }} gap={2} sx={{ alignItems: { md: "center" } }}>
-          <TextField
-            size="small"
-            label="Search memory"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            sx={{ minWidth: 260 }}
-          />
-          <TextField
-            select
-            size="small"
-            label="Type"
-            value={type}
-            onChange={(event) => setType(event.target.value)}
-            sx={{ minWidth: 180 }}
-          >
-            {typeOptions.map((option) => (
-              <MenuItem key={option} value={option}>
-                {option}
-              </MenuItem>
-            ))}
-          </TextField>
-          <Button
-            variant={useCurrentContext ? "contained" : "outlined"}
-            onClick={() => setUseCurrentContext((value) => !value)}
-          >
-            {useCurrentContext ? "Current context" : "All memories"}
-          </Button>
-          {contextLabel && (
-            <Typography variant="body2" color="text.secondary">
-              {contextLabel}
-            </Typography>
-          )}
-        </Stack>
-      </Paper>
-
-      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Stack direction={{ xs: "column", md: "row" }} gap={2} sx={{ justifyContent: "space-between", mb: 1.5 }}>
-          <Box>
-            <Typography variant="subtitle1" fontWeight={600}>
-              Graph memory
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Connected farm, pond, cycle, action, and observation context.
-            </Typography>
-          </Box>
-          <Stack direction="row" gap={1} sx={{ flexWrap: "wrap" }}>
-            <Chip size="small" label={`${graph.entities.length} entities`} />
-            <Chip size="small" label={`${graph.relations.length} links`} />
-            <Chip size="small" label={`${graph.observations.length} observations`} />
-          </Stack>
+        <Typography variant="body2" color="text.secondary" mb={1.5}>
+          Connected farm, pond, cycle, action, and observation context.
+        </Typography>
+        <Stack direction="row" gap={1} sx={{ flexWrap: "wrap", mb: 1.5 }}>
+          <Chip size="small" label={`${graph.entities.length} entities`} />
+          <Chip size="small" label={`${graph.relations.length} links`} />
+          <Chip size="small" label={`${graph.observations.length} observations`} />
         </Stack>
 
         {isGraphLoading && (
@@ -265,13 +306,10 @@ const MemoryPage = () => {
             <Typography variant="body2">Loading graph memory...</Typography>
           </Stack>
         )}
-
         {isGraphError && <Alert severity="error">Failed to load graph memory.</Alert>}
-
         {!isGraphLoading && !isGraphError && recentGraphObservations.length === 0 && (
           <Alert severity="info">No graph observations for the current filters yet.</Alert>
         )}
-
         {!isGraphLoading && !isGraphError && recentGraphObservations.length > 0 && (
           <Stack gap={1}>
             {recentGraphObservations.map((observation) => (
@@ -292,70 +330,110 @@ const MemoryPage = () => {
         )}
       </Paper>
 
-      {isLoading && (
-        <Stack direction="row" gap={1} sx={{ alignItems: "center" }}>
-          <CircularProgress size={18} />
-          <Typography variant="body2">Loading memories...</Typography>
-        </Stack>
-      )}
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+        <Tab label="All memories" />
+        <Tab
+          label={
+            needsReview.length > 0
+              ? `Needs review (${needsReview.length})`
+              : "Needs review"
+          }
+        />
+      </Tabs>
 
-      {isError && <Alert severity="error">Failed to load memories.</Alert>}
-
-      {!isLoading && !isError && filtered.length === 0 && (
-        <Alert severity="info">No memories match the current filters.</Alert>
-      )}
-
-      <Stack gap={1.5}>
-        {filtered.map((memory) => (
-          <Paper key={memory.id} variant="outlined" sx={{ p: 2 }}>
-            <Stack direction="row" gap={1.5} sx={{ alignItems: "flex-start" }}>
-              <Box flex={1}>
-                <Stack direction="row" gap={1} sx={{ flexWrap: "wrap", mb: 1 }}>
-                  <Chip size="small" label={memory.memory_type} />
-                  <Chip
-                    size="small"
-                    color={memory.is_verified ? "success" : "default"}
-                    label={memory.is_verified ? "verified" : "unverified"}
-                  />
-                  <Chip size="small" variant="outlined" label={memory.source} />
-                  {memory.confidence != null && (
-                    <Chip
-                      size="small"
-                      variant="outlined"
-                      label={`${Math.round(memory.confidence * 100)}%`}
-                      sx={{
-                        color: memory.confidence >= 0.8 ? "#2e7d32" : memory.confidence >= 0.6 ? "#e65100" : "#616161",
-                        borderColor: memory.confidence >= 0.8 ? "#66bb6a" : memory.confidence >= 0.6 ? "#ffa726" : "#bdbdbd",
-                      }}
-                    />
-                  )}
-                </Stack>
-                <Typography variant="body1" mb={1}>
-                  {memory.content}
-                </Typography>
-                {memory.tags.length > 0 && (
-                  <Stack direction="row" gap={0.5} sx={{ flexWrap: "wrap", mb: 1 }}>
-                    {memory.tags.map((tag) => (
-                      <Chip key={tag} size="small" variant="outlined" label={tag} />
-                    ))}
-                  </Stack>
-                )}
-                <Typography variant="caption" color="text.secondary">
-                  Created {formatDate(memory.created_at)}
-                </Typography>
-              </Box>
-              <IconButton
+      {tab === 0 && (
+        <>
+          <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+            <Stack direction={{ xs: "column", md: "row" }} gap={2} sx={{ alignItems: { md: "center" } }}>
+              <TextField
                 size="small"
-                disabled={deleting}
-                onClick={() => handleDelete(memory.id)}
-                title="Delete memory"
+                label="Search memory"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                sx={{ minWidth: 260 }}
+              />
+              <TextField
+                select
+                size="small"
+                label="Type"
+                value={type}
+                onChange={(event) => setType(event.target.value)}
+                sx={{ minWidth: 180 }}
               >
-                <MdDeleteOutline />
-              </IconButton>
+                {typeOptions.map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <Button
+                variant={useCurrentContext ? "contained" : "outlined"}
+                onClick={() => setUseCurrentContext((value) => !value)}
+              >
+                {useCurrentContext ? "Current context" : "All memories"}
+              </Button>
+              {contextLabel && (
+                <Typography variant="body2" color="text.secondary">
+                  {contextLabel}
+                </Typography>
+              )}
             </Stack>
           </Paper>
-        ))}
-      </Stack>
+
+          {isLoading && (
+            <Stack direction="row" gap={1} sx={{ alignItems: "center" }}>
+              <CircularProgress size={18} />
+              <Typography variant="body2">Loading memories...</Typography>
+            </Stack>
+          )}
+          {isError && <Alert severity="error">Failed to load memories.</Alert>}
+          {!isLoading && !isError && filtered.length === 0 && (
+            <Alert severity="info">No memories match the current filters.</Alert>
+          )}
+          <Stack gap={1.5}>
+            {filtered.map((memory) => (
+              <MemoryCard
+                key={memory.id}
+                memory={memory}
+                deleting={deleting}
+                verifying={verifying}
+                onDelete={handleDelete}
+                onVerify={handleVerify}
+              />
+            ))}
+          </Stack>
+        </>
+      )}
+
+      {tab === 1 && (
+        <>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            These memories were inferred by the assistant or saved with low confidence. Verify ones that are
+            accurate, or delete ones that are wrong.
+          </Alert>
+          {isLoading && (
+            <Stack direction="row" gap={1} sx={{ alignItems: "center" }}>
+              <CircularProgress size={18} />
+              <Typography variant="body2">Loading memories...</Typography>
+            </Stack>
+          )}
+          {!isLoading && needsReview.length === 0 && (
+            <Alert severity="success">All memories have been reviewed. Nothing pending.</Alert>
+          )}
+          <Stack gap={1.5}>
+            {needsReview.map((memory) => (
+              <MemoryCard
+                key={memory.id}
+                memory={memory}
+                deleting={deleting}
+                verifying={verifying}
+                onDelete={handleDelete}
+                onVerify={handleVerify}
+              />
+            ))}
+          </Stack>
+        </>
+      )}
     </Box>
   );
 };
