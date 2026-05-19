@@ -14,7 +14,7 @@ import {
   Chip,
   Divider,
 } from "@mui/material";
-import { MdExpandMore, MdClose, MdSend, MdDeleteOutline, MdDone, MdAlarm, MdGroups } from "react-icons/md";
+import { MdExpandMore, MdClose, MdSend, MdDeleteOutline, MdDone, MdAlarm, MdGroups, MdMic, MdStop } from "react-icons/md";
 import ReactMarkdown from "react-markdown";
 import { useToastStore } from "store/toast.store";
 import {
@@ -27,6 +27,7 @@ import {
   useCompleteAgentTask,
   useExplainForTeam,
   useCreateAgentMemory,
+  useCreateVoiceNote,
 } from "components/agent-chat/queries";
 import { buildAgentContext } from "components/agent-chat/context";
 
@@ -63,9 +64,12 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [recording, setRecording] = useState(false);
   const [sessionId, setSessionId] = useState(() => localStorage.getItem(SESSION_KEY) || "");
   const messagesEndRef = useRef(null);
   const abortRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
 
   const { data: alerts = [] } = useAgentAlerts(open);
   const { data: tasks = [] } = useGetAgentTasks(open);
@@ -76,6 +80,7 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
   const { mutateAsync: completeTask } = useCompleteAgentTask();
   const { mutateAsync: explainForTeam, isPending: explaining } = useExplainForTeam();
   const { mutateAsync: createMemory, isPending: savingMemory } = useCreateAgentMemory();
+  const { mutateAsync: createVoiceNote, isPending: transcribing } = useCreateVoiceNote();
 
   useEffect(() => {
     if (onAlertsLoaded) onAlertsLoaded(alerts.length);
@@ -324,6 +329,44 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
     if (hours < 0) return "Overdue";
     if (hours < 24) return `Due in ${hours}h`;
     return `Due in ${Math.round(hours / 24)}d`;
+  };
+
+  const handleVoiceRecord = async () => {
+    if (recording) {
+      mediaRecorderRef.current?.stop();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      mediaRecorderRef.current = mr;
+      audioChunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setRecording(false);
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const context = buildAgentContext({ params, search: location.search, pathname: location.pathname });
+        const fd = new FormData();
+        fd.append("audio", blob, "voice-note.webm");
+        fd.append("farm_id", context.farm_id || "");
+        fd.append("pond_id", context.pond_id || "");
+        fd.append("cycle_id", context.cycle_id || "");
+        try {
+          const note = await createVoiceNote(fd);
+          if (note?.content) {
+            setInput((prev) => prev ? `${prev} ${note.content}` : note.content);
+            setToast({ open: true, variant: "success", text: "Voice transcribed" });
+          }
+        } catch {
+          setToast({ open: true, variant: "error", text: "Voice transcription failed" });
+        }
+      };
+      mr.start();
+      setRecording(true);
+    } catch {
+      setToast({ open: true, variant: "error", text: "Microphone access denied" });
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -618,6 +661,14 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
           onKeyDown={handleKeyDown}
           disabled={sending}
         />
+        <IconButton
+          onClick={handleVoiceRecord}
+          disabled={sending || transcribing}
+          style={{ alignSelf: "flex-end", color: recording ? "#f44336" : "#757575" }}
+          title={recording ? "Stop recording" : "Record voice note"}
+        >
+          {transcribing ? <CircularProgress size={18} /> : recording ? <MdStop size={20} /> : <MdMic size={20} />}
+        </IconButton>
         <IconButton
           color="primary"
           onClick={handleSend}

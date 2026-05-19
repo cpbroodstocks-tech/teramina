@@ -178,3 +178,19 @@ export const useGetPondTimeline = (cycle_id: string | null, limit = 50) =>
       axios.get("/agent/pond-timeline", { params: { cycle_id, limit } }).then((r: any) => r?.payload),
     enabled: !!cycle_id,
   });
+
+export const useCreateVoiceNote = () =>
+  useMutation<{ id: string; content: string }, Error, FormData>({
+    mutationFn: (formData) =>
+      axios.post("/agent/voice-note", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      }).then((r: any) => r?.payload?.data),
+  });
+
+export const useGetFarmerNotes = (farm_id: string | null, enabled: boolean) =>
+  useQuery({
+    queryKey: ["farmer-notes", farm_id],
+    queryFn: () =>
+      axios.get("/agent/notes", { params: { farm_id, limit: 30 } }).then((r: any) => r?.payload?.data ?? []),
+    enabled: enabled && !!farm_id,
+  });

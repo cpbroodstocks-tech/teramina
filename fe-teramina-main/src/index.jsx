@@ -12,6 +12,12 @@ import ReactGA from "react-ga4"; // import react-ga
 import * as Sentry from "@sentry/react";
 
 import reportWebVitals from "./reportWebVitals";
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}
 import Loader from "components/loader";
 import ErrorBoundary from "components/error-boundary";
 

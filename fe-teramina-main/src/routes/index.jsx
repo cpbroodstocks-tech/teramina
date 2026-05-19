@@ -38,6 +38,7 @@ const FarmPLReport = lazy(() => import("pages/dashboard/farm_pl_report"));
 const Memory = lazy(() => import("pages/dashboard/memory"));
 const TodayView = lazy(() => import("pages/dashboard/today"));
 const PondTimeline = lazy(() => import("pages/dashboard/pond-timeline"));
+const DailyLog = lazy(() => import("pages/dashboard/daily-log"));
 const SharePage = lazy(() => import("pages/share"));
 
 const routes = [
@@ -151,6 +152,13 @@ const routes = [
         label: "MENU.MEMORY",
         element: <Memory />,
         icon: <PsychologyIcon fontSize="small" />,
+        category: "parrent",
+      },
+      {
+        path: "daily-log",
+        label: "MENU.DAILY_LOG",
+        element: <DailyLog />,
+        icon: <TodayIcon fontSize="small" />,
         category: "parrent",
       },
       {

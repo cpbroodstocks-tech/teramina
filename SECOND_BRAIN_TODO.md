@@ -71,6 +71,44 @@
 - [x] Decide whether MVP should be committed before vector retrieval work.
 - [x] Re-run backend tests, frontend tests, lint, build, and syntax checks.
 
+## Strategic Remaining Work
+
+### Stage 1: Mongo Memory Backfill Gate
+
+- [x] Add a dry-run/apply management command for existing `agent_memories`.
+- [x] Backfill missing `memory_observations` with `source_ref=agent_memory:<id>`.
+- [x] Attach `source_ref` to legacy matching observations when safe.
+- [x] Clamp flat memory and graph observation confidence values into `0.0..1.0`.
+- [x] Report duplicate legacy observations for manual review instead of guessing.
+- [x] Add focused backend tests for dry-run and apply behavior.
+- [x] Re-run backend memory tests and syntax checks.
+
+### Stage 2: Vector Retrieval MVP
+
+- [x] Choose the short-term vector store path for the current Mongo MVP.
+- [x] Add embedding provider abstraction with test doubles.
+- [x] Add memory embedding fields or companion collection.
+- [x] Index verified memories and graph observations after create/backfill.
+- [x] Add semantic memory search endpoint/tool with deterministic fallback.
+- [x] Add tests for lexical fallback, embedding upsert, and scoped retrieval.
+
+### Stage 3: Retrieval-Aware Chat
+
+- [x] Inject semantically relevant memory snippets into chat context.
+- [x] Preserve source, reason, confidence, and context IDs in recommendations.
+- [x] Add regression tests for low-DO and harvest-history questions.
+- [x] Smoke-test Memory page, Pond panel, and chat drawer together.
+
+### Stage 4: Production Beta Hardening
+
+- [x] Add observability for memory search latency and hit/miss counts.
+- [x] Add backend low-confidence review filter path for memory review.
+- [x] Add admin/backoffice UI for low-confidence memories.
+- [x] Add documented rollback plan for vector indexing changes.
+- [x] Decide whether to merge MVP branch or continue toward beta branch.
+
+Decision: continue on the beta branch until the Mongo MVP vector layer and the separate Postgres/pgvector migration work are cleanly separated.
+
 ## Backend MVP
 
 - [x] Add memory entity, relation, and observation models.
