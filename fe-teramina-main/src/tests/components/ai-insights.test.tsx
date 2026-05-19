@@ -54,6 +54,15 @@ function insightPayload(overrides = {}) {
   return { payload: { insight: { ...sampleInsight, ...overrides } } };
 }
 
+function streamInsightResponse(insight) {
+  const insightJson = JSON.stringify(insight);
+  const body =
+    `data: {"type":"chunk","text":${JSON.stringify(insightJson)}}\n` +
+    "data: {\"type\":\"done\"}\n\n";
+
+  return new Response(body, { headers: { "Content-Type": "text/event-stream" } });
+}
+
 describe("AiInsights", () => {
   beforeEach(() => {
     mockSetToast.mockClear();
@@ -93,7 +102,7 @@ describe("AiInsights", () => {
   it("Generate button fetches and renders summary + score", async () => {
     const user = userEvent.setup();
     server.use(
-      http.get("*/summarize/insight", () => HttpResponse.json(insightPayload()))
+      http.get("*/summarize/insight/stream", () => streamInsightResponse(sampleInsight))
     );
 
     renderComponent();
@@ -106,7 +115,7 @@ describe("AiInsights", () => {
   it("renders metrics, anomalies, and recommendations after generate", async () => {
     const user = userEvent.setup();
     server.use(
-      http.get("*/summarize/insight", () => HttpResponse.json(insightPayload()))
+      http.get("*/summarize/insight/stream", () => streamInsightResponse(sampleInsight))
     );
 
     renderComponent();
@@ -121,8 +130,8 @@ describe("AiInsights", () => {
   it("shows error toast when Generate API fails", async () => {
     const user = userEvent.setup();
     server.use(
-      http.get("*/summarize/insight", () =>
-        HttpResponse.json({ message: "timeout" }, { status: 504 })
+      http.get("*/summarize/insight/stream", () =>
+        HttpResponse.error()
       )
     );
 
@@ -131,7 +140,7 @@ describe("AiInsights", () => {
 
     await waitFor(() =>
       expect(mockSetToast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error", text: "Failed to load insight" })
+        expect.objectContaining({ variant: "error", text: "Streaming failed" })
       )
     );
   });
@@ -177,18 +186,15 @@ describe("AiInsights", () => {
       summary: "Streamed insight summary",
       performance_score: 75,
     });
-    const body =
-      `data: {"type":"chunk","text":${JSON.stringify(insightJson)}}\n` +
-      "data: {\"type\":\"done\"}\n\n";
 
     server.use(
       http.get("*/summarize/insight/stream", () =>
-        new Response(body, { headers: { "Content-Type": "text/event-stream" } })
+        streamInsightResponse(JSON.parse(insightJson))
       )
     );
 
     renderComponent();
-    await user.click(screen.getByRole("button", { name: /Generate \(Live\)/i }));
+    await user.click(screen.getByRole("button", { name: /^Generate$/i }));
 
     expect(await screen.findByText("Streamed insight summary")).toBeInTheDocument();
   });
@@ -204,7 +210,7 @@ describe("AiInsights", () => {
     );
 
     renderComponent();
-    await user.click(screen.getByRole("button", { name: /Generate \(Live\)/i }));
+    await user.click(screen.getByRole("button", { name: /^Generate$/i }));
 
     await waitFor(() =>
       expect(mockSetToast).toHaveBeenCalledWith(
