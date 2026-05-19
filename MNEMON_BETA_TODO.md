@@ -12,6 +12,9 @@ Move Mnemon from MVP-complete to beta-ready without mixing in voice notes, daily
 - [x] Create an authenticated smoke-test checklist for farmer chat and memory review.
 - [x] Add beta rollout notes for the memory backfill command and Celery pattern jobs.
 - [x] Decide whether low-confidence memory review needs an internal admin UI or whether the farmer-facing review tab is enough for beta.
+- [x] Add actual periodic scheduling for Mnemon pattern detection.
+- [x] Add memory correction/update flow in backend and UI.
+- [x] Block unconfirmed `save_farm_memory` tool writes.
 - [ ] After beta checks pass, open/refresh the PR for `feature/second-brain-production-readiness`.
 
 ## Completed Execution Slice
@@ -49,3 +52,12 @@ The beta PR branch should remain:
 - `feature/second-brain-production-readiness`
 
 Current blocker: authenticated browser smoke testing requires a real Firebase session and seeded farmer data. GitHub PR creation also requires an authenticated `gh` session or `GH_TOKEN`.
+
+## Plan Gap Closure
+
+1. [x] Added `agent.detect_all_patterns` Celery task and daily beat schedule.
+2. [x] Added backend `PATCH /agent/memories/{memory_id}` correction API.
+3. [x] Synced corrected memory content/type/tags/confidence into graph observations and memory embeddings.
+4. [x] Added correction before save in chat confirmation UX.
+5. [x] Added correction controls on the Memory review page.
+6. [x] Hardened `save_farm_memory` so unconfirmed tool writes are rejected.

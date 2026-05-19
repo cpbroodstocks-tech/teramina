@@ -158,6 +158,54 @@ class TestAgentMemoryService:
         assert status == 200
         assert MemoryObservation.objects(content="Legacy observation cleanup.").count() == 0
 
+    def test_update_memory_corrects_flat_graph_and_embedding_records(self):
+        _, response = AgentService.add_memory(
+            USER_ID,
+            FARM_ID,
+            "note",
+            "Pond A has low DO every morning.",
+            pond_id=POND_ID,
+            cycle_id=CYCLE_ID,
+            tags=["old"],
+            confidence=0.5,
+        )
+        memory_id = response.payload["id"]
+
+        status, update_response = AgentService.update_memory(
+            memory_id,
+            USER_ID,
+            memory_type="event",
+            content="Pond A had low DO after heavy rain.",
+            tags=["do", "rain"],
+            confidence=1.2,
+        )
+
+        assert status == 200
+        assert update_response.message == "Memory updated"
+        memory = AgentMemory.objects(id=memory_id).first()
+        assert memory.memory_type == "event"
+        assert memory.content == "Pond A had low DO after heavy rain."
+        assert memory.tags == ["do", "rain"]
+        assert memory.confidence == 1.0
+        assert memory.is_verified is True
+
+        observation = MemoryObservation.objects(source_ref=f"agent_memory:{memory_id}").first()
+        assert observation.observation_type == "event_summary"
+        assert observation.content == "Pond A had low DO after heavy rain."
+        assert observation.confidence == 1.0
+        assert observation.is_verified is True
+
+        embedding = MemoryEmbedding.objects(source_ref=f"agent_memory:{memory_id}").first()
+        assert embedding.content == "Pond A had low DO after heavy rain."
+
+    def test_update_memory_rejects_empty_content(self):
+        _, response = AgentService.add_memory(USER_ID, FARM_ID, "note", "Keep me")
+
+        status, update_response = AgentService.update_memory(response.payload["id"], USER_ID, content="   ")
+
+        assert status == 400
+        assert update_response.message == "Memory content is required"
+
     def test_build_memory_context_prioritizes_matching_verified_memory(self):
         AgentService.add_memory(
             USER_ID,
@@ -418,7 +466,23 @@ class TestAgentMemoryTools:
     def setup_method(self):
         _clear_memory_collections()
 
-    def test_save_farm_memory_clamps_confidence_and_searches_by_tag(self):
+    def test_save_farm_memory_requires_confirmation(self):
+        farm = MagicMock()
+        farm.user_id = USER_ID
+        with patch("teramina.agent.services.agent_tools.Farm") as MockFarm:
+            MockFarm.objects.return_value.first.return_value = farm
+            result = save_farm_memory(
+                FARM_ID,
+                "event",
+                "DO improved after extra aeration.",
+                pond_id=POND_ID,
+                tags=["do", "aeration"],
+            )
+
+        assert result["saved"] is False
+        assert AgentMemory.objects(farm_id=FARM_ID).count() == 0
+
+    def test_save_farm_memory_clamps_confidence_and_searches_by_tag_after_confirmation(self):
         farm = MagicMock()
         farm.user_id = USER_ID
         with patch("teramina.agent.services.agent_tools.Farm") as MockFarm:
@@ -430,11 +494,14 @@ class TestAgentMemoryTools:
                 pond_id=POND_ID,
                 tags=["do", "aeration"],
                 confidence=1.5,
+                confirmed=True,
             )
 
         assert result["saved"] is True
         memory = AgentMemory.objects(farm_id=FARM_ID).first()
         assert memory.confidence == 1.0
+        assert memory.source == "user_input"
+        assert memory.is_verified is True
         assert MemoryEmbedding.objects(source_ref=f"agent_memory:{memory.id}").count() == 1
 
         search = search_farm_memory(FARM_ID, query="aeration", pond_id=POND_ID)

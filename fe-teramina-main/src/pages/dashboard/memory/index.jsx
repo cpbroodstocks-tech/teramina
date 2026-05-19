@@ -14,12 +14,13 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { MdCheckCircleOutline, MdDeleteOutline, MdRefresh } from "react-icons/md";
+import { MdCheckCircleOutline, MdClose, MdDeleteOutline, MdEdit, MdRefresh, MdSave } from "react-icons/md";
 import {
   useAgentMemoryGraph,
   useAgentMemories,
   useCreateAgentMemory,
   useDeleteAgentMemory,
+  useUpdateAgentMemory,
   useVerifyAgentMemory,
 } from "components/agent-chat/queries";
 import { useToastStore } from "store/toast.store";
@@ -37,12 +38,25 @@ const confidenceColor = (c) => {
   return { color: "#616161", borderColor: "#bdbdbd" };
 };
 
-const MemoryCard = ({ memory, deleting, verifying, onDelete, onVerify }) => (
+const MemoryCard = ({
+  memory,
+  deleting,
+  verifying,
+  updating,
+  editing,
+  draft,
+  onDelete,
+  onVerify,
+  onEdit,
+  onCancel,
+  onDraftChange,
+  onSave,
+}) => (
   <Paper key={memory.id} variant="outlined" sx={{ p: 2 }}>
     <Stack direction="row" gap={1.5} sx={{ alignItems: "flex-start" }}>
       <Box flex={1}>
         <Stack direction="row" gap={1} sx={{ flexWrap: "wrap", mb: 1 }}>
-          <Chip size="small" label={memory.memory_type} />
+          <Chip size="small" label={editing ? draft.memory_type : memory.memory_type} />
           <Chip
             size="small"
             color={memory.is_verified ? "success" : "warning"}
@@ -58,10 +72,45 @@ const MemoryCard = ({ memory, deleting, verifying, onDelete, onVerify }) => (
             />
           )}
         </Stack>
-        <Typography variant="body1" mb={1}>
-          {memory.content}
-        </Typography>
-        {memory.tags.length > 0 && (
+        {editing ? (
+          <Stack gap={1} sx={{ mb: 1 }}>
+            <TextField
+              select
+              size="small"
+              label="Type"
+              value={draft.memory_type}
+              onChange={(event) => onDraftChange({ ...draft, memory_type: event.target.value })}
+              sx={{ maxWidth: 180 }}
+            >
+              {typeOptions.filter((option) => option !== "all").map((option) => (
+                <MenuItem key={option} value={option}>
+                  {option}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              size="small"
+              label="Correct memory"
+              value={draft.content}
+              onChange={(event) => onDraftChange({ ...draft, content: event.target.value })}
+              multiline
+              minRows={2}
+              fullWidth
+            />
+            <TextField
+              size="small"
+              label="Tags"
+              value={draft.tags}
+              onChange={(event) => onDraftChange({ ...draft, tags: event.target.value })}
+              placeholder="do, harvest"
+            />
+          </Stack>
+        ) : (
+          <Typography variant="body1" mb={1}>
+            {memory.content}
+          </Typography>
+        )}
+        {!editing && memory.tags.length > 0 && (
           <Stack direction="row" gap={0.5} sx={{ flexWrap: "wrap", mb: 1 }}>
             {memory.tags.map((tag) => (
               <Chip key={tag} size="small" variant="outlined" label={tag} />
@@ -73,7 +122,38 @@ const MemoryCard = ({ memory, deleting, verifying, onDelete, onVerify }) => (
         </Typography>
       </Box>
       <Stack direction="row" gap={0.5}>
-        {!memory.is_verified && (
+        {editing ? (
+          <>
+            <IconButton
+              size="small"
+              disabled={updating || !draft.content.trim()}
+              onClick={() => onSave(memory.id)}
+              title="Save correction"
+              color="primary"
+            >
+              <MdSave />
+            </IconButton>
+            <IconButton
+              size="small"
+              disabled={updating}
+              onClick={onCancel}
+              title="Cancel correction"
+            >
+              <MdClose />
+            </IconButton>
+          </>
+        ) : (
+          <IconButton
+            size="small"
+            disabled={updating}
+            onClick={() => onEdit(memory)}
+            title="Correct memory"
+            color="primary"
+          >
+            <MdEdit />
+          </IconButton>
+        )}
+        {!editing && !memory.is_verified && (
           <IconButton
             size="small"
             disabled={verifying}
@@ -84,14 +164,14 @@ const MemoryCard = ({ memory, deleting, verifying, onDelete, onVerify }) => (
             <MdCheckCircleOutline />
           </IconButton>
         )}
-        <IconButton
+        {!editing && <IconButton
           size="small"
           disabled={deleting}
           onClick={() => onDelete(memory.id)}
           title="Delete memory"
         >
           <MdDeleteOutline />
-        </IconButton>
+        </IconButton>}
       </Stack>
     </Stack>
   </Paper>
@@ -107,6 +187,8 @@ const MemoryPage = () => {
   const [newContent, setNewContent] = useState("");
   const [newTags, setNewTags] = useState("");
   const [saveWithContext, setSaveWithContext] = useState(true);
+  const [editingId, setEditingId] = useState("");
+  const [draft, setDraft] = useState({ memory_type: "note", content: "", tags: "" });
   const farmId = useCurrentContext ? localStorage.getItem("farm_id") || "" : "";
   const pondId = useCurrentContext ? localStorage.getItem("pond_id") || "" : "";
   const currentFarmId = localStorage.getItem("farm_id") || "";
@@ -133,6 +215,7 @@ const MemoryPage = () => {
   const { mutateAsync: deleteMemory, isPending: deleting } = useDeleteAgentMemory();
   const { mutateAsync: verifyMemory, isPending: verifying } = useVerifyAgentMemory();
   const { mutateAsync: createMemory, isPending: creating } = useCreateAgentMemory();
+  const { mutateAsync: updateMemory, isPending: updating } = useUpdateAgentMemory();
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -171,6 +254,40 @@ const MemoryPage = () => {
       setToast({ open: true, variant: "success", text: "Memory verified" });
     } catch {
       setToast({ open: true, variant: "error", text: "Failed to verify memory" });
+    }
+  };
+
+  const handleEdit = (memory) => {
+    setEditingId(memory.id);
+    setDraft({
+      memory_type: memory.memory_type,
+      content: memory.content,
+      tags: (memory.tags || []).join(", "),
+    });
+  };
+
+  const handleUpdate = async (memoryId) => {
+    const content = draft.content.trim();
+    if (!content) {
+      setToast({ open: true, variant: "error", text: "Memory content is required" });
+      return;
+    }
+    const tags = draft.tags
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+    try {
+      await updateMemory({
+        memoryId,
+        memory_type: draft.memory_type,
+        content,
+        tags,
+        confidence: 0.95,
+      });
+      setEditingId("");
+      setToast({ open: true, variant: "success", text: "Memory updated" });
+    } catch {
+      setToast({ open: true, variant: "error", text: "Failed to update memory" });
     }
   };
 
@@ -397,8 +514,15 @@ const MemoryPage = () => {
                 memory={memory}
                 deleting={deleting}
                 verifying={verifying}
+                updating={updating}
+                editing={editingId === memory.id}
+                draft={draft}
                 onDelete={handleDelete}
                 onVerify={handleVerify}
+                onEdit={handleEdit}
+                onCancel={() => setEditingId("")}
+                onDraftChange={setDraft}
+                onSave={handleUpdate}
               />
             ))}
           </Stack>
@@ -427,8 +551,15 @@ const MemoryPage = () => {
                 memory={memory}
                 deleting={deleting}
                 verifying={verifying}
+                updating={updating}
+                editing={editingId === memory.id}
+                draft={draft}
                 onDelete={handleDelete}
                 onVerify={handleVerify}
+                onEdit={handleEdit}
+                onCancel={() => setEditingId("")}
+                onDraftChange={setDraft}
+                onSave={handleUpdate}
               />
             ))}
           </Stack>

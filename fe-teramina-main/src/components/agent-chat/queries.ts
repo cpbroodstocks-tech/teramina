@@ -136,6 +136,20 @@ export const useVerifyAgentMemory = () => {
   });
 };
 
+export const useUpdateAgentMemory = () => {
+  const invalidate = useInvalidateAgentMemories();
+  return useMutation<void, Error, {
+    memoryId: string;
+    memory_type?: AgentMemory["memory_type"];
+    content?: string;
+    tags?: string[];
+    confidence?: number;
+  }>({
+    mutationFn: ({ memoryId, ...payload }) => axios.patch(`/agent/memories/${memoryId}`, payload),
+    onSuccess: () => invalidate(),
+  });
+};
+
 export const useCreateAgentMemory = () => {
   const invalidate = useInvalidateAgentMemories();
   return useMutation<void, Error, {

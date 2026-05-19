@@ -590,6 +590,63 @@ class AgentService:
         return 200, DataSuccessSchema(code=200, message="Memory verified", payload={"id": memory_id})
 
     @staticmethod
+    def update_memory(memory_id: str, user_id: str, memory_type: str | None = None,
+                      content: str | None = None, tags: list | None = None,
+                      confidence: float | None = None) -> tuple:
+        try:
+            mem = AgentMemory.objects.filter(id=memory_id, user_id=user_id).first()
+        except ValidationError:
+            mem = None
+        if not mem:
+            return 400, DataErrorSchema(code=400, message="Memory not found")
+
+        valid_types = {"fact", "preference", "event", "advice", "note"}
+        new_type = memory_type if memory_type in valid_types else mem.memory_type
+        new_content = content.strip() if isinstance(content, str) else mem.content
+        if not new_content:
+            return 400, DataErrorSchema(code=400, message="Memory content is required")
+        new_confidence = mem.confidence if confidence is None else max(0.0, min(1.0, float(confidence)))
+        new_tags = list(tags) if tags is not None else list(mem.tags or [])
+
+        mem.memory_type = new_type
+        mem.content = new_content
+        mem.tags = new_tags
+        mem.confidence = new_confidence
+        mem.is_verified = True
+        mem.updated_at = datetime.utcnow()
+        mem.save()
+        index_agent_memory(mem)
+
+        source_ref = f"agent_memory:{memory_id}"
+        observations = list(MemoryObservation.objects(user_id=user_id, source_ref=source_ref))
+        observation_type = {
+            "fact": "fact",
+            "preference": "preference",
+            "event": "event_summary",
+            "advice": "outcome",
+            "note": "note",
+        }.get(new_type, "note")
+        for observation in observations:
+            observation.observation_type = observation_type
+            observation.content = new_content
+            observation.confidence = new_confidence
+            observation.is_verified = True
+            observation.save()
+            index_memory_observation(observation)
+
+        return 200, DataSuccessSchema(
+            code=200,
+            message="Memory updated",
+            payload={
+                "id": memory_id,
+                "memory_type": new_type,
+                "content": new_content,
+                "tags": new_tags,
+                "confidence": new_confidence,
+            },
+        )
+
+    @staticmethod
     def explain_for_team(user_id: str, farm_id: str, cycle_id: str = "", pond_id: str = "") -> tuple:
         """Generate a simple Bahasa Indonesia summary for farm workers."""
         try:

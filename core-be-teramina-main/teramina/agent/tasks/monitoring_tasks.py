@@ -533,3 +533,26 @@ def weekly_farm_summary():
 
     logger.info("Weekly summary complete: %d tasks created, %d errors", created, errors)
     return {"created": created, "errors": errors}
+
+
+@shared_task(name="agent.detect_all_patterns")
+def detect_all_patterns():
+    """
+    Celery Beat task (daily): run all pattern detectors across active cycles
+    and write durable pattern memories for recurring issues.
+    """
+    results = {}
+    for name, fn in (
+        ("detect_recurring_low_do_patterns", detect_recurring_low_do_patterns),
+        ("detect_growth_lag_patterns", detect_growth_lag_patterns),
+        ("detect_high_feed_leftover_patterns", detect_high_feed_leftover_patterns),
+        ("detect_harvest_outcome_patterns", detect_harvest_outcome_patterns),
+        ("detect_cost_overrun_patterns", detect_cost_overrun_patterns),
+    ):
+        try:
+            results[name] = fn()
+        except Exception as exc:
+            logger.error("Pattern detector %s failed: %s", name, exc)
+            results[name] = {"error": str(exc)}
+    logger.info("detect_all_patterns complete: %s", results)
+    return results

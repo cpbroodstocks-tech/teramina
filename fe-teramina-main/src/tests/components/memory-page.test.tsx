@@ -157,4 +157,37 @@ describe("MemoryPage", () => {
 
     await waitFor(() => expect(deletedId).toBe("memory-1"));
   });
+
+  it("updates a corrected memory and shows success toast", async () => {
+    const user = userEvent.setup();
+    let updatedId = "";
+    let capturedBody: Record<string, unknown> = {};
+
+    server.use(
+      http.get("*/agent/memories", () => HttpResponse.json(memoryPayload)),
+      http.get("*/agent/memories/graph", () => HttpResponse.json(graphPayload)),
+      http.patch("*/agent/memories/:id", async ({ params, request }) => {
+        updatedId = String(params.id);
+        capturedBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ payload: { id: updatedId } });
+      })
+    );
+
+    renderComponent();
+    expect(await screen.findByText("Farmer prefers harvest around size 40.")).toBeInTheDocument();
+
+    await user.click(screen.getByTitle("Correct memory"));
+    await user.clear(screen.getByLabelText("Correct memory"));
+    await user.type(screen.getByLabelText("Correct memory"), "Farmer prefers harvest around size 35.");
+    await user.click(screen.getByTitle("Save correction"));
+
+    await waitFor(() => expect(updatedId).toBe("memory-1"));
+    expect(capturedBody).toMatchObject({
+      memory_type: "preference",
+      content: "Farmer prefers harvest around size 35.",
+      tags: ["harvest"],
+      confidence: 0.95,
+    });
+    expect(mockSetToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success", text: "Memory updated" }));
+  });
 });

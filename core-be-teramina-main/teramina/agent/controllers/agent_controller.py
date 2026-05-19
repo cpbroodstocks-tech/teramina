@@ -7,7 +7,7 @@ from teramina.authentication.auth_bearer import AuthBearer
 from teramina.authentication.services.authentication_service import get_signed_in_user
 from teramina.schemas.general_schema import DataErrorSchema, DataSuccessSchema
 
-from ..schemas.agent_schema import ChatMessageSchema, ExplainSchema, MemoryCreateSchema
+from ..schemas.agent_schema import ChatMessageSchema, ExplainSchema, MemoryCreateSchema, MemoryUpdateSchema
 from ..services.agent_service import AgentService
 
 router = Router(tags=["Farm Assistant"])
@@ -117,6 +117,19 @@ def delete_memory(request, memory_id: str):
 def verify_memory(request, memory_id: str):
     user = get_signed_in_user(request)
     return AgentService.verify_memory(memory_id, str(user.id))
+
+
+@router.patch("/memories/{memory_id}", response=response_schema, auth=AuthBearer())
+def update_memory(request, memory_id: str, data: MemoryUpdateSchema = Body(...)):
+    user = get_signed_in_user(request)
+    return AgentService.update_memory(
+        memory_id=memory_id,
+        user_id=str(user.id),
+        memory_type=data.memory_type,
+        content=data.content,
+        tags=data.tags,
+        confidence=data.confidence,
+    )
 
 
 @router.post("/chat/stream", auth=AuthBearer())

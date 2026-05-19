@@ -32,6 +32,13 @@ class MemoryCreateSchema(BaseModel):
     confidence: float = 0.7
 
 
+class MemoryUpdateSchema(BaseModel):
+    memory_type: Optional[str] = None
+    content: Optional[str] = None
+    tags: Optional[list[str]] = None
+    confidence: Optional[float] = None
+
+
 class ExplainSchema(BaseModel):
     farm_id: str
     cycle_id: Optional[str] = ""

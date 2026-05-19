@@ -277,6 +277,27 @@ class TestPatternDetectionJobs:
         assert memory is not None
         assert "feed leftover" in memory.content.lower()
 
+    def test_detect_all_patterns_runs_each_detector(self):
+        from teramina.agent.tasks import monitoring_tasks
+
+        with patch.object(monitoring_tasks, "detect_recurring_low_do_patterns", return_value={"created": 1}) as low_do, \
+             patch.object(monitoring_tasks, "detect_growth_lag_patterns", return_value={"created": 2}) as growth, \
+             patch.object(monitoring_tasks, "detect_high_feed_leftover_patterns", return_value={"created": 3}) as feed, \
+             patch.object(monitoring_tasks, "detect_harvest_outcome_patterns", return_value={"created": 4}) as harvest, \
+             patch.object(monitoring_tasks, "detect_cost_overrun_patterns", return_value={"created": 5}) as cost:
+            result = monitoring_tasks.detect_all_patterns()
+
+        assert result["detect_recurring_low_do_patterns"]["created"] == 1
+        assert result["detect_growth_lag_patterns"]["created"] == 2
+        assert result["detect_high_feed_leftover_patterns"]["created"] == 3
+        assert result["detect_harvest_outcome_patterns"]["created"] == 4
+        assert result["detect_cost_overrun_patterns"]["created"] == 5
+        low_do.assert_called_once()
+        growth.assert_called_once()
+        feed.assert_called_once()
+        harvest.assert_called_once()
+        cost.assert_called_once()
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # AgentService: get_today_summary

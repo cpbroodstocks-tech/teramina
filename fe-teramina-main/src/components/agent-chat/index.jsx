@@ -305,7 +305,7 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
         pond_id: candidate.pond_id,
         cycle_id: candidate.cycle_id,
         memory_type: candidate.memory_type,
-        content: candidate.content,
+        content: candidate.content.trim(),
         tags: candidate.tags,
         confidence: 0.9,
       });
@@ -315,6 +315,18 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
     } catch {
       setToast({ open: true, variant: "error", text: "Failed to save memory" });
     }
+  };
+
+  const handleMemoryCandidateChange = (messageIndex, content) => {
+    setMessages((prev) => prev.map((msg, i) => (
+      i === messageIndex && msg.memoryCandidate
+        ? {
+          ...msg,
+          content: `Should I remember this for future recommendations?\n\n${content}`,
+          memoryCandidate: { ...msg.memoryCandidate, content },
+        }
+        : msg
+    )));
   };
 
   const formatDue = (dueAt) => {
@@ -575,23 +587,34 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
                     <span style={{ color: "#474DA4", fontWeight: "bold", fontSize: 14 }}>▋</span>
                   )}
                   {msg.memoryCandidate && (
-                    <Box style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                      <Button
+                    <Box style={{ marginTop: 8 }}>
+                      <TextField
+                        fullWidth
                         size="small"
-                        variant="contained"
-                        onClick={() => handleMemoryDecision(i, true)}
-                        disabled={savingMemory}
-                      >
-                        Remember
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() => handleMemoryDecision(i, false)}
-                        disabled={savingMemory}
-                      >
-                        Not now
-                      </Button>
+                        label="Edit memory before saving"
+                        multiline
+                        minRows={2}
+                        value={msg.memoryCandidate.content}
+                        onChange={(event) => handleMemoryCandidateChange(i, event.target.value)}
+                      />
+                      <Box style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={() => handleMemoryDecision(i, true)}
+                          disabled={savingMemory || !msg.memoryCandidate.content.trim()}
+                        >
+                          Remember
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => handleMemoryDecision(i, false)}
+                          disabled={savingMemory}
+                        >
+                          Not now
+                        </Button>
+                      </Box>
                     </Box>
                   )}
                 </Box>

@@ -177,17 +177,18 @@ Do not build now:
 
 ## Current Progress Snapshot
 
-- Memory CRUD: partial/done.
-- Memory review UI: partial/done.
-- Per-pond panel: partial.
+- Memory CRUD: done, including create, verify, correct/update, delete, graph sync, and embedding sync.
+- Memory review UI: done for list, filter, create, verify, correct/update, delete, and low-confidence review.
+- Per-pond panel: done for the MVP grouped memory surface.
 - Alert action outcome memory: done.
 - Chat context IDs: done for assistant chat payload.
 - `page_context`: done for assistant chat payload, backend schema, session persistence, and stream completion payload.
 - `search_memory`: done.
 - `get_pond_history`: done.
-- Confirmation UX: done for explicit farmer "Remember ..." chat turns.
-- Pattern jobs: done for low DO, growth lag, high feed leftover, harvest window, and cost overrun.
+- Confirmation UX: done for explicit farmer "Remember ..." chat turns, including correction before save.
+- Pattern jobs: done for low DO, growth lag, high feed leftover, harvest window, and cost overrun, with daily Celery Beat scheduling through `agent.detect_all_patterns`.
 - Eval suite: done as deterministic Mnemon quality gates.
+- Silent unconfirmed memory writes: blocked in `save_farm_memory`; the tool now requires explicit confirmation.
 
 ## Immediate Next Stage
 
@@ -196,14 +197,14 @@ Production hardening status:
 - Focused backend/frontend checks: done.
 - Local app boot smoke: done for frontend `/` and backend `/api/docs`.
 - Authenticated farmer chat + memory click-through: requires a real Firebase session and seeded farmer data.
-- Postgres/pgvector runtime hooks: isolated from active MongoEngine MVP settings and requirements.
+- Postgres/pgvector runtime hooks: parked outside the beta branch on `mnemon-experimental-voice-daily-log-pg`.
 
 ## Branch Hygiene Decision
 
-The following files are **Postgres/pgvector future-track** and must remain untracked on this branch:
+The following files are **Postgres/pgvector future-track** and were moved off this branch:
 
 - `core-be-teramina-main/teramina/core_pg/` — future Postgres app (models, sync, migrations).
 - `core-be-teramina-main/teramina/agent/models/pg_models.py` — Django ORM counterparts of Mongo models.
 - `core-be-teramina-main/teramina/agent/migrations/` — Django ORM migrations generated for the pg models.
 
-These will be committed only when the Postgres migration track is formally started. Do not add them to `.gitignore`; leave untracked so they are visible and can be staged intentionally later.
+These should stay on `mnemon-experimental-voice-daily-log-pg` until the Postgres migration track is formally started. The MongoEngine Mnemon beta branch should remain clean of these files.

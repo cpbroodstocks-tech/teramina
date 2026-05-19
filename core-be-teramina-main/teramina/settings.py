@@ -344,4 +344,8 @@ CELERY_BEAT_SCHEDULE = {
         "task": "agent.weekly_farm_summary",
         "schedule": 604800,  # every 7 days
     },
+    "detect-all-patterns": {
+        "task": "agent.detect_all_patterns",
+        "schedule": 86400,  # every 24 hours
+    },
 }

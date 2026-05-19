@@ -149,16 +149,18 @@ describe("AgentChat", () => {
 
     expect(await screen.findByText(/Should I remember this for future recommendations/i)).toBeInTheDocument();
     expect(fetchSpy).not.toHaveBeenCalled();
+    await user.clear(screen.getByLabelText("Edit memory before saving"));
+    await user.type(screen.getByLabelText("Edit memory before saving"), "Pond B has recurring low DO after heavy rain");
 
     await user.click(screen.getByRole("button", { name: "Remember" }));
 
-    await screen.findByText("Remembered: Pond B has low DO after rain");
+    await screen.findByText("Remembered: Pond B has recurring low DO after heavy rain");
     expect(capturedMemory).toMatchObject({
       farm_id: "farm-url",
       pond_id: "pond-url",
       cycle_id: "cycle-url",
       memory_type: "note",
-      content: "Pond B has low DO after rain",
+      content: "Pond B has recurring low DO after heavy rain",
       tags: ["chat_confirmation"],
       confidence: 0.9,
     });

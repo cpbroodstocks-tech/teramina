@@ -546,9 +546,14 @@ def get_pond_history(farm_id: str, pond_id: str, limit: int = 30) -> dict:
 
 def save_farm_memory(farm_id: str, memory_type: str, content: str,
                      pond_id: str = "", cycle_id: str = "", tags: list = None,
-                     confidence: float = 0.7) -> dict:
+                     confidence: float = 0.7, confirmed: bool = False) -> dict:
     """Persist a durable memory for this farm."""
     from .memory_retrieval import index_agent_memory, index_memory_observation
+    if not confirmed:
+        return {
+            "saved": False,
+            "error": "Memory was not saved because farmer confirmation is required.",
+        }
     valid_types = {"fact", "preference", "event", "advice", "note"}
     if memory_type not in valid_types:
         memory_type = "note"
@@ -563,8 +568,9 @@ def save_farm_memory(farm_id: str, memory_type: str, content: str,
         memory_type=memory_type,
         content=content,
         tags=tags or [],
-        source="agent_inference",
+        source="user_input",
         confidence=min(max(confidence, 0.0), 1.0),
+        is_verified=True,
     )
     index_agent_memory(memory)
     observation = _store_memory_observation(
@@ -574,6 +580,8 @@ def save_farm_memory(farm_id: str, memory_type: str, content: str,
         cycle_id=cycle_id,
         memory_type=memory_type,
         content=content,
+        source_type="farmer",
+        is_verified=True,
         source_ref=f"agent_memory:{memory.id}",
     )
     index_memory_observation(observation)
@@ -860,11 +868,18 @@ TOOL_DEFINITIONS = [
                     "type": "number",
                     "description": (
                         "How confident you are in this memory (0.0–1.0). Use 0.9+ for farmer-confirmed "
-                        "facts, 0.7 for AI inferences, 0.5 for uncertain observations."
+                        "facts and lower values only when the farmer explicitly confirms uncertainty."
+                    ),
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": (
+                        "Must be true only after the farmer explicitly confirms this should be remembered. "
+                        "If false or omitted, the memory will not be saved."
                     ),
                 },
             },
-            "required": ["farm_id", "memory_type", "content"],
+            "required": ["farm_id", "memory_type", "content", "confirmed"],
         },
     },
 ]
