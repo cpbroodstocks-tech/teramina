@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime
 
 import anthropic
+from mongoengine import ValidationError
 
 from teramina.cycle_data.models.cycle_data_model import CycleData
 from teramina.farm.models.farm_model import Farm
@@ -577,7 +578,10 @@ class AgentService:
 
     @staticmethod
     def verify_memory(memory_id: str, user_id: str) -> tuple:
-        mem = AgentMemory.objects.filter(id=memory_id, user_id=user_id).first()
+        try:
+            mem = AgentMemory.objects.filter(id=memory_id, user_id=user_id).first()
+        except ValidationError:
+            mem = None
         if not mem:
             return 400, DataErrorSchema(code=400, message="Memory not found")
         mem.update(is_verified=True)

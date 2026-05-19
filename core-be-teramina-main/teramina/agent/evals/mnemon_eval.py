@@ -1,5 +1,6 @@
 """Deterministic checks for Mnemon memory-answer quality."""
 
+import json
 import re
 
 
@@ -136,3 +137,28 @@ def evaluate_answer_set(cases: list[dict]) -> dict:
         "passed_count": sum(1 for result in results if result["passed"]),
         "results": results,
     }
+
+
+def load_answer_cases(path: str) -> list[dict]:
+    """Load eval cases from a JSON or JSONL answer file."""
+    with open(path, "r", encoding="utf-8") as handle:
+        raw = handle.read().strip()
+    if not raw:
+        return []
+
+    if raw.startswith("[") or raw.startswith("{"):
+        payload = json.loads(raw)
+        if isinstance(payload, dict):
+            cases = payload.get("answers", [payload] if payload.get("id") else [])
+        else:
+            cases = payload
+    else:
+        cases = [json.loads(line) for line in raw.splitlines() if line.strip()]
+
+    by_id = {case["id"]: case for case in FARMER_QUESTION_SET}
+    merged = []
+    for answer_case in cases:
+        case_id = answer_case.get("id")
+        base = by_id.get(case_id, {"id": case_id})
+        merged.append({**base, **answer_case})
+    return merged
