@@ -28,7 +28,7 @@ Move Mnemon from MVP-complete to beta-ready without mixing in voice notes, daily
 2. [x] Add rollout notes for `backfill_agent_memory_graph --apply`.
 3. [x] Add rollout notes for enabling periodic pattern jobs.
 4. [x] Decide whether low-confidence review needs internal admin UI for beta.
-5. [ ] Move or park experimental voice/daily-log/Postgres work before PR refresh.
+5. [x] Move or park experimental voice/daily-log/Postgres work before PR refresh.
 6. [ ] Run the authenticated smoke checklist with real Firebase session and seeded farmer data.
 7. [ ] Open/refresh the PR for `feature/second-brain-production-readiness`.
 
@@ -37,3 +37,15 @@ Move Mnemon from MVP-complete to beta-ready without mixing in voice notes, daily
 For beta, the farmer-facing Memory review page is enough for low-confidence memory review. An internal admin queue should wait until beta usage shows real support-team review volume or false-positive pattern memory pressure.
 
 Detailed runbook: `MNEMON_BETA_RUNBOOK.md`.
+
+## Branch Parking
+
+Experimental voice notes, daily log, and Postgres/pgvector migration work was moved to:
+
+- `mnemon-experimental-voice-daily-log-pg`
+
+The beta PR branch should remain:
+
+- `feature/second-brain-production-readiness`
+
+Current blocker: authenticated browser smoke testing requires a real Firebase session and seeded farmer data. GitHub PR creation also requires an authenticated `gh` session or `GH_TOKEN`.
