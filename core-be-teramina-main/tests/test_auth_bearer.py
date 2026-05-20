@@ -10,6 +10,7 @@ import pytest
 # conftest.py handles Django + mongomock setup
 
 from teramina.authentication.auth_bearer import AuthBearer
+from teramina.authentication.services.authentication_service import authenticate
 from teramina.user.models.user_model import User
 
 JWT_SECRET = os.getenv("JWT_SECRET_KEY", "test-jwt-secret")
@@ -91,6 +92,11 @@ class TestAuthenticate:
     def test_empty_token_returns_false(self, bearer, mock_request):
         result = bearer.authenticate(mock_request, "")
         assert result is False
+
+
+class TestPasswordAuthenticate:
+    def test_unknown_email_returns_none(self):
+        assert authenticate("missing@farm.io", "Password123!") is None
 
 
 # ---------------------------------------------------------------------------

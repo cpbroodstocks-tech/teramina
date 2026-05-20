@@ -7,7 +7,13 @@ from teramina.authentication.auth_bearer import AuthBearer
 from teramina.authentication.services.authentication_service import get_signed_in_user
 from teramina.schemas.general_schema import DataErrorSchema, DataSuccessSchema
 
-from ..schemas.agent_schema import ChatMessageSchema, ExplainSchema, MemoryCreateSchema, MemoryUpdateSchema
+from ..schemas.agent_schema import (
+    ChatMessageSchema,
+    ExplainSchema,
+    MemoryCreateSchema,
+    MemoryUpdateSchema,
+    SummaryRequestSchema,
+)
 from ..services.agent_service import AgentService
 
 router = Router(tags=["Farm Assistant"])
@@ -148,7 +154,6 @@ def stream_chat(request, data: ChatMessageSchema = Body(...)):
     response = StreamingHttpResponse(gen, content_type="text/event-stream")
     response["Cache-Control"] = "no-cache"
     response["X-Accel-Buffering"] = "no"
-    response["Access-Control-Allow-Origin"] = "*"
     return response
 
 
@@ -167,6 +172,16 @@ def explain_for_team(request, data: ExplainSchema = Body(...)):
 def get_today_summary(request, farm_id: str):
     user = get_signed_in_user(request)
     return AgentService.get_today_summary(str(user.id), farm_id)
+
+
+@router.post("/summary", response=response_schema, auth=AuthBearer())
+def request_summary(request, data: SummaryRequestSchema = Body(...)):
+    return AgentService.request_external_summary(data.question, data.model)
+
+
+@router.get("/summary/{task_id}", response=response_schema, auth=AuthBearer())
+def get_summary_result(request, task_id: str):
+    return AgentService.get_external_summary_result(task_id)
 
 
 @router.get("/pond-timeline", response=response_schema, auth=AuthBearer())

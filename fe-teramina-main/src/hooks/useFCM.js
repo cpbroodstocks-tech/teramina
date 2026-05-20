@@ -22,7 +22,7 @@ export function useFCM() {
         const messaging = getMessaging(app);
         getToken(messaging, { vapidKey: VAPID_KEY }).then((token) => {
           if (token) {
-            axios.post(`/user/fcm-token?token=${encodeURIComponent(token)}`).then(() => {
+            axios.post("/user/fcm-token", { token }).then(() => {
               sessionStorage.setItem("fcm_registered", "1");
             });
           }

@@ -7,7 +7,7 @@ from mongoengine import Document, fields, QuerySetManager
 class AgentConversation(Document):
     """Stores per-session conversation history for the farm assistant."""
     user_id = fields.StringField(required=True)
-    session_id = fields.StringField(required=True, unique=True)
+    session_id = fields.StringField(required=True)
     farm_id = fields.StringField(default="")
     pond_id = fields.StringField(default="")
     cycle_id = fields.StringField(default="")
@@ -17,7 +17,7 @@ class AgentConversation(Document):
     last_active = fields.DateTimeField(default=datetime.now)
 
     meta = {
-        "indexes": ["user_id", "session_id"],
+        "indexes": ["user_id", {"fields": ["user_id", "session_id"], "unique": True}],
         "collection": "agent_conversations",
     }
     objects = QuerySetManager()
@@ -72,7 +72,13 @@ class AgentMemory(Document):
     expires_at = fields.DateTimeField(null=True)
 
     meta = {
-        "indexes": ["user_id", "farm_id", "pond_id", "-created_at"],
+        "indexes": [
+            "user_id",
+            "farm_id",
+            "pond_id",
+            "-created_at",
+            {"fields": ["expires_at"], "expireAfterSeconds": 0, "sparse": True},
+        ],
         "collection": "agent_memories",
     }
     objects = QuerySetManager()
@@ -150,7 +156,14 @@ class MemoryObservation(Document):
     expires_at = fields.DateTimeField(null=True)
 
     meta = {
-        "indexes": ["user_id", "farm_id", "pond_id", "cycle_id", "-created_at"],
+        "indexes": [
+            "user_id",
+            "farm_id",
+            "pond_id",
+            "cycle_id",
+            "-created_at",
+            {"fields": ["expires_at"], "expireAfterSeconds": 0, "sparse": True},
+        ],
         "collection": "memory_observations",
     }
     objects = QuerySetManager()
@@ -200,7 +213,7 @@ class FarmAlert(Document):
     outcome_memory_id = fields.StringField(default="")
 
     meta = {
-        "indexes": ["user_id", "is_read", "-created_at"],
+        "indexes": ["user_id", "is_read", "-created_at", {"fields": ["expires_at"], "expireAfterSeconds": 0}],
         "collection": "farm_alerts",
     }
     objects = QuerySetManager()

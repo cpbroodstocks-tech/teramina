@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime
 
 import anthropic
+import requests
 from mongoengine import ValidationError
 
 from teramina.cycle_data.models.cycle_data_model import CycleData
@@ -159,12 +160,14 @@ def _build_system_with_context(user_id: str, farm_id: str, pond_id: str,
     return "\n".join(context_lines)
 
 
-def _run_tool(tool_name: str, tool_input: dict) -> str:
+def _run_tool(tool_name: str, tool_input: dict, user_id: str = "") -> str:
     """Execute a tool and return its result as a JSON string."""
     fn = TOOL_REGISTRY.get(tool_name)
     if not fn:
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
     try:
+        if tool_name == "save_farm_memory":
+            tool_input = {**tool_input, "current_user_id": user_id}
         result = fn(**tool_input)
         return json.dumps(result, default=str)
     except Exception as exc:
@@ -186,7 +189,7 @@ class AgentService:
             session_id = str(uuid.uuid4())
 
         normalized_page_context = _normalize_page_context(page_context)
-        conversation = AgentConversation.objects.filter(session_id=session_id).first()
+        conversation = AgentConversation.objects.filter(session_id=session_id, user_id=user_id).first()
         if not conversation:
             conversation = AgentConversation.objects.create(
                 user_id=user_id,
@@ -241,7 +244,7 @@ class AgentService:
                 tool_results = []
                 for block in response.content:
                     if block.type == "tool_use":
-                        result_content = _run_tool(block.name, block.input)
+                        result_content = _run_tool(block.name, block.input, user_id=user_id)
                         tool_results.append({
                             "type": "tool_result",
                             "tool_use_id": block.id,
@@ -722,7 +725,7 @@ class AgentService:
             session_id = str(uuid.uuid4())
 
         normalized_page_context = _normalize_page_context(page_context)
-        conversation = AgentConversation.objects.filter(session_id=session_id).first()
+        conversation = AgentConversation.objects.filter(session_id=session_id, user_id=user_id).first()
         if not conversation:
             conversation = AgentConversation.objects.create(
                 user_id=user_id,
@@ -783,7 +786,7 @@ class AgentService:
                     for block in final_msg.content:
                         if block.type == "tool_use":
                             yield f"data: {json.dumps({'type': 'tool_start', 'name': block.name})}\n\n"
-                            result_content = _run_tool(block.name, block.input)
+                            result_content = _run_tool(block.name, block.input, user_id=user_id)
                             yield f"data: {json.dumps({'type': 'tool_done', 'name': block.name})}\n\n"
                             tool_results.append({
                                 "type": "tool_result",
@@ -931,6 +934,52 @@ class AgentService:
                 "tasks": tasks_payload,
             },
         )
+
+    @staticmethod
+    def request_external_summary(question: str, model: str | None = None) -> tuple:
+        """Proxy legacy summary generation so API credentials stay server-side."""
+        llm_api = os.getenv("TERAMINA_LLM_API")
+        api_key = os.getenv("TERAMINA_API_KEY")
+        if not llm_api or not api_key:
+            return 400, DataErrorSchema(code=400, message="Summary service is not configured")
+
+        try:
+            response = requests.post(
+                f"{llm_api.rstrip('/')}/api/chat",
+                json={
+                    "question": question,
+                    "model": model or os.getenv("SUMMARY_MODEL", "claude-sonnet-4-6"),
+                },
+                headers={"x-api-key": api_key},
+                timeout=30,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            logger.error("External summary request failed: %s", exc)
+            return 400, DataErrorSchema(code=400, message="Failed to start summary generation")
+
+        return 200, DataSuccessSchema(code=200, message="OK", payload=response.json())
+
+    @staticmethod
+    def get_external_summary_result(task_id: str) -> tuple:
+        """Proxy legacy summary polling so API credentials stay server-side."""
+        llm_api = os.getenv("TERAMINA_LLM_API")
+        api_key = os.getenv("TERAMINA_API_KEY")
+        if not llm_api or not api_key:
+            return 400, DataErrorSchema(code=400, message="Summary service is not configured")
+
+        try:
+            response = requests.get(
+                f"{llm_api.rstrip('/')}/api/chat/result/{task_id}",
+                headers={"x-api-key": api_key},
+                timeout=30,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            logger.error("External summary result request failed: %s", exc)
+            return 400, DataErrorSchema(code=400, message="Failed to fetch summary result")
+
+        return 200, DataSuccessSchema(code=200, message="OK", payload=response.json())
 
     @staticmethod
     def get_pond_timeline(user_id: str, cycle_id: str, limit: int = 50) -> tuple:

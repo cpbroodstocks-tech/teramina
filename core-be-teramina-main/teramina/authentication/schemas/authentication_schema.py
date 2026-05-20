@@ -3,10 +3,8 @@
 from ninja import Schema
 
 
-class SignedUserSchema(Schema):
-    email: str
-    photoURL: str
-    displayName: str
+class FirebaseTokenSchema(Schema):
+    token: str
 
 
 class UserLoginSchema(Schema):

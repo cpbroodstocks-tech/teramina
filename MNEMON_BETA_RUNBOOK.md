@@ -95,6 +95,21 @@ Run this against a seeded farmer account with at least one farm, pond, active cy
 
 ## Backfill Rollout
 
+### Conversation Session Index Migration
+
+The production-ready chat session key is now `(user_id, session_id)`, not a globally
+unique `session_id`. Before deploying to an existing MongoDB database:
+
+1. Inspect `agent_conversations` for duplicate `(user_id, session_id)` pairs.
+2. Drop the old global unique `session_id` index if it exists.
+3. Create the compound unique index:
+   - `db.agent_conversations.createIndex({ user_id: 1, session_id: 1 }, { unique: true })`
+4. Keep existing documents unchanged unless duplicate pairs are found for the same user.
+
+This prevents one farmer from reusing another farmer's client-supplied `session_id`.
+
+### Memory Graph Backfill
+
 The command is dry-run by default:
 
 ```bash
@@ -129,6 +144,9 @@ Rollback posture:
 ## Celery Pattern Job Rollout
 
 The committed schedule includes `detect-all-patterns` every 24 hours through `CELERY_BEAT_SCHEDULE`.
+By default production uses Celery's persistent scheduler so Mnemon does not require Postgres just to run beat.
+Set `CELERY_BEAT_SCHEDULER=django_celery_beat.schedulers:DatabaseScheduler` only if a Django relational database
+and `django_celery_beat` migrations are deployed.
 
 Required services:
 
@@ -137,7 +155,7 @@ Required services:
 - Celery worker:
   - `celery -A teramina worker --loglevel=info --concurrency=2`
 - Celery beat:
-  - `celery -A teramina beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler`
+  - `celery -A teramina beat --loglevel=info`
 
 Beta rollout:
 

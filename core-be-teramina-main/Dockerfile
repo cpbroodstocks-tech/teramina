@@ -29,4 +29,4 @@ EXPOSE 8000
 
 # run the app — gunicorn process manager with uvicorn workers
 # WORKERS default: 4; override at runtime with -e WORKERS=N
-CMD ["sh", "-c", "gunicorn teramina.asgi:application -k uvicorn.workers.UvicornWorker -w ${WORKERS:-4} --bind 0.0.0.0:8000 --timeout 120 --graceful-timeout 30 --access-logfile - --error-logfile -"]
+CMD ["sh", "-c", "gunicorn teramina.asgi:application -k uvicorn.workers.UvicornWorker -w ${WORKERS:-4} --bind 0.0.0.0:${PORT:-8000} --timeout 120 --graceful-timeout 30 --access-logfile - --error-logfile -"]

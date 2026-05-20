@@ -1,9 +1,9 @@
 # pylint: disable=missing-function-docstring, unused-argument
 
-from ninja import Router, File, Form
+from ninja import Router, Body, File, Form
 from ninja.files import UploadedFile
 
-from ..schemas.profile_schema import UpdateProfileSchema
+from ..schemas.profile_schema import FcmTokenSchema, UpdateProfileSchema
 from ...schemas.general_schema import DataErrorSchema, DataSuccessSchema
 from ...user.services.profile_service import ProfileService
 
@@ -46,9 +46,9 @@ def data_status(request):
 
 
 @router.post("/fcm-token", response=response_schema, auth=AuthBearer())
-def update_fcm_token(request, token: str):
+def update_fcm_token(request, data: FcmTokenSchema = Body(...)):
     """Store/update FCM token for push notifications."""
     user = get_signed_in_user(request)
-    user.fcm_token = token
+    user.fcm_token = data.token
     user.save()
     return 200, DataSuccessSchema(code=200, message="Token updated", payload={})

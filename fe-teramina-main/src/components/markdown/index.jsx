@@ -5,6 +5,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import { useStyles } from "components/markdown/styles";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
+import { axios } from "helper/axios";
 
 export const Markdown = ({ data }) => {
   const [messages, setMessages] = useState([]);
@@ -18,23 +19,12 @@ export const Markdown = ({ data }) => {
       setButtonText("Generating...");
       setIsButtonDisabled(true);
 
-      const response = await fetch(`${import.meta.env.VITE_TERAMINA_LLM_API}/api/chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": import.meta.env.VITE_TERAMINA_API_KEY,
-        },
-        body: JSON.stringify({
-          question: data.prompt_summary,
-          model: import.meta.env.VITE_SUMMARY_MODEL,
-        }),
+      const response = await axios.post("/agent/summary", {
+        question: data.prompt_summary,
+        model: import.meta.env.VITE_SUMMARY_MODEL,
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
-      const responseData = await response.json();
+      const responseData = response.payload;
       const taskId = responseData.task_id;
 
       // Step 2: Polling untuk mengecek status task
@@ -44,21 +34,8 @@ export const Markdown = ({ data }) => {
       while (taskStatus !== "completed") {
         await new Promise((resolve) => setTimeout(resolve, 10000)); // Wiat 10 detik sebelum cek lagi
 
-        const statusResponse = await fetch(
-          `${import.meta.env.VITE_TERAMINA_LLM_API}/api/chat/result/${taskId}`, // API untuk cek status task
-          {
-            method: "GET",
-            headers: {
-              "x-api-key": import.meta.env.VITE_TERAMINA_API_KEY,
-            },
-          }
-        );
-
-        if (!statusResponse.ok) {
-          throw new Error("Failed to fetch task status.");
-        }
-
-        const statusData = await statusResponse.json();
+        const statusResponse = await axios.get(`/agent/summary/${taskId}`);
+        const statusData = statusResponse.payload;
         taskStatus = statusData.status;
         result = statusData.response; // Ambil hasil jika tersedia
       }

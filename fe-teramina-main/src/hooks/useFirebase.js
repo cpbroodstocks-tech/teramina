@@ -30,7 +30,7 @@ const useFirebase = () => {
 
           if (!get("authentication") && currentUser) {
             const {stsTokenManager} = currentUser
-            const validate = await axios.post(`/user/firebase-verify-user?token=${stsTokenManager.accessToken}`);
+            const validate = await axios.post("/user/firebase-verify-user", { token: stsTokenManager.accessToken });
 
             if (!validate) throw validate
 

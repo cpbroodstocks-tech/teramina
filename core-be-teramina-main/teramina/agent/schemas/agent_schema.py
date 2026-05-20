@@ -39,6 +39,11 @@ class MemoryUpdateSchema(BaseModel):
     confidence: Optional[float] = None
 
 
+class SummaryRequestSchema(BaseModel):
+    question: str
+    model: Optional[str] = None
+
+
 class ExplainSchema(BaseModel):
     farm_id: str
     cycle_id: Optional[str] = ""

@@ -24,7 +24,9 @@ import "@fontsource/lato";
 
 import "locales/i18n";
 
-ReactGA.initialize("G-5RMKKEF1WM"); // initialize react-ga
+if (import.meta.env.VITE_GA_MEASUREMENT_ID) {
+  ReactGA.initialize(import.meta.env.VITE_GA_MEASUREMENT_ID);
+}
 
 if (import.meta.env.VITE_SENTRY_DSN) {
   Sentry.init({

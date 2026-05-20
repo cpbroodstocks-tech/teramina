@@ -7,7 +7,9 @@ logger = logging.getLogger(__name__)
 
 # (max_requests, window_seconds)
 _LIMITS = {
-    "/api/auth/": (10, 60),       # 10 req/min — auth is expensive and sensitive
+    "/api/user/login": (10, 60),       # 10 req/min — auth is expensive and sensitive
+    "/api/user/firebase-verify-user": (10, 60),
+    "/api/user/verify-with-refresh-token": (20, 60),
     "/api/": (120, 60),           # 120 req/min — general API
 }
 _DEFAULT_LIMIT = (200, 60)

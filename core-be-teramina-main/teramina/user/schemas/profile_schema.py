@@ -7,3 +7,7 @@ class UpdateProfileSchema(Schema):
     name: str
     phone: str
     address: str
+
+
+class FcmTokenSchema(Schema):
+    token: str

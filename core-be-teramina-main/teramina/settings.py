@@ -14,6 +14,7 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 
 from pathlib import Path
 
+import json
 import os
 import mongoengine
 import sentry_sdk
@@ -248,11 +249,13 @@ GS_PROJECT_ID = os.getenv("GS_PROJECT_ID")
 
 # use this code for local environment
 GS_APP_CRED = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-GS_CREDENTIALS = (
-    service_account.Credentials.from_service_account_file(GS_APP_CRED)
-    if GS_APP_CRED
-    else None
-)
+GS_APP_CRED_JSON = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+if GS_APP_CRED_JSON:
+    GS_CREDENTIALS = service_account.Credentials.from_service_account_info(json.loads(GS_APP_CRED_JSON))
+elif GS_APP_CRED:
+    GS_CREDENTIALS = service_account.Credentials.from_service_account_file(GS_APP_CRED)
+else:
+    GS_CREDENTIALS = None
 
 # use this code for deployment enviroment
 # creds = compute_engine.Credentials()
@@ -308,7 +311,7 @@ LOGGING = {
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0"),
+        "LOCATION": os.getenv("CACHE_REDIS_URL", os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")),
     }
 }
 
@@ -321,7 +324,7 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
-CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+CELERY_BEAT_SCHEDULER = os.getenv("CELERY_BEAT_SCHEDULER", "celery.beat:PersistentScheduler")
 
 CELERY_BEAT_SCHEDULE = {
     "sync-all-active-sheets": {

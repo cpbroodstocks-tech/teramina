@@ -546,7 +546,8 @@ def get_pond_history(farm_id: str, pond_id: str, limit: int = 30) -> dict:
 
 def save_farm_memory(farm_id: str, memory_type: str, content: str,
                      pond_id: str = "", cycle_id: str = "", tags: list = None,
-                     confidence: float = 0.7, confirmed: bool = False) -> dict:
+                     confidence: float = 0.7, confirmed: bool = False,
+                     current_user_id: str = "") -> dict:
     """Persist a durable memory for this farm."""
     from .memory_retrieval import index_agent_memory, index_memory_observation
     if not confirmed:
@@ -560,6 +561,8 @@ def save_farm_memory(farm_id: str, memory_type: str, content: str,
     farm = Farm.objects(id=farm_id).first()
     if not farm:
         return {"error": f"Farm {farm_id} not found"}
+    if current_user_id and str(farm.user_id) != str(current_user_id):
+        return {"error": "Farm not found or not accessible"}
     memory = AgentMemory.objects.create(
         user_id=str(farm.user_id),
         farm_id=farm_id,

@@ -350,6 +350,26 @@ class TestAgentChatContext:
         assert conversation.cycle_id == CYCLE_ID
         assert conversation.page_context["page_type"] == "cycle"
 
+    def test_chat_does_not_reuse_same_session_id_from_other_user(self):
+        AgentConversation(
+            user_id="other-user",
+            session_id="shared-session",
+            farm_id="other-farm",
+            messages=[{"role": "user", "content": "Other farmer private note."}],
+        ).save()
+        captured_requests = []
+
+        with patch("teramina.agent.services.agent_service._get_client", return_value=_mock_chat_client(captured_requests)):
+            status, response = AgentService.chat(USER_ID, "Start my session.", "shared-session", FARM_ID, "", "")
+
+        assert status == 200
+        assert response.payload["farm_id"] == FARM_ID
+        assert AgentConversation.objects(session_id="shared-session").count() == 2
+        user_conversation = AgentConversation.objects(session_id="shared-session", user_id=USER_ID).first()
+        assert user_conversation.farm_id == FARM_ID
+        system_messages = captured_requests[0]["messages"]
+        assert all("Other farmer private note." not in str(message) for message in system_messages)
+
     def test_system_prompt_blocks_speculative_memory_writes(self):
         assert "Do not save speculative information" in SYSTEM_PROMPT
         assert "only save facts the farmer has confirmed or data you have directly observed" in SYSTEM_PROMPT
@@ -508,6 +528,22 @@ class TestAgentMemoryTools:
         assert search["count"] >= 1
         assert search["retrieval"] in {"semantic", "lexical_fallback"}
         assert any("extra aeration" in memory["content"] for memory in search["memories"])
+
+    def test_save_farm_memory_rejects_farm_owned_by_another_user(self):
+        farm = MagicMock()
+        farm.user_id = "other-user"
+        with patch("teramina.agent.services.agent_tools.Farm") as MockFarm:
+            MockFarm.objects.return_value.first.return_value = farm
+            result = save_farm_memory(
+                FARM_ID,
+                "event",
+                "DO improved after extra aeration.",
+                confirmed=True,
+                current_user_id=USER_ID,
+            )
+
+        assert "not accessible" in result["error"]
+        assert AgentMemory.objects(farm_id=FARM_ID).count() == 0
 
     def test_search_memory_alias_is_registered_and_scoped(self):
         AgentService.add_memory(

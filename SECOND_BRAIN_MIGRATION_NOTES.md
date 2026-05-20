@@ -15,6 +15,17 @@ They are for existing deployments that may already contain `agent_memories`,
 
 ## Required Backfill
 
+0. Update conversation indexes.
+   - `AgentConversation` is scoped by `(user_id, session_id)`.
+   - Drop any legacy global unique `session_id` index before applying the new compound unique index.
+   - Create `user_id + session_id` as a unique compound index.
+   - Existing documents do not need content changes unless the same user has duplicate `session_id` values.
+
+0a. Update expiry indexes.
+   - Create TTL indexes on `agent_memories.expires_at`, `memory_observations.expires_at`, and `farm_alerts.expires_at`.
+   - Use `expireAfterSeconds: 0` so each document expires at its own timestamp.
+   - Leave documents with empty or missing `expires_at` untouched.
+
 1. Backfill missing graph observations for existing `agent_memories`.
    - For every `agent_memories` document without a matching observation, create one through `_store_memory_observation`.
    - Use the flat memory fields: `user_id`, `farm_id`, `pond_id`, `cycle_id`, `memory_type`, and `content`.
