@@ -22,7 +22,7 @@ openpyxl==3.1.1
 matplotlib>=3.6.0
 tiktoken
 openai
-pinecone-client>=3.0.0
+pinecone>=3.0.0
 fpdf
 uvicorn==0.23.2
 celery[redis]>=5.3.4
