@@ -4,7 +4,7 @@
 
 Move Mnemon from MVP-complete to beta-ready without mixing in voice notes, daily log, or Postgres/pgvector migration work.
 
-This is the active beta checklist for the current branch. The broader `SECOND_BRAIN_DEV_PLAN.md` remains the strategic roadmap; the divergence is intentional and documented in `SECOND_BRAIN_ARCHITECTURE_DECISION.md`.
+This is the active beta checklist for the current branch. The product direction is defined in `CYBERNETIC_PRODUCT_FRAMEWORK.md`; the broader `SECOND_BRAIN_DEV_PLAN.md` remains the strategic roadmap. The divergence between the beta branch and target architecture is intentional and documented in `SECOND_BRAIN_ARCHITECTURE_DECISION.md`.
 
 ## Todo
 

@@ -192,3 +192,9 @@ export const useGetPondTimeline = (cycle_id: string | null, limit = 50) =>
       axios.get("/agent/pond-timeline", { params: { cycle_id, limit } }).then((r: any) => r?.payload),
     enabled: !!cycle_id,
   });
+
+export const createAgentSummary = (question: string, model?: string) =>
+  axios.post("/agent/summary", { question, model }).then((r: any) => r?.payload);
+
+export const getAgentSummaryStatus = (taskId: string) =>
+  axios.get(`/agent/summary/${taskId}`).then((r: any) => r?.payload);

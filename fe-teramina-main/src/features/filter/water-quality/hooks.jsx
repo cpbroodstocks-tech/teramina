@@ -2,10 +2,10 @@ import dayjs from "dayjs";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { axios } from "helper/axios";
 import { useEffect, useRef, useState } from "react";
 import { useNDayAfter } from "hooks/useNDayAfter";
 import { useFormatToQueryParams as formatToQueryParams } from "hooks/useFormatToQueryParams";
+import { fetchFilterUrl, fetchWaterQualityFilter } from "features/filter/queries";
 
 const DOC_LENGTH = 120;
 
@@ -163,7 +163,7 @@ const useFilter = () => {
     let url = "/dashboard/wq-filter";
     url = `${url}?${formatToQueryParams(filterQueryParams.current)}`;
 
-    const response = await axios.get(url);
+    const response = await fetchFilterUrl(url);
     if (!response) throw response;
 
     const updateListItem = {};
@@ -195,7 +195,7 @@ const useFilter = () => {
   useEffect(() => {
     const fetchfilterListItem = async () => {
       try {
-        const filter = await axios.get("/dashboard/wq-filter");
+        const filter = await fetchWaterQualityFilter();
         if (!filter) throw filter;
         setFilter((previousValue) => ({
           ...previousValue,

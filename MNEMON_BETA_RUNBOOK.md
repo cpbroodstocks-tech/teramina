@@ -4,6 +4,8 @@
 
 Use this runbook to move the MongoEngine Mnemon MVP into beta without mixing in the future Postgres/pgvector, voice notes, or daily log tracks.
 
+Product alignment: beta validation should be judged against `CYBERNETIC_PRODUCT_FRAMEWORK.md`. The smoke tests should confirm that Mnemon improves the farm control loop: context-aware state interpretation, scoped memory, uncertainty-aware answers, alerts/tasks, and follow-up actions.
+
 ## Beta Scope
 
 Included:

@@ -19,8 +19,6 @@ const SERVICE_WORKER = VitePWA({
 });
 const ALIAS = {
   components: resolve(__dirname, "./src/components"),
-  containers: resolve(__dirname, "./src/features"),
-  hoc: resolve(__dirname, "./src/hoc"),
   pages: resolve(__dirname, "./src/pages"),
   routes: resolve(__dirname, "./src/routes"),
   theme: resolve(__dirname, "./src/theme"),
@@ -54,10 +52,6 @@ const OUTPUT = {
 
       if (id.includes("@mui/icons-material")) {
         return "vendor_mui_icons_material";
-      }
-
-      if (id.includes("@mui/styles")) {
-        return "vendor_mui_styles";
       }
 
       if (id.includes("@mui/x-data-grid")) {
@@ -98,14 +92,6 @@ const OUTPUT = {
 
       if (id.includes("universal-cookie")) {
         return "vendor_universal_cookie";
-      }
-
-      if (id.includes("remix")) {
-        return "vendor_remix";
-      }
-
-      if (id.includes("jss")) {
-        return "vendor_jss";
       }
 
       return "vendor";

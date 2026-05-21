@@ -5,7 +5,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import { useStyles } from "components/markdown/styles";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
-import { axios } from "helper/axios";
+import { createAgentSummary, getAgentSummaryStatus } from "components/agent-chat/queries";
 
 export const Markdown = ({ data }) => {
   const [messages, setMessages] = useState([]);
@@ -19,12 +19,7 @@ export const Markdown = ({ data }) => {
       setButtonText("Generating...");
       setIsButtonDisabled(true);
 
-      const response = await axios.post("/agent/summary", {
-        question: data.prompt_summary,
-        model: import.meta.env.VITE_SUMMARY_MODEL,
-      });
-
-      const responseData = response.payload;
+      const responseData = await createAgentSummary(data.prompt_summary, import.meta.env.VITE_SUMMARY_MODEL);
       const taskId = responseData.task_id;
 
       // Step 2: Polling untuk mengecek status task
@@ -34,8 +29,7 @@ export const Markdown = ({ data }) => {
       while (taskStatus !== "completed") {
         await new Promise((resolve) => setTimeout(resolve, 10000)); // Wiat 10 detik sebelum cek lagi
 
-        const statusResponse = await axios.get(`/agent/summary/${taskId}`);
-        const statusData = statusResponse.payload;
+        const statusData = await getAgentSummaryStatus(taskId);
         taskStatus = statusData.status;
         result = statusData.response; // Ambil hasil jika tersedia
       }

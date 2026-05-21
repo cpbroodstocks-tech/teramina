@@ -1,10 +1,10 @@
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { axios } from "helper/axios";
 import { useEffect, useRef, useState } from "react";
 import { useToastStore } from "store/toast.store";
 import { useTranslation } from "react-i18next";
+import { fetchDashboardFilter, fetchFilteredData, fetchFilterUrl } from "features/filter/queries";
 
 const FILTER_SCHEMA = z.object({
   farm_id: z.string().min(1),
@@ -49,9 +49,7 @@ const useFilter = (api) => {
 
     try {
       const response = await Promise.all(
-        api.map((api) =>
-          axios.get(`${api}?${new URLSearchParams(values).toString()}`)
-        )
+        api.map((api) => fetchFilteredData(api, values))
       );
       if (!response) throw response;
 
@@ -168,7 +166,7 @@ const useFilter = (api) => {
     let url = "/dashboard/filter";
     url = `${url}?${new URLSearchParams(filterQueryParams.current).toString()}`;
 
-    const response = await axios.get(url);
+    const response = await fetchFilterUrl(url);
     if (!response) throw response;
 
     const updateListItem = {};
@@ -200,7 +198,7 @@ const useFilter = (api) => {
   useEffect(() => {
     const fetchfilterListItem = async () => {
       try {
-        const filter = await axios.get("/dashboard/filter");
+        const filter = await fetchDashboardFilter();
 
         if (!filter) throw filter;
 

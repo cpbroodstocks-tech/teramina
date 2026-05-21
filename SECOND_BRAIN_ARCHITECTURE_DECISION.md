@@ -8,6 +8,8 @@ Accepted for the current beta branch.
 
 The current second-brain beta will continue on the existing Django Ninja + MongoEngine + MongoDB platform. `SECOND_BRAIN_DEV_PLAN.md` remains the strategic target architecture, while `MNEMON_DEV_PLAN.md`, `MNEMON_BETA_TODO.md`, and `MNEMON_BETA_RUNBOOK.md` are the active execution documents for the current branch.
 
+`CYBERNETIC_PRODUCT_FRAMEWORK.md` is the product-level framework above these technical plans. Architecture decisions should support that framework: state, trajectory, margin, uncertainty, feedback, and risk-adjusted profit.
+
 Postgres, TimescaleDB, pgvector, voice notes, offline daily log, and Temporal workflows are deferred until the beta path is validated with real farmer data.
 
 ## Rationale
@@ -54,6 +56,7 @@ Revisit Postgres, TimescaleDB, and pgvector only after:
 
 ## Documentation Ownership
 
+- `CYBERNETIC_PRODUCT_FRAMEWORK.md`: product philosophy, feature contract, and decision standard.
 - `SECOND_BRAIN_DEV_PLAN.md`: strategic architecture and long-term roadmap.
 - `MNEMON_DEV_PLAN.md`: active MongoEngine Mnemon implementation plan.
 - `MNEMON_BETA_TODO.md`: current beta checklist.

@@ -7,8 +7,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const alias = {
   components: resolve(__dirname, "./src/components"),
-
-  hoc: resolve(__dirname, "./src/hoc"),
   pages: resolve(__dirname, "./src/pages"),
   routes: resolve(__dirname, "./src/routes"),
   theme: resolve(__dirname, "./src/theme"),

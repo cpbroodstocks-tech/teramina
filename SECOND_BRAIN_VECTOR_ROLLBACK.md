@@ -4,6 +4,8 @@
 
 This rollback plan covers the Mongo MVP vector retrieval layer:
 
+Product alignment comes from `CYBERNETIC_PRODUCT_FRAMEWORK.md`: retrieval is only valuable when it improves state interpretation, uncertainty handling, and follow-up decisions. If semantic retrieval weakens trust or scope safety, lexical/recent retrieval is preferable for beta.
+
 - `memory_embeddings` companion collection.
 - `backfill_agent_memory_graph --apply` indexing side effect.
 - `search_farm_memory` semantic retrieval with lexical fallback.

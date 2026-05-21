@@ -4,8 +4,11 @@
 
 This document is the strategic target architecture for Teramina Second Brain. It is **not** the active execution plan for the current beta branch.
 
+The product philosophy and feature-level decision contract are defined in `CYBERNETIC_PRODUCT_FRAMEWORK.md`. This plan should be read as the long-term architecture needed to support that product framework.
+
 The current beta branch intentionally follows the MongoEngine Mnemon track:
 
+- Product framework: `CYBERNETIC_PRODUCT_FRAMEWORK.md`
 - Active implementation plan: `MNEMON_DEV_PLAN.md`
 - Beta checklist: `MNEMON_BETA_TODO.md`
 - Beta rollout procedure: `MNEMON_BETA_RUNBOOK.md`
@@ -62,7 +65,9 @@ The target stack below is the long-term architecture. The current beta branch re
 - Decision: MongoDB stays short-term or gradual migration starts
 - Baseline metrics: API latency, build health, test coverage, data quality gaps
 
-### Critical items to audit now (pre-Phase-1 blockers)
+### Historical Critical Items From The Original Audit
+
+These were the original pre-Phase-1 audit blockers. Several have since been resolved in the MongoEngine Mnemon beta path; verify current status against `MNEMON_DEV_PLAN.md`, `MNEMON_BETA_TODO.md`, and the code before treating any row as open.
 
 | Item | Location | Issue |
 |------|----------|-------|

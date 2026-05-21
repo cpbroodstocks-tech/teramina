@@ -4,9 +4,15 @@
 **Date:** 2026-04-17
 **Approach:** Incremental — each phase is independently shippable. Never a big-bang rewrite.
 
+## Product Context
+
+Frontend modernization should support the product direction in `CYBERNETIC_PRODUCT_FRAMEWORK.md`. The UI should increasingly present pond state, trajectory, control margin, uncertainty, and follow-up actions, not just isolated dashboard metrics. Refactors should preserve that direction and avoid generic redesign work that does not improve the farmer control loop.
+
 ---
 
-## Current State Snapshot
+## Historical State Snapshot
+
+This snapshot reflects the frontend state when this modernization plan was first written. Some items have already moved forward; verify against `package.json`, `vite.config.js`, and the current test tree before treating a row as still open.
 
 | Area | Current | Problem |
 |------|---------|---------|
@@ -19,6 +25,31 @@
 | Folder Structure | Type-based (`containers/`, `pages/`, `components/`) | Feature code scattered across 3+ directories |
 | Testing | None | No safety net for migration or future changes |
 | MUI | 5.14.8 | One major version behind; `@mui/styles` (legacy) still in use |
+
+## Closure Status — 2026-05-21
+
+The frontend is now in closure mode for this plan rather than initial migration mode.
+
+| Area | Status | Notes |
+|------|--------|-------|
+| Build | Complete | Vite 6 build path is active. Production build should remain part of closure verification. |
+| TypeScript | Partial | `tsconfig.json` exists and relaxed typecheck passes, but much of the app remains `.js/.jsx`. `src/types/api.ts` is not committed because generation currently depends on a live backend OpenAPI endpoint. |
+| Server state | Mostly complete | Direct Axios usage has been moved behind query/API modules. Remaining fetch work should preserve this boundary. |
+| Client state | Mostly complete | `src/store/` contains Zustand stores only. |
+| Forms | Mostly complete | Formik/Yup are removed; RHF/Zod are active. Some local variable names may still say `formik*` and should be cleaned when touched. |
+| Feature structure | Mostly complete | Large route implementations have moved under `features/*`; `src/pages/` is now route shims plus small shell pages. |
+| HOCs | Complete | `src/hoc/` is gone and stale aliases have been removed. |
+| Tests | Complete | Vitest/RTL/MSW infrastructure exists; `npm run test` passed on 2026-05-21 with 28 files and 165 tests. |
+| Dependencies | Mostly complete | Legacy packages called out by the original plan are removed or no longer referenced in config. |
+
+### OpenAPI Type Generation
+
+`npm run gen:types` currently runs `npx openapi-typescript http://localhost:8000/api/docs/openapi.json -o src/types/api.ts`.
+On 2026-05-21 this failed because `localhost:8000` refused the schema request. Treat generated API types as a backend-available task:
+
+1. Start the Django backend with API docs available at `/api/docs/openapi.json`.
+2. Run `npm run gen:types`.
+3. Commit `src/types/api.ts` only when the generated output is real and repeatable.
 
 ---
 

@@ -2,11 +2,11 @@ import dayjs from "dayjs";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { axios } from "helper/axios";
 import { useEffect, useRef, useState } from "react";
 import { useNDayAfter } from "hooks/useNDayAfter";
 import { useToastStore } from "store/toast.store";
 import { useTranslation } from "react-i18next";
+import { fetchDashboardFilter, fetchFilteredData, fetchFilterUrl } from "features/filter/queries";
 
 const DOC_LENGTH = 120;
 
@@ -56,9 +56,7 @@ const useFilter = (api) => {
     }));
 
     try {
-      const response = await axios.get(
-        `${api}?${new URLSearchParams(values).toString()}`
-      );
+      const response = await fetchFilteredData(api, values);
 
       if (!response) throw response;
 
@@ -189,7 +187,7 @@ const useFilter = (api) => {
     let url = "/dashboard/filter";
     url = `${url}?${new URLSearchParams(filterQueryParams.current).toString()}`;
 
-    const response = await axios.get(url);
+    const response = await fetchFilterUrl(url);
     if (!response) throw response;
 
     const updateListItem = {};
@@ -217,7 +215,7 @@ const useFilter = (api) => {
   useEffect(() => {
     const fetchfilterListItem = async () => {
       try {
-        const filter = await axios.get("/dashboard/filter");
+        const filter = await fetchDashboardFilter();
 
         if (!filter) throw filter;
 

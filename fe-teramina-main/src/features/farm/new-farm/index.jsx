@@ -8,16 +8,10 @@ import {
 } from "@mui/material";
 import classNames from "classnames";
 import { useStyles } from "features/farm/new-farm/styles";
-import axios from "axios";
 import startCase from "lodash/startCase";
 import toLower from "lodash/toLower";
 import { useTranslation } from "react-i18next";
-
-const fetchCityRegion = async (url) => {
-  const response = await axios.get(url);
-  if (!response) throw new Error("Failed to fetch city region");
-  return response.data;
-};
+import { fetchCityRegion } from "features/farm/queries";
 
 const NewFarm = (props) => {
   const {

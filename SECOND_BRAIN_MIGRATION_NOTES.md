@@ -6,6 +6,8 @@ These notes cover the MongoDB second-brain MVP before vector retrieval work star
 They are for existing deployments that may already contain `agent_memories`,
 `memory_observations`, `memory_entities`, and `memory_relations` documents.
 
+The product reason for this lifecycle discipline is defined in `CYBERNETIC_PRODUCT_FRAMEWORK.md`: memory must improve the farm control loop by preserving verified context, prior interventions, response history, and uncertainty. Migration and backfill should therefore preserve source, confidence, verification state, and context IDs.
+
 ## Current Document Sets
 
 - `agent_memories`: flat farmer-visible memories.

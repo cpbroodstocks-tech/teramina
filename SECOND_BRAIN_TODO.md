@@ -1,5 +1,7 @@
 # Teramina Graph Memory MVP Todo
 
+This todo supports the product direction in `CYBERNETIC_PRODUCT_FRAMEWORK.md`: Teramina should behave as a cybernetic shrimp-farm operating system, not just a dashboard. Graph memory work is valuable when it improves state awareness, trajectory interpretation, uncertainty handling, and the observe -> interpret -> act -> learn loop.
+
 ## Completed In This Pass
 
 - [x] Stabilize existing agent/chat changes so the app still builds and routes still work.

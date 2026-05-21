@@ -4,10 +4,13 @@
 
 Build Mnemon as Teramina's farmer-facing graph memory layer: the assistant should know the active farm, pond, cycle, and page context, retrieve relevant prior facts/actions/patterns, ask for confirmation before storing inferred memories, and surface remembered context where farmers make decisions.
 
+Mnemon serves the broader product framework in `CYBERNETIC_PRODUCT_FRAMEWORK.md`: it exists to improve the farm control loop by preserving context, surfacing prior responses, explaining uncertainty, and helping farmers close the loop after action.
+
 ## Non-Negotiable Principles
 
 - Current MVP stays aligned with the existing Django Ninja + MongoEngine platform.
 - Postgres/pgvector work is a future migration track and must not be mixed into the Mongo MVP branch.
+- Mnemon recommendations must follow the cybernetic product contract: state, risk, confidence, action, tradeoff, next check, and source.
 - `SECOND_BRAIN_DEV_PLAN.md` is the strategic target architecture; this document is the active implementation plan for the current beta branch. See `SECOND_BRAIN_ARCHITECTURE_DECISION.md`.
 - Live farm data beats stale memory.
 - Memory is not saved silently unless it is direct verified data or a farmer-confirmed action/outcome.
