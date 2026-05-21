@@ -8,6 +8,7 @@ Build Mnemon as Teramina's farmer-facing graph memory layer: the assistant shoul
 
 - Current MVP stays aligned with the existing Django Ninja + MongoEngine platform.
 - Postgres/pgvector work is a future migration track and must not be mixed into the Mongo MVP branch.
+- `SECOND_BRAIN_DEV_PLAN.md` is the strategic target architecture; this document is the active implementation plan for the current beta branch. See `SECOND_BRAIN_ARCHITECTURE_DECISION.md`.
 - Live farm data beats stale memory.
 - Memory is not saved silently unless it is direct verified data or a farmer-confirmed action/outcome.
 - Every recommendation should cite source, reason, confidence, and relevant context IDs.

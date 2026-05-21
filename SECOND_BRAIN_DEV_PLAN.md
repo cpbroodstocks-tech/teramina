@@ -1,5 +1,26 @@
 # Teramina Second Brain — Development Plan
 
+## Current Status
+
+This document is the strategic target architecture for Teramina Second Brain. It is **not** the active execution plan for the current beta branch.
+
+The current beta branch intentionally follows the MongoEngine Mnemon track:
+
+- Active implementation plan: `MNEMON_DEV_PLAN.md`
+- Beta checklist: `MNEMON_BETA_TODO.md`
+- Beta rollout procedure: `MNEMON_BETA_RUNBOOK.md`
+- Architecture decision: `SECOND_BRAIN_ARCHITECTURE_DECISION.md`
+- MongoDB memory backfill notes: `SECOND_BRAIN_MIGRATION_NOTES.md`
+
+Current branch status:
+
+- The MongoEngine-based Mnemon beta is near complete.
+- Chat context, scoped memory retrieval, memory CRUD, graph observations, pattern jobs, alerts, tasks, Today view, Memory page, and pond timeline are implemented.
+- Authenticated smoke testing with real Firebase session and seeded farmer data remains the main beta gate.
+- Postgres, TimescaleDB, pgvector, voice notes, offline daily log, Temporal workflows, and full graph visualization are deferred.
+
+Do not start the deferred migration tracks from this document until the migration gate in `SECOND_BRAIN_ARCHITECTURE_DECISION.md` is met.
+
 **Goal:** Transform Teramina from a data dashboard into a farmer operating system that proactively watches, remembers, and advises.
 
 **Target questions the system must answer:**
@@ -14,6 +35,8 @@
 ---
 
 ## Target Stack
+
+The target stack below is the long-term architecture. The current beta branch remains on Django Ninja + MongoEngine + MongoDB until the documented migration gate is met.
 
 | Layer | Technology |
 |-------|-----------|

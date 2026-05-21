@@ -4,6 +4,8 @@
 
 Move Mnemon from MVP-complete to beta-ready without mixing in voice notes, daily log, or Postgres/pgvector migration work.
 
+This is the active beta checklist for the current branch. The broader `SECOND_BRAIN_DEV_PLAN.md` remains the strategic roadmap; the divergence is intentional and documented in `SECOND_BRAIN_ARCHITECTURE_DECISION.md`.
+
 ## Todo
 
 - [x] Keep the pushed MongoEngine Mnemon MVP isolated from experimental local work.
