@@ -13,7 +13,7 @@ from tests.conftest import (
 
 from teramina.google_sheets.services.sheet_service import (
     SheetService, _normalize_date, _safe_float, _safe_int, _safe_str,
-    _auto_fill_doc, _col, _upsert_result_data,
+    _auto_fill_doc, _col, _upsert_result_data, _backfill_row_ids,
 )
 from teramina.google_sheets.models.sheet_integration_model import SheetIntegration
 
@@ -91,6 +91,35 @@ class TestCol:
     def test_out_of_bounds(self):
         assert _col(["a"], 5) is None
         assert _col(["a"], 5, "X") == "X"
+
+
+class TestRowIdBackfill:
+    def test_writes_only_blank_row_id_cells(self):
+        svc = _build_sheets_service({
+            "DAILY_LOG": [
+                ["2024-01-01"] + [""] * 19 + [""],
+                ["2024-01-02"] + [""] * 19 + ["DAILY_LOG-4"],
+            ],
+            "ABW_SAMPLING": [["2024-01-01"] + [""] * 9 + [""]],
+            "MORTALITY": [["2024-01-01", "", "", "", ""]],
+            "COST": [["2024-01-01", "Feed", "Starter", "", "", "", "", "", "", ""]],
+            "HARVEST": [["2024-01-01", "", "", "", "", "", "", "", "", "", ""]],
+        })
+        batch_update = MagicMock()
+        batch_update.return_value.execute.return_value = {}
+        svc.spreadsheets.return_value.values.return_value.batchUpdate = batch_update
+
+        count = _backfill_row_ids(svc, SPREADSHEET_ID)
+
+        assert count == 5
+        data = batch_update.call_args.kwargs["body"]["data"]
+        assert data == [
+            {"range": "DAILY_LOG!U3", "values": [["DAILY_LOG-3"]]},
+            {"range": "ABW_SAMPLING!K3", "values": [["ABW_SAMPLING-3"]]},
+            {"range": "COST!J3", "values": [["COST-3"]]},
+            {"range": "HARVEST!K3", "values": [["HARVEST-3"]]},
+            {"range": "MORTALITY!E3", "values": [["MORTALITY-3"]]},
+        ]
 
 
 # ── UpsertResultData tests ────────────────────────────────────────────────
@@ -224,6 +253,27 @@ class TestGetStatus:
         assert code == 200
         assert body.payload["is_active"] is True
         assert body.payload["rows_synced"] == 42
+
+    @patch("teramina.google_sheets.services.sheet_service.SheetIntegration")
+    def test_status_old_integration_without_sync_fields(self, MockIntegration):
+        integration = SimpleNamespace(
+            spreadsheet_id=SPREADSHEET_ID,
+            spreadsheet_url=SPREADSHEET_URL,
+            is_active=True,
+            last_synced=None,
+            last_status="ok",
+            last_error=None,
+            rows_synced=0,
+            last_sync_log_id=None,
+        )
+        MockIntegration.objects.return_value.first.return_value = integration
+
+        code, body = SheetService.get_status(CYCLE_ID)
+
+        assert code == 200
+        assert body.payload["active_sync_id"] is None
+        assert body.payload["last_sync_id"] is None
+        assert body.payload["tab_summaries"] == []
 
 
 # ── SyncCycle tests ───────────────────────────────────────────────────────
@@ -436,6 +486,9 @@ class TestSyncCycle:
             ],
             "ABW_SAMPLING": [], "COST": [], "HARVEST": [], "MORTALITY": [],
         })
+        feedback_batch_update = MagicMock()
+        feedback_batch_update.return_value.execute.return_value = {}
+        svc.spreadsheets.return_value.values.return_value.batchUpdate = feedback_batch_update
         mock_get_svc.return_value = svc
         integration = self._make_integration()
         MockIntegration.objects.return_value.first.return_value = integration
@@ -456,6 +509,15 @@ class TestSyncCycle:
         assert date_rejections[0]["field"] == "date"
         assert date_rejections[0]["raw_value"] == "not-a-date"
         assert date_rejections[0]["row_number"] == 3  # row 1-2 are headers
+        feedback_data = (
+            svc.spreadsheets.return_value
+            .values.return_value
+            .batchUpdate.call_args.kwargs["body"]["data"]
+        )
+        assert feedback_data == [{
+            "range": "DAILY_LOG!W3:X3",
+            "values": [["ERROR", "date: invalid_date"]],
+        }]
 
     @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
     @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
@@ -537,7 +599,7 @@ class TestSyncCycle:
         # COST should have error; others should succeed
         assert "error" in result["summary"]["COST"]
         assert "error" not in result["summary"]["DAILY_LOG"]
-        assert result["status"] in ("partial", "error")
+        assert result["status"] == "partial"
 
     @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
     @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
@@ -576,11 +638,12 @@ class TestSyncCycle:
 
         # But the bad price is flagged in rejected_rows
         rejected = result["rejected_rows"]
-        price_issues = [r for r in rejected if r.get("reason") == "invalid_number:unit_price"]
+        price_issues = [r for r in rejected if r.get("reason") == "warn:invalid_number:unit_price"]
         assert len(price_issues) == 1
         assert price_issues[0]["tab"] == "COST"
         assert price_issues[0]["field"] == "unit_price"
         assert price_issues[0]["raw_value"] == "fifteen thousand"
+        assert result["status"] == "partial"
 
     @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
     @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
@@ -619,6 +682,297 @@ class TestSyncCycle:
         # But summary should still reflect what would happen
         assert result["summary"]["DAILY_LOG"]["inserted"] == 3
         assert result["status"] == "ok"
+        assert result["source_fingerprint"]
+
+    @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
+    @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
+    @patch("teramina.google_sheets.services.sheet_service.HarvestRecord")
+    @patch("teramina.google_sheets.services.sheet_service.CostData")
+    @patch("teramina.google_sheets.services.sheet_service.CycleData")
+    @patch("teramina.google_sheets.services.sheet_service.Cycle")
+    @patch("teramina.google_sheets.services.sheet_service.SheetIntegration")
+    @patch("teramina.google_sheets.services.sheet_service._get_sheets_service")
+    def test_read_error_marks_tab_error_not_empty_success(
+        self, mock_get_svc, MockIntegration, MockCycle,
+        MockCycleData, MockCostData, MockHarvest, MockFeed, MockSyncLog
+    ):
+        svc = MagicMock()
+        values = MagicMock()
+
+        def get_side_effect(**kwargs):
+            req = MagicMock()
+            if kwargs["range"].startswith("COST"):
+                resp = MagicMock()
+                resp.status = 403
+                req.execute.side_effect = HttpError(resp, b"forbidden")
+            else:
+                req.execute.return_value = {"values": []}
+            return req
+
+        values.get.side_effect = get_side_effect
+        values.append.return_value.execute.return_value = {}
+        svc.spreadsheets.return_value.values.return_value = values
+        mock_get_svc.return_value = svc
+
+        integration = self._make_integration()
+        MockIntegration.objects.return_value.first.return_value = integration
+        MockCycle.objects.return_value.first.return_value = self._make_cycle()
+        self._make_empty_db(MockCycleData, MockCostData, MockHarvest, MockFeed)
+        MockSyncLog.return_value.save.return_value = MockSyncLog.return_value
+
+        result = SheetService.sync_cycle(CYCLE_ID)
+
+        assert "error" in result["summary"]["COST"]
+        assert result["status"] == "partial"
+        sync_log_kwargs = MockSyncLog.call_args.kwargs
+        assert sync_log_kwargs["spreadsheet_id"] == SPREADSHEET_ID
+        assert sync_log_kwargs["source_fingerprint"] == result["source_fingerprint"]
+        assert sync_log_kwargs["duration_seconds"] >= 0
+        cost_summary = [
+            ts for ts in sync_log_kwargs["tab_summaries"]
+            if ts.tab == "COST"
+        ][0]
+        assert "forbidden" in cost_summary.error
+
+    @patch("teramina.google_sheets.services.sheet_service.SheetIntegration")
+    @patch("teramina.google_sheets.services.sheet_service.Cycle")
+    @patch("teramina.google_sheets.services.sheet_service._get_sheets_service")
+    def test_expected_fingerprint_mismatch_aborts_before_writes(
+        self, mock_get_svc, MockCycle, MockIntegration
+    ):
+        mock_get_svc.return_value = _build_sheets_service({
+            "DAILY_LOG": [["2024-01-01", "1", "5.0"]],
+            "ABW_SAMPLING": [], "COST": [], "HARVEST": [], "MORTALITY": [],
+        })
+        integration = self._make_integration()
+        MockIntegration.objects.return_value.first.return_value = integration
+        MockCycle.objects.return_value.first.return_value = self._make_cycle()
+
+        result = SheetService.sync_cycle(CYCLE_ID, expected_fingerprint="stale")
+
+        assert result["error"] == "Sheet changed since preview. Run preview-sync again."
+        assert integration.last_status == "error"
+
+    @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
+    @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
+    @patch("teramina.google_sheets.services.sheet_service.HarvestRecord")
+    @patch("teramina.google_sheets.services.sheet_service.CostData")
+    @patch("teramina.google_sheets.services.sheet_service.CycleData")
+    @patch("teramina.google_sheets.services.sheet_service.Cycle")
+    @patch("teramina.google_sheets.services.sheet_service.SheetIntegration")
+    @patch("teramina.google_sheets.services.sheet_service._get_sheets_service")
+    def test_cost_existing_key_is_updated_not_skipped(
+        self, mock_get_svc, MockIntegration, MockCycle,
+        MockCycleData, MockCostData, MockHarvest, MockFeed, MockSyncLog
+    ):
+        mock_get_svc.return_value = _build_sheets_service({
+            "DAILY_LOG": [], "ABW_SAMPLING": [], "HARVEST": [], "MORTALITY": [],
+            "COST": [["2024-01-01", "Feed", "Starter feed", "200", "kg", "16000", "3200000", "PT Feed", "corrected"]],
+        })
+        integration = self._make_integration()
+        MockIntegration.objects.return_value.first.return_value = integration
+        MockCycle.objects.return_value.first.return_value = self._make_cycle()
+        MockCycleData.objects.return_value.first.return_value = None
+        MockHarvest.objects.return_value = []
+        MockFeed.objects.return_value.only.return_value = []
+        cost_doc = MagicMock()
+        cost_doc.data = [{
+            "date": "2024-01-01", "category": "Feed", "description": "Starter feed",
+            "quantity": 100.0, "unit_price": 15000.0, "total": 1500000.0,
+        }]
+        MockCostData.objects.return_value.first.return_value = cost_doc
+        MockSyncLog.return_value.save.return_value = MockSyncLog.return_value
+
+        result = SheetService.sync_cycle(CYCLE_ID)
+
+        assert result["summary"]["COST"]["updated"] == 1
+        assert result["summary"]["COST"]["skipped"] == 0
+        assert cost_doc.data[0]["quantity"] == 200.0
+        assert cost_doc.data[0]["unit_price"] == 16000.0
+        assert cost_doc.data[0]["notes"] == "corrected"
+
+    @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
+    @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
+    @patch("teramina.google_sheets.services.sheet_service.HarvestRecord")
+    @patch("teramina.google_sheets.services.sheet_service.CostData")
+    @patch("teramina.google_sheets.services.sheet_service.CycleData")
+    @patch("teramina.google_sheets.services.sheet_service.Cycle")
+    @patch("teramina.google_sheets.services.sheet_service.SheetIntegration")
+    @patch("teramina.google_sheets.services.sheet_service._get_sheets_service")
+    def test_cost_row_id_allows_description_correction(
+        self, mock_get_svc, MockIntegration, MockCycle,
+        MockCycleData, MockCostData, MockHarvest, MockFeed, MockSyncLog
+    ):
+        mock_get_svc.return_value = _build_sheets_service({
+            "DAILY_LOG": [], "ABW_SAMPLING": [], "HARVEST": [], "MORTALITY": [],
+            "COST": [["2024-01-01", "Feed", "Starter feed corrected", "100", "kg", "15000", "1500000", "PT Feed", "", "COST-3"]],
+        })
+        integration = self._make_integration()
+        MockIntegration.objects.return_value.first.return_value = integration
+        MockCycle.objects.return_value.first.return_value = self._make_cycle()
+        MockCycleData.objects.return_value.first.return_value = None
+        MockHarvest.objects.return_value = []
+        MockFeed.objects.return_value.only.return_value = []
+        cost_doc = MagicMock()
+        cost_doc.data = [{
+            "date": "2024-01-01",
+            "sheet_row_id": "COST-3",
+            "category": "Feed",
+            "description": "Starter feed",
+        }]
+        MockCostData.objects.return_value.first.return_value = cost_doc
+        MockSyncLog.return_value.save.return_value = MockSyncLog.return_value
+
+        result = SheetService.sync_cycle(CYCLE_ID)
+
+        assert result["summary"]["COST"]["updated"] == 1
+        assert cost_doc.data[0]["description"] == "Starter feed corrected"
+
+    @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
+    @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
+    @patch("teramina.google_sheets.services.sheet_service.HarvestRecord")
+    @patch("teramina.google_sheets.services.sheet_service.CostData")
+    @patch("teramina.google_sheets.services.sheet_service.CycleData")
+    @patch("teramina.google_sheets.services.sheet_service.Cycle")
+    @patch("teramina.google_sheets.services.sheet_service.SheetIntegration")
+    @patch("teramina.google_sheets.services.sheet_service._get_sheets_service")
+    def test_cost_delete_marker_removes_matching_row_id(
+        self, mock_get_svc, MockIntegration, MockCycle,
+        MockCycleData, MockCostData, MockHarvest, MockFeed, MockSyncLog
+    ):
+        mock_get_svc.return_value = _build_sheets_service({
+            "DAILY_LOG": [], "ABW_SAMPLING": [], "HARVEST": [], "MORTALITY": [],
+            "COST": [["2024-01-01", "Feed", "Starter feed", "", "", "", "", "", "", "COST-3", "Y"]],
+        })
+        integration = self._make_integration()
+        MockIntegration.objects.return_value.first.return_value = integration
+        MockCycle.objects.return_value.first.return_value = self._make_cycle()
+        MockCycleData.objects.return_value.first.return_value = None
+        MockHarvest.objects.return_value = []
+        MockFeed.objects.return_value.only.return_value = []
+        cost_doc = MagicMock()
+        cost_doc.data = [
+            {"date": "2024-01-01", "sheet_row_id": "COST-3", "category": "Feed", "description": "Starter feed"},
+            {"date": "2024-01-02", "sheet_row_id": "COST-4", "category": "Feed", "description": "Grower feed"},
+        ]
+        MockCostData.objects.return_value.first.return_value = cost_doc
+        MockSyncLog.return_value.save.return_value = MockSyncLog.return_value
+
+        result = SheetService.sync_cycle(CYCLE_ID)
+
+        assert result["summary"]["COST"]["deleted"] == 1
+        assert [row["sheet_row_id"] for row in cost_doc.data] == ["COST-4"]
+        cost_doc.save.assert_called_once()
+
+    @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
+    @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
+    @patch("teramina.google_sheets.services.sheet_service.HarvestRecord")
+    @patch("teramina.google_sheets.services.sheet_service.CostData")
+    @patch("teramina.google_sheets.services.sheet_service.CycleData")
+    @patch("teramina.google_sheets.services.sheet_service.Cycle")
+    @patch("teramina.google_sheets.services.sheet_service.SheetIntegration")
+    @patch("teramina.google_sheets.services.sheet_service._get_sheets_service")
+    def test_mortality_existing_date_counts_as_update(
+        self, mock_get_svc, MockIntegration, MockCycle,
+        MockCycleData, MockCostData, MockHarvest, MockFeed, MockSyncLog
+    ):
+        mock_get_svc.return_value = _build_sheets_service({
+            "DAILY_LOG": [], "ABW_SAMPLING": [], "COST": [], "HARVEST": [],
+            "MORTALITY": [["2024-01-05", "5", "20", "corrected"]],
+        })
+        integration = self._make_integration()
+        MockIntegration.objects.return_value.first.return_value = integration
+        MockCycle.objects.return_value.first.return_value = self._make_cycle()
+        cycle_data = MagicMock()
+        cycle_data.result_data = [{"date": "2024-01-05", "mortality_count": 12}]
+        MockCycleData.objects.return_value.first.return_value = cycle_data
+        MockCostData.objects.return_value.first.return_value = None
+        MockHarvest.objects.return_value = []
+        MockFeed.objects.return_value.only.return_value = []
+        MockSyncLog.return_value.save.return_value = MockSyncLog.return_value
+
+        result = SheetService.sync_cycle(CYCLE_ID)
+
+        assert result["summary"]["MORTALITY"]["inserted"] == 0
+        assert result["summary"]["MORTALITY"]["updated"] == 1
+        assert cycle_data.result_data[0]["mortality_count"] == 20
+
+    @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
+    @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
+    @patch("teramina.google_sheets.services.sheet_service.HarvestRecord")
+    @patch("teramina.google_sheets.services.sheet_service.CostData")
+    @patch("teramina.google_sheets.services.sheet_service.CycleData")
+    @patch("teramina.google_sheets.services.sheet_service.Cycle")
+    @patch("teramina.google_sheets.services.sheet_service.SheetIntegration")
+    @patch("teramina.google_sheets.services.sheet_service._get_sheets_service")
+    def test_mortality_delete_marker_removes_matching_row_id(
+        self, mock_get_svc, MockIntegration, MockCycle,
+        MockCycleData, MockCostData, MockHarvest, MockFeed, MockSyncLog
+    ):
+        mock_get_svc.return_value = _build_sheets_service({
+            "DAILY_LOG": [], "ABW_SAMPLING": [], "COST": [], "HARVEST": [],
+            "MORTALITY": [["2024-01-05", "5", "", "", "MORTALITY-3", "Y"]],
+        })
+        integration = self._make_integration()
+        MockIntegration.objects.return_value.first.return_value = integration
+        MockCycle.objects.return_value.first.return_value = self._make_cycle()
+        cycle_data = MagicMock()
+        cycle_data.result_data = [
+            {"date": "2024-01-05", "sheet_row_id": "MORTALITY-3", "mortality_count": 12},
+            {"date": "2024-01-06", "sheet_row_id": "MORTALITY-4", "mortality_count": 8},
+        ]
+        MockCycleData.objects.return_value.first.return_value = cycle_data
+        MockCostData.objects.return_value.first.return_value = None
+        MockHarvest.objects.return_value = []
+        MockFeed.objects.return_value.only.return_value = []
+        MockSyncLog.return_value.save.return_value = MockSyncLog.return_value
+
+        result = SheetService.sync_cycle(CYCLE_ID)
+
+        assert result["summary"]["MORTALITY"]["deleted"] == 1
+        assert [row["sheet_row_id"] for row in cycle_data.result_data] == ["MORTALITY-4"]
+        cycle_data.save.assert_called()
+
+    @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
+    @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
+    @patch("teramina.google_sheets.services.sheet_service.HarvestRecord")
+    @patch("teramina.google_sheets.services.sheet_service.CostData")
+    @patch("teramina.google_sheets.services.sheet_service.CycleData")
+    @patch("teramina.google_sheets.services.sheet_service.Cycle")
+    @patch("teramina.google_sheets.services.sheet_service.SheetIntegration")
+    @patch("teramina.google_sheets.services.sheet_service._get_sheets_service")
+    def test_existing_feed_realization_updates_feed_given_and_leftover(
+        self, mock_get_svc, MockIntegration, MockCycle,
+        MockCycleData, MockCostData, MockHarvest, MockFeed, MockSyncLog
+    ):
+        row = ["2024-01-01", "1", "5.0", "6.0", "", "28", "30", "",
+               "7.5", "7.8", "15", "0.1", "35", "25", "2.5",
+               "Starter", "40", "4", ""]
+        mock_get_svc.return_value = _build_sheets_service({
+            "DAILY_LOG": [row], "ABW_SAMPLING": [], "COST": [],
+            "HARVEST": [], "MORTALITY": [],
+        })
+        integration = self._make_integration()
+        MockIntegration.objects.return_value.first.return_value = integration
+        MockCycle.objects.return_value.first.return_value = self._make_cycle()
+        cycle_data = MagicMock()
+        cycle_data.result_data = [{"date": "2024-01-01", "doc": 1}]
+        MockCycleData.objects.return_value.first.return_value = cycle_data
+        MockCostData.objects.return_value.first.return_value = None
+        MockHarvest.objects.return_value = []
+        existing_feed = MagicMock()
+        existing_feed.doc = 1
+        MockFeed.objects.return_value.only.return_value = [existing_feed]
+        MockSyncLog.return_value.save.return_value = MockSyncLog.return_value
+
+        SheetService.sync_cycle(CYCLE_ID)
+
+        MockFeed.objects.return_value.update_one.assert_called_with(
+            set__feed_given=25.0,
+            set__feed_ration=25.0,
+            set__last_updated=MockFeed.objects.return_value.update_one.call_args.kwargs["set__last_updated"],
+            set__feed_leftover=2.5,
+        )
 
 
 # ── CreateTemplate tests ──────────────────────────────────────────────────
@@ -665,23 +1019,214 @@ class TestCreateTemplate:
         assert code == 400
 
 
+# ── Controller endpoint tests ─────────────────────────────────────────────
+
+class TestSheetController:
+    @patch("teramina.google_sheets.controllers.sheet_controller.SheetSyncLog")
+    @patch("teramina.google_sheets.controllers.sheet_controller.verify_cycle_owner")
+    @patch("teramina.google_sheets.controllers.sheet_controller.get_signed_in_user")
+    def test_sync_log_old_document_renders_without_new_fields(
+        self, mock_user, mock_owner, MockSyncLog
+    ):
+        from teramina.google_sheets.controllers.sheet_controller import get_sync_log
+
+        mock_user.return_value = SimpleNamespace(id=USER_ID)
+        mock_owner.return_value = True
+        old_tab_summary = SimpleNamespace(
+            tab="DAILY_LOG",
+            processed=1,
+            inserted=1,
+            updated=0,
+            skipped=0,
+            rejected=0,
+        )
+        old_log = SimpleNamespace(
+            sync_id="12345678-1234-5678-1234-567812345678",
+            cycle_id=CYCLE_ID,
+            started_at=datetime(2024, 1, 1),
+            finished_at=datetime(2024, 1, 1),
+            status="ok",
+            tab_summaries=[old_tab_summary],
+            rejected_rows=[],
+        )
+        MockSyncLog.objects.return_value.first.return_value = old_log
+
+        code, body = get_sync_log(MagicMock(), CYCLE_ID)
+
+        assert code == 200
+        assert body.payload["spreadsheet_id"] is None
+        assert body.payload["source_fingerprint"] is None
+        assert body.payload["duration_seconds"] is None
+        assert body.payload["tab_summaries"][0]["deleted"] == 0
+        assert body.payload["tab_summaries"][0]["error"] is None
+
+    @patch("teramina.google_sheets.controllers.sheet_controller.sync_single_cycle")
+    @patch("teramina.google_sheets.controllers.sheet_controller.cache")
+    @patch("teramina.google_sheets.controllers.sheet_controller.SheetIntegration")
+    @patch("teramina.google_sheets.controllers.sheet_controller.verify_cycle_owner")
+    @patch("teramina.google_sheets.controllers.sheet_controller.get_signed_in_user")
+    def test_manual_sync_returns_queued_sync_id(
+        self, mock_user, mock_owner, MockIntegration, mock_cache, mock_task
+    ):
+        from teramina.google_sheets.controllers.sheet_controller import manual_sync
+
+        mock_user.return_value = SimpleNamespace(id=USER_ID)
+        mock_owner.return_value = True
+        mock_cache.get.return_value = None
+        integration = MagicMock()
+        MockIntegration.objects.return_value.first.return_value = integration
+
+        code, body = manual_sync(MagicMock(), CYCLE_ID)
+
+        assert code == 200
+        assert body.payload["cycle_id"] == CYCLE_ID
+        assert body.payload["status"] == "queued"
+        assert body.payload["sync_id"]
+        assert integration.last_status == "queued"
+        assert str(integration.active_sync_id) == body.payload["sync_id"]
+        mock_task.delay.assert_called_once_with(
+            CYCLE_ID,
+            None,
+            body.payload["sync_id"],
+            "valid_rows_only",
+        )
+
+    @patch("teramina.google_sheets.controllers.sheet_controller.sync_single_cycle")
+    @patch("teramina.google_sheets.controllers.sheet_controller.cache")
+    @patch("teramina.google_sheets.controllers.sheet_controller.SheetIntegration")
+    @patch("teramina.google_sheets.controllers.sheet_controller.verify_cycle_owner")
+    @patch("teramina.google_sheets.controllers.sheet_controller.get_signed_in_user")
+    def test_manual_sync_lock_contention_returns_400(
+        self, mock_user, mock_owner, MockIntegration, mock_cache, mock_task
+    ):
+        from teramina.google_sheets.controllers.sheet_controller import manual_sync
+
+        mock_user.return_value = SimpleNamespace(id=USER_ID)
+        mock_owner.return_value = True
+        mock_cache.get.return_value = "1"
+        MockIntegration.objects.return_value.first.return_value = MagicMock()
+
+        code, body = manual_sync(MagicMock(), CYCLE_ID)
+
+        assert code == 400
+        assert body.message == "Sync already in progress"
+        mock_task.delay.assert_not_called()
+
+    @patch("teramina.google_sheets.controllers.sheet_controller.cache")
+    @patch("teramina.google_sheets.controllers.sheet_controller.SheetIntegration")
+    @patch("teramina.google_sheets.controllers.sheet_controller.SheetService")
+    @patch("teramina.google_sheets.controllers.sheet_controller.verify_cycle_owner")
+    @patch("teramina.google_sheets.controllers.sheet_controller.get_signed_in_user")
+    def test_preview_sync_stores_source_fingerprint(
+        self, mock_user, mock_owner, MockService, MockIntegration, mock_cache
+    ):
+        from teramina.google_sheets.controllers.sheet_controller import preview_sync
+
+        mock_user.return_value = SimpleNamespace(id=USER_ID)
+        mock_owner.return_value = True
+        MockIntegration.objects.return_value.first.return_value = MagicMock()
+        MockService.sync_cycle.return_value = {
+            "summary": {"DAILY_LOG": {"inserted": 1, "updated": 0, "skipped": 0, "rejected": 0}},
+            "rejected_rows": [],
+            "source_fingerprint": "fingerprint-1",
+            "status": "ok",
+        }
+
+        code, body = preview_sync(MagicMock(), CYCLE_ID)
+
+        assert code == 200
+        assert body.payload["preview_id"]
+        cache_payload = mock_cache.set.call_args.args[1]
+        assert cache_payload["cycle_id"] == CYCLE_ID
+        assert cache_payload["source_fingerprint"] == "fingerprint-1"
+
+    @patch("teramina.google_sheets.controllers.sheet_controller.cache")
+    @patch("teramina.google_sheets.controllers.sheet_controller.SheetIntegration")
+    @patch("teramina.google_sheets.controllers.sheet_controller.SheetService")
+    @patch("teramina.google_sheets.controllers.sheet_controller.verify_cycle_owner")
+    @patch("teramina.google_sheets.controllers.sheet_controller.get_signed_in_user")
+    def test_preview_sync_strict_blocks_errors(
+        self, mock_user, mock_owner, MockService, MockIntegration, mock_cache
+    ):
+        from teramina.google_sheets.controllers.sheet_controller import preview_sync
+
+        mock_user.return_value = SimpleNamespace(id=USER_ID)
+        mock_owner.return_value = True
+        MockIntegration.objects.return_value.first.return_value = MagicMock()
+        MockService.sync_cycle.return_value = {
+            "summary": {"DAILY_LOG": {"inserted": 0, "updated": 0, "skipped": 0, "rejected": 1}},
+            "rejected_rows": [{"reason": "invalid_date"}],
+            "source_fingerprint": "fingerprint-1",
+            "status": "partial",
+        }
+
+        code, body = preview_sync(MagicMock(), CYCLE_ID, import_mode="strict")
+
+        assert code == 400
+        assert body.message == "Strict import blocked because the sheet has errors."
+        mock_cache.set.assert_not_called()
+
+    @patch("teramina.google_sheets.controllers.sheet_controller.sync_single_cycle")
+    @patch("teramina.google_sheets.controllers.sheet_controller.cache")
+    @patch("teramina.google_sheets.controllers.sheet_controller.SheetIntegration")
+    @patch("teramina.google_sheets.controllers.sheet_controller.verify_cycle_owner")
+    @patch("teramina.google_sheets.controllers.sheet_controller.get_signed_in_user")
+    def test_confirm_sync_passes_preview_fingerprint_to_task(
+        self, mock_user, mock_owner, MockIntegration, mock_cache, mock_task
+    ):
+        from teramina.google_sheets.controllers.sheet_controller import confirm_sync
+
+        mock_user.return_value = SimpleNamespace(id=USER_ID)
+        mock_owner.return_value = True
+        mock_cache.get.side_effect = [
+            {"cycle_id": CYCLE_ID, "source_fingerprint": "fingerprint-1"},
+            None,
+        ]
+        integration = MagicMock()
+        MockIntegration.objects.return_value.first.return_value = integration
+
+        code, body = confirm_sync(MagicMock(), "preview-1")
+
+        assert code == 200
+        assert body.payload["preview_id"] == "preview-1"
+        assert body.payload["status"] == "queued"
+        assert body.payload["sync_id"]
+        assert integration.last_status == "queued"
+        mock_cache.delete.assert_called_once_with("sheet_preview:preview-1")
+        mock_task.delay.assert_called_once_with(
+            CYCLE_ID,
+            "fingerprint-1",
+            body.payload["sync_id"],
+            "valid_rows_only",
+        )
+
+
 # ── Celery task tests ─────────────────────────────────────────────────────
 
 class TestSyncTasks:
+    @patch("teramina.google_sheets.tasks.sync_tasks.cache")
     @patch("teramina.google_sheets.tasks.sync_tasks.SheetService")
-    def test_sync_single(self, MockService):
+    def test_sync_single(self, MockService, mock_cache):
+        mock_cache.add.return_value = True
         MockService.sync_cycle.return_value = {
             "summary": {"DAILY_LOG": {"inserted": 1}},
             "status": "ok",
         }
         from teramina.google_sheets.tasks.sync_tasks import sync_single_cycle
         result = sync_single_cycle(CYCLE_ID)
-        MockService.sync_cycle.assert_called_once_with(CYCLE_ID)
+        MockService.sync_cycle.assert_called_once_with(
+            CYCLE_ID,
+            expected_fingerprint=None,
+            sync_id=None,
+        )
+        mock_cache.delete.assert_called_once()
         assert "summary" in result
 
+    @patch("teramina.google_sheets.tasks.sync_tasks.cache")
     @patch("teramina.google_sheets.tasks.sync_tasks.SheetService")
     @patch("teramina.google_sheets.tasks.sync_tasks.SheetIntegration")
-    def test_sync_all(self, MockIntegration, MockService):
+    def test_sync_all(self, MockIntegration, MockService, mock_cache):
+        mock_cache.add.return_value = True
         i1 = MagicMock()
         i1.cycle_id = "c1"
         i2 = MagicMock()
@@ -693,3 +1238,25 @@ class TestSyncTasks:
         result = sync_all_active_sheets()
         assert result["synced"] == 2
         assert result["errors"] == 0
+
+    @patch("teramina.google_sheets.tasks.sync_tasks.cache")
+    @patch("teramina.google_sheets.tasks.sync_tasks.SheetIntegration")
+    @patch("teramina.google_sheets.tasks.sync_tasks.SheetService")
+    def test_strict_sync_blocks_before_write(self, MockService, MockIntegration, mock_cache):
+        mock_cache.add.return_value = True
+        integration = MagicMock()
+        MockIntegration.objects.return_value.first.return_value = integration
+        MockService.sync_cycle.return_value = {
+            "summary": {"DAILY_LOG": {"inserted": 0, "updated": 0, "skipped": 0, "rejected": 1}},
+            "rejected_rows": [{"reason": "invalid_date"}],
+            "source_fingerprint": "fingerprint-1",
+        }
+
+        from teramina.google_sheets.tasks.sync_tasks import sync_single_cycle
+        result = sync_single_cycle(CYCLE_ID, import_mode="strict")
+
+        assert result["error"] == "Strict import blocked because the sheet has errors."
+        assert MockService.sync_cycle.call_count == 1
+        assert MockService.sync_cycle.call_args.kwargs["dry_run"] is True
+        assert integration.last_status == "error"
+        mock_cache.delete.assert_called_once()

@@ -60,6 +60,11 @@ describe("GoogleSheets", () => {
   beforeEach(() => {
     mockSetToast.mockClear();
     vi.spyOn(window, "open").mockImplementation(() => null);
+    server.use(
+      http.get("*/sheets/sync-log", () =>
+        HttpResponse.json({ message: "No sync log found for this cycle" }, { status: 404 })
+      )
+    );
   });
 
   afterEach(() => {
@@ -101,6 +106,17 @@ describe("GoogleSheets", () => {
   // ── Connected states ─────────────────────────────────────────────────────
 
   describe("connected states", () => {
+    it("shows an unavailable state when status request fails", async () => {
+      server.use(
+        http.get("*/sheets/status", () =>
+          HttpResponse.json({ message: "Unauthorized" }, { status: 401 })
+        )
+      );
+      renderComponent();
+      expect(await screen.findByText("Google Sheets unavailable")).toBeInTheDocument();
+      expect(screen.queryByText("Connect Google Sheets")).not.toBeInTheDocument();
+    });
+
     it("shows Connected chip and Synced chip for ok status", async () => {
       server.use(
         http.get("*/sheets/status", () => HttpResponse.json(connectedPayload()))
@@ -108,6 +124,37 @@ describe("GoogleSheets", () => {
       renderComponent();
       expect(await screen.findByText("Connected")).toBeInTheDocument();
       expect(screen.getByText("Synced")).toBeInTheDocument();
+      expect(screen.getByLabelText("Import mode")).toHaveTextContent("Import valid rows");
+    });
+
+    it("passes selected strict import mode to preview", async () => {
+      const user = userEvent.setup();
+      let importMode = "";
+      server.use(
+        http.get("*/sheets/status", () => HttpResponse.json(connectedPayload())),
+        http.post("*/sheets/preview-sync", ({ request }) => {
+          importMode = new URL(request.url).searchParams.get("import_mode") || "";
+          return HttpResponse.json({
+            payload: {
+              preview_id: "preview-1",
+              rows_valid: 1,
+              rows_warning: 0,
+              rows_error: 0,
+              tab_summaries: [],
+              rejected_rows: [],
+            },
+          });
+        })
+      );
+
+      renderComponent();
+      await screen.findByText("Connected");
+      fireEvent.mouseDown(screen.getByLabelText("Import mode"));
+      await user.click(screen.getByRole("option", { name: "Strict import" }));
+      await user.click(screen.getByRole("button", { name: "Review & Sync" }));
+
+      await screen.findByText("Review Import");
+      expect(importMode).toBe("strict");
     });
 
     it("shows Partial chip for partial status", async () => {
@@ -118,6 +165,20 @@ describe("GoogleSheets", () => {
       );
       renderComponent();
       expect(await screen.findByText("Partial")).toBeInTheDocument();
+    });
+
+    it("shows queued status and sync id when a sync is queued", async () => {
+      server.use(
+        http.get("*/sheets/status", () =>
+          HttpResponse.json(connectedPayload({
+            last_status: "queued",
+            active_sync_id: "sync-123",
+          }))
+        )
+      );
+      renderComponent();
+      expect(await screen.findByText("Queued")).toBeInTheDocument();
+      expect(screen.getByText("Sync ID: sync-123")).toBeInTheDocument();
     });
 
     it("shows Error chip and inline error text for error status", async () => {
@@ -131,6 +192,21 @@ describe("GoogleSheets", () => {
       renderComponent();
       expect(await screen.findByText("Error")).toBeInTheDocument();
       expect(screen.getByText("API quota exceeded")).toBeInTheDocument();
+    });
+
+    it("offers Review Again for stale preview errors", async () => {
+      server.use(
+        http.get("*/sheets/status", () =>
+          HttpResponse.json(
+            connectedPayload({
+              last_status: "error",
+              last_error: "Sheet changed since preview. Run preview-sync again.",
+            })
+          )
+        )
+      );
+      renderComponent();
+      expect(await screen.findByRole("button", { name: "Review Again" })).toBeInTheDocument();
     });
 
     it("shows no error text when last_status is not error", async () => {

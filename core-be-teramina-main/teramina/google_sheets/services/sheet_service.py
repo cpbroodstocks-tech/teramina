@@ -2,7 +2,11 @@
 
 import logging
 import os
+import hashlib
+import json
+import time
 from datetime import datetime, date as date_type
+from uuid import UUID
 
 import pandas as pd
 from google.oauth2 import service_account
@@ -35,6 +39,31 @@ TAB_MORTALITY = "MORTALITY"
 TAB_COST = "COST"
 TAB_HARVEST = "HARVEST"
 TAB_SYNC_LOG = "SYNC_LOG"
+SYNC_LOCK_KEY_PREFIX = "sheet_sync_lock:"
+
+SYNC_TAB_RANGES = {
+    TAB_DAILY_LOG: f"{TAB_DAILY_LOG}!A3:X",
+    TAB_ABW_SAMPLING: f"{TAB_ABW_SAMPLING}!A3:N",
+    TAB_COST: f"{TAB_COST}!A3:M",
+    TAB_HARVEST: f"{TAB_HARVEST}!A3:N",
+    TAB_MORTALITY: f"{TAB_MORTALITY}!A3:H",
+}
+
+FEEDBACK_COLUMNS = {
+    TAB_DAILY_LOG: ("W", "X"),
+    TAB_ABW_SAMPLING: ("M", "N"),
+    TAB_MORTALITY: ("G", "H"),
+    TAB_COST: ("L", "M"),
+    TAB_HARVEST: ("M", "N"),
+}
+ROW_ID_COLUMNS = {
+    TAB_DAILY_LOG: ("U", 20),
+    TAB_ABW_SAMPLING: ("K", 10),
+    TAB_MORTALITY: ("E", 4),
+    TAB_COST: ("J", 9),
+    TAB_HARVEST: ("K", 10),
+}
+TRANSIENT_GOOGLE_STATUSES = {429, 500, 502, 503, 504}
 
 # DAILY_LOG column layout (0-indexed):
 # A=0  date          B=1  doc           C=2  do_morning     D=3  do_afternoon
@@ -42,6 +71,7 @@ TAB_SYNC_LOG = "SYNC_LOG"
 # I=8  ph_morning    J=9  ph_afternoon  K=10 salinity       L=11 nh3
 # M=12 turbidity     N=13 feed_given_kg O=14 feed_leftover  P=15 feed_type
 # Q=16 protein_pct   R=17 feeding_freq  S=18 notes
+# T=19 status/formula U=20 row_id V=21 delete_marker
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -63,17 +93,38 @@ def _get_drive_service():
 
 
 def _get_sheet_values(service, spreadsheet_id: str, range_name: str) -> list:
+    last_exc = None
+    for attempt in range(3):
+        try:
+            result = (
+                service.spreadsheets()
+                .values()
+                .get(spreadsheetId=spreadsheet_id, range=range_name)
+                .execute()
+            )
+            return result.get("values", [])
+        except HttpError as exc:
+            last_exc = exc
+            status = getattr(getattr(exc, "resp", None), "status", None)
+            if status not in TRANSIENT_GOOGLE_STATUSES or attempt == 2:
+                logger.error("Sheets read error for %s/%s: %s", spreadsheet_id, range_name, exc)
+                raise
+            time.sleep(0.2 * (attempt + 1))
+    raise last_exc
+
+
+def _check_spreadsheet_access(spreadsheet_id: str) -> tuple[str, str | None]:
     try:
-        result = (
-            service.spreadsheets()
-            .values()
-            .get(spreadsheetId=spreadsheet_id, range=range_name)
-            .execute()
-        )
-        return result.get("values", [])
-    except HttpError as exc:
-        logger.error("Sheets read error for %s/%s: %s", spreadsheet_id, range_name, exc)
-        return []
+        service = _get_sheets_service()
+        _get_sheet_values(service, spreadsheet_id, f"{TAB_SETUP}!A1:B2")
+        return "ok", None
+    except Exception as exc:
+        return "error", str(exc)
+
+
+def _fingerprint_sheet_rows(rows_by_tab: dict) -> str:
+    payload = json.dumps(rows_by_tab, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _append_sync_log(service, spreadsheet_id: str, tab: str, rows_processed: int,
@@ -99,6 +150,71 @@ def _append_sync_log(service, spreadsheet_id: str, tab: str, rows_processed: int
         ).execute()
     except Exception as exc:
         logger.warning("Failed to write SYNC_LOG: %s", exc)
+
+
+def _write_sheet_feedback(service, spreadsheet_id: str, rejected_rows: list) -> None:
+    if not rejected_rows:
+        return
+
+    data = []
+    for row in rejected_rows:
+        row_number = row.get("row_number")
+        tab = row.get("tab")
+        if not row_number or tab not in FEEDBACK_COLUMNS:
+            continue
+        status_col, message_col = FEEDBACK_COLUMNS[tab]
+        severity = "WARN" if row.get("reason", "").startswith("warn:") else "ERROR"
+        message = f"{row.get('field') or ''}: {row.get('reason') or ''}".strip(": ")
+        data.append({
+            "range": f"{tab}!{status_col}{row_number}:{message_col}{row_number}",
+            "values": [[severity, message]],
+        })
+
+    if not data:
+        return
+
+    try:
+        service.spreadsheets().values().batchUpdate(
+            spreadsheetId=spreadsheet_id,
+            body={"valueInputOption": "RAW", "data": data},
+        ).execute()
+    except Exception as exc:
+        logger.warning("Failed to write sheet feedback: %s", exc)
+
+
+def _backfill_row_ids(service, spreadsheet_id: str) -> int:
+    data = []
+    for tab, range_name in SYNC_TAB_RANGES.items():
+        row_id_col, row_id_idx = ROW_ID_COLUMNS[tab]
+        try:
+            rows = _get_sheet_values(service, spreadsheet_id, range_name)
+        except Exception as exc:
+            logger.warning("Failed to inspect row IDs for %s: %s", tab, exc)
+            continue
+
+        for row_idx, row in enumerate(rows):
+            if not row or not _col(row, 0):
+                continue
+            if _safe_str(_col(row, row_id_idx)):
+                continue
+            sheet_row = row_idx + 3
+            data.append({
+                "range": f"{tab}!{row_id_col}{sheet_row}",
+                "values": [[f"{tab}-{sheet_row}"]],
+            })
+
+    if not data:
+        return 0
+
+    try:
+        service.spreadsheets().values().batchUpdate(
+            spreadsheetId=spreadsheet_id,
+            body={"valueInputOption": "RAW", "data": data},
+        ).execute()
+        return len(data)
+    except Exception as exc:
+        logger.warning("Failed to backfill sheet row IDs: %s", exc)
+        return 0
 
 
 def _safe_float(val, default=None):
@@ -176,6 +292,39 @@ def _auto_fill_doc(date_str: str, start_date) -> int | None:
 def _col(row: list, idx: int, default=None):
     """Safe column access."""
     return row[idx] if len(row) > idx else default
+
+
+def _row_identity(row: list, row_idx: int, fallback_key: str) -> str:
+    raw = _safe_str(_col(row, row_idx))
+    return raw or fallback_key
+
+
+def _is_delete_marker(val) -> bool:
+    return _safe_str(val).upper() in ("Y", "YES", "TRUE", "1", "DELETE", "DELETED")
+
+
+def _safe_uuid_str(value) -> str | None:
+    return str(value) if value else None
+
+
+def _delete_result_rows(cycle_data: CycleData | None, cycle_id: str, keys: set[str]) -> int:
+    if not keys:
+        return 0
+    if cycle_data is None:
+        cycle_data = CycleData.objects(cycle_id=cycle_id).first()
+    if not cycle_data or not cycle_data.result_data:
+        return 0
+
+    before = len(cycle_data.result_data)
+    cycle_data.result_data = [
+        r for r in cycle_data.result_data
+        if (r.get("sheet_row_id") or str(r.get("date", ""))) not in keys
+    ]
+    deleted = before - len(cycle_data.result_data)
+    if deleted:
+        cycle_data.last_updated = datetime.utcnow()
+        cycle_data.save()
+    return deleted
 
 
 def _share_spreadsheet(spreadsheet_id: str, email: str) -> None:
@@ -362,11 +511,18 @@ class SheetService:
                         "processed": ts.processed,
                         "inserted": ts.inserted,
                         "updated": ts.updated,
+                        "deleted": getattr(ts, "deleted", 0),
                         "skipped": ts.skipped,
                         "rejected": ts.rejected,
+                        "error": ts.error,
                     }
                     for ts in log.tab_summaries
                 ]
+
+        access_status = "not_checked"
+        access_error = None
+        if integration.is_active and os.getenv("SHEETS_STATUS_ACCESS_CHECK", "").lower() == "true":
+            access_status, access_error = _check_spreadsheet_access(integration.spreadsheet_id)
 
         return 200, DataSuccessSchema(
             code=200,
@@ -380,12 +536,21 @@ class SheetService:
                 "last_status": integration.last_status,
                 "last_error": integration.last_error,
                 "rows_synced": integration.rows_synced,
+                "active_sync_id": _safe_uuid_str(getattr(integration, "active_sync_id", None)),
+                "last_sync_id": _safe_uuid_str(getattr(integration, "last_sync_log_id", None)),
+                "access_status": access_status,
+                "access_error": access_error,
                 "tab_summaries": tab_summaries,
             },
         )
 
     @staticmethod
-    def sync_cycle(cycle_id: str, dry_run: bool = False) -> dict:
+    def sync_cycle(
+        cycle_id: str,
+        dry_run: bool = False,
+        expected_fingerprint: str = None,
+        sync_id: str | UUID = None,
+    ) -> dict:
         """
         Pull data from all tabs and upsert into MongoDB.
         If dry_run=True, validate and parse everything but write nothing to DB.
@@ -400,6 +565,7 @@ class SheetService:
             if not dry_run:
                 integration.last_status = "error"
                 integration.last_error = "Cycle not found"
+                integration.active_sync_id = None
                 integration.save()
             return {"error": "Cycle not found"}
 
@@ -410,6 +576,7 @@ class SheetService:
         total_updated = 0
         started_at = datetime.utcnow()
         rejected_rows_collector: list = []
+        sync_uuid = UUID(str(sync_id)) if sync_id else None
 
         try:
             service = _get_sheets_service()
@@ -417,13 +584,42 @@ class SheetService:
             if not dry_run:
                 integration.last_status = "error"
                 integration.last_error = str(exc)
+                integration.active_sync_id = None
                 integration.save()
             return {"error": str(exc)}
 
+        row_ids_backfilled = _backfill_row_ids(service, spreadsheet_id)
+
+        rows_by_tab = {}
+        read_errors = {}
+        for tab, range_name in SYNC_TAB_RANGES.items():
+            try:
+                rows_by_tab[tab] = _get_sheet_values(service, spreadsheet_id, range_name)
+            except HttpError as exc:
+                rows_by_tab[tab] = []
+                read_errors[tab] = str(exc)
+
+        source_fingerprint = _fingerprint_sheet_rows(rows_by_tab)
+        if expected_fingerprint and expected_fingerprint != source_fingerprint:
+            message = "Sheet changed since preview. Run preview-sync again."
+            if not dry_run:
+                integration.last_status = "error"
+                integration.last_error = message
+                integration.active_sync_id = None
+                integration.save()
+            return {"error": message}
+
+        if not dry_run:
+            integration.last_status = "syncing"
+            integration.active_sync_id = sync_uuid
+            integration.save()
+
         # ── DAILY_LOG ─────────────────────────────────────────────────────────
         try:
-            rows = _get_sheet_values(service, spreadsheet_id, f"{TAB_DAILY_LOG}!A3:S")
-            inserted = updated = skipped = rejected = 0
+            if TAB_DAILY_LOG in read_errors:
+                raise RuntimeError(read_errors[TAB_DAILY_LOG])
+            rows = rows_by_tab[TAB_DAILY_LOG]
+            inserted = updated = deleted = skipped = rejected = 0
 
             cycle_data = CycleData.objects(cycle_id=cycle_id).first()
             existing_dates = {}
@@ -434,6 +630,7 @@ class SheetService:
                 }
 
             new_or_updated = []
+            delete_keys = set()
             date_to_sheet_row: dict = {}
 
             for row_idx, row in enumerate(rows):
@@ -441,6 +638,10 @@ class SheetService:
                 if not row or not _col(row, 0):
                     continue
                 date_str = _normalize_date(_col(row, 0))
+                row_key = _row_identity(row, 20, date_str or f"{TAB_DAILY_LOG}:{sheet_row}")
+                if _is_delete_marker(_col(row, 21)):
+                    delete_keys.add(row_key)
+                    continue
                 if not date_str:
                     rejected += 1
                     rejected_rows_collector.append({
@@ -466,6 +667,7 @@ class SheetService:
 
                 entry = {
                     "date": date_str, "doc": doc,
+                    "sheet_row_id": row_key,
                     "do_morning": do_morning, "do_afternoon": do_afternoon, "do_avg": do_avg,
                     "temp_morning": temp_morning, "temp_afternoon": temp_afternoon,
                     "temp_avg": temp_avg,
@@ -515,13 +717,16 @@ class SheetService:
                     for fe in feed_entries:
                         doc_val = fe["doc"]
                         if doc_val in existing_feed_docs:
+                            update_fields = {
+                                "set__feed_given": fe["feed_given_kg"],
+                                "set__feed_ration": fe["feed_given_kg"],
+                                "set__last_updated": datetime.utcnow(),
+                            }
                             if fe.get("feed_leftover") is not None:
-                                FeedRealization.objects(
-                                    cycle_id=cycle_id, doc=doc_val
-                                ).update_one(
-                                    set__feed_leftover=fe["feed_leftover"],
-                                    set__last_updated=datetime.utcnow(),
-                                )
+                                update_fields["set__feed_leftover"] = fe["feed_leftover"]
+                            FeedRealization.objects(
+                                cycle_id=cycle_id, doc=doc_val
+                            ).update_one(**update_fields)
                         else:
                             FeedRealization(
                                 cycle_id=cycle_id,
@@ -533,16 +738,18 @@ class SheetService:
                                 last_updated=datetime.utcnow(),
                             ).save()
                             existing_feed_docs.add(doc_val)
+            if delete_keys and not dry_run:
+                deleted = _delete_result_rows(cycle_data, cycle_id, delete_keys)
 
             total_inserted += inserted
             total_updated += updated
             summary[TAB_DAILY_LOG] = {
-                "inserted": inserted, "updated": updated,
+                "inserted": inserted, "updated": updated, "deleted": deleted,
                 "skipped": skipped, "rejected": rejected,
             }
             if not dry_run:
                 _append_sync_log(service, spreadsheet_id, TAB_DAILY_LOG,
-                                 inserted + updated + skipped + rejected,
+                                 inserted + updated + deleted + skipped + rejected,
                                  inserted, updated, skipped, rejected, "ok")
         except Exception as exc:
             logger.exception("DAILY_LOG sync error: %s", exc)
@@ -553,8 +760,10 @@ class SheetService:
 
         # ── ABW_SAMPLING ──────────────────────────────────────────────────────
         try:
-            rows = _get_sheet_values(service, spreadsheet_id, f"{TAB_ABW_SAMPLING}!A3:J")
-            inserted = updated = skipped = rejected = 0
+            if TAB_ABW_SAMPLING in read_errors:
+                raise RuntimeError(read_errors[TAB_ABW_SAMPLING])
+            rows = rows_by_tab[TAB_ABW_SAMPLING]
+            inserted = updated = deleted = skipped = rejected = 0
 
             cycle_data = CycleData.objects(cycle_id=cycle_id).first()
             existing_abw_dates = set()
@@ -566,6 +775,7 @@ class SheetService:
                 }
 
             new_abw = []
+            delete_keys = set()
             abw_date_to_sheet_row: dict = {}
 
             for row_idx, row in enumerate(rows):
@@ -573,6 +783,10 @@ class SheetService:
                 if not row or not _col(row, 0):
                     continue
                 date_str = _normalize_date(_col(row, 0))
+                row_key = _row_identity(row, 10, date_str or f"{TAB_ABW_SAMPLING}:{sheet_row}")
+                if _is_delete_marker(_col(row, 11)):
+                    delete_keys.add(row_key)
+                    continue
                 if not date_str:
                     rejected += 1
                     rejected_rows_collector.append({
@@ -596,6 +810,7 @@ class SheetService:
                 doc = _safe_int(_col(row, 1)) or _auto_fill_doc(date_str, start_date)
                 entry = {
                     "date": date_str, "doc": doc,
+                    "sheet_row_id": row_key,
                     "abw_sample_count": _safe_int(_col(row, 2)),
                     "abw_total_weight_g": _safe_float(_col(row, 3)),
                     "abw": abw_val,
@@ -629,16 +844,18 @@ class SheetService:
 
             if new_abw and not dry_run:
                 _upsert_result_data(cycle_data, cycle_id, new_abw)
+            if delete_keys and not dry_run:
+                deleted = _delete_result_rows(cycle_data, cycle_id, delete_keys)
 
             total_inserted += inserted
             total_updated += updated
             summary[TAB_ABW_SAMPLING] = {
-                "inserted": inserted, "updated": updated,
+                "inserted": inserted, "updated": updated, "deleted": deleted,
                 "skipped": skipped, "rejected": rejected,
             }
             if not dry_run:
                 _append_sync_log(service, spreadsheet_id, TAB_ABW_SAMPLING,
-                                 inserted + updated + skipped + rejected,
+                                 inserted + updated + deleted + skipped + rejected,
                                  inserted, updated, skipped, rejected, "ok")
         except Exception as exc:
             logger.exception("ABW_SAMPLING sync error: %s", exc)
@@ -650,23 +867,32 @@ class SheetService:
         # ── COST ──────────────────────────────────────────────────────────────
         # Cost is stored per cycle_id in CostData.farm_id — costs are cycle-scoped.
         try:
-            rows = _get_sheet_values(service, spreadsheet_id, f"{TAB_COST}!A3:I")
-            inserted = skipped = rejected = 0
+            if TAB_COST in read_errors:
+                raise RuntimeError(read_errors[TAB_COST])
+            rows = rows_by_tab[TAB_COST]
+            inserted = updated = deleted = skipped = rejected = 0
 
             cost_doc = CostData.objects(farm_id=cycle_id).first()
-            existing_keys = set()
+            existing_key_to_index = {}
             if cost_doc and cost_doc.data:
-                existing_keys = {
-                    f"{r.get('date')}_{r.get('category')}_{r.get('description')}"
-                    for r in cost_doc.data
+                existing_key_to_index = {
+                    r.get("sheet_row_id") or f"{r.get('date')}_{r.get('category')}_{r.get('description')}": i
+                    for i, r in enumerate(cost_doc.data)
                 }
 
             new_costs = []
+            delete_keys = set()
             for row_idx, row in enumerate(rows):
                 sheet_row = row_idx + 3
                 if not row or not _col(row, 0):
                     continue
                 date_str = _normalize_date(_col(row, 0))
+                category = _safe_str(_col(row, 1))
+                description = _safe_str(_col(row, 2))
+                key = _row_identity(row, 9, f"{date_str}_{category}_{description}")
+                if _is_delete_marker(_col(row, 10)):
+                    delete_keys.add(key)
+                    continue
                 if not date_str:
                     rejected += 1
                     rejected_rows_collector.append({
@@ -675,13 +901,6 @@ class SheetService:
                         "reason": "invalid_date",
                     })
                     continue
-                category = _safe_str(_col(row, 1))
-                description = _safe_str(_col(row, 2))
-                key = f"{date_str}_{category}_{description}"
-                if key in existing_keys:
-                    skipped += 1
-                    continue
-
                 # Flag non-parseable unit_price if the cell was non-empty
                 raw_price = _col(row, 5)
                 unit_price = _safe_float(raw_price)
@@ -689,11 +908,12 @@ class SheetService:
                     rejected_rows_collector.append({
                         "tab": TAB_COST, "row_number": sheet_row,
                         "field": "unit_price", "raw_value": str(raw_price),
-                        "reason": "invalid_number:unit_price",
+                        "reason": "warn:invalid_number:unit_price",
                     })
 
                 entry = {
-                    "date": date_str, "category": category, "description": description,
+                    "date": date_str, "sheet_row_id": key,
+                    "category": category, "description": description,
                     "quantity": _safe_float(_col(row, 3)),
                     "unit": _safe_str(_col(row, 4)),
                     "unit_price": unit_price,
@@ -702,11 +922,33 @@ class SheetService:
                     "notes": _safe_str(_col(row, 8)),
                     "source": "google_sheets",
                 }
-                new_costs.append(entry)
-                existing_keys.add(key)
-                inserted += 1
+                if key in existing_key_to_index:
+                    existing_index = existing_key_to_index[key]
+                    if existing_index is None:
+                        skipped += 1
+                        continue
+                    if cost_doc and not dry_run:
+                        existing_cost = cost_doc.data[existing_index]
+                        for field, value in entry.items():
+                            if value is not None and value != "":
+                                existing_cost[field] = value
+                    updated += 1
+                else:
+                    new_costs.append(entry)
+                    existing_key_to_index[key] = None
+                    inserted += 1
 
-            if new_costs and not dry_run:
+            if delete_keys:
+                existing_delete_count = sum(1 for key in delete_keys if key in existing_key_to_index)
+                deleted += existing_delete_count
+                skipped += len(delete_keys) - existing_delete_count
+                if cost_doc and not dry_run and existing_delete_count:
+                    cost_doc.data = [
+                        row for row in cost_doc.data
+                        if (row.get("sheet_row_id") or f"{row.get('date')}_{row.get('category')}_{row.get('description')}") not in delete_keys
+                    ]
+
+            if (new_costs or updated or deleted) and not dry_run:
                 if cost_doc:
                     cost_doc.data.extend(new_costs)
                     cost_doc.last_updated = datetime.utcnow()
@@ -719,10 +961,15 @@ class SheetService:
                     ).save()
 
             total_inserted += inserted
-            summary[TAB_COST] = {"inserted": inserted, "skipped": skipped, "rejected": rejected}
+            total_updated += updated
+            summary[TAB_COST] = {
+                "inserted": inserted, "updated": updated, "deleted": deleted,
+                "skipped": skipped, "rejected": rejected,
+            }
             if not dry_run:
                 _append_sync_log(service, spreadsheet_id, TAB_COST,
-                                 inserted + skipped + rejected, inserted, 0, skipped, rejected, "ok")
+                                 inserted + updated + deleted + skipped + rejected,
+                                 inserted, updated, skipped, rejected, "ok")
         except Exception as exc:
             logger.exception("COST sync error: %s", exc)
             summary[TAB_COST] = {"error": str(exc)}
@@ -732,12 +979,15 @@ class SheetService:
 
         # ── HARVEST ───────────────────────────────────────────────────────────
         try:
-            rows = _get_sheet_values(service, spreadsheet_id, f"{TAB_HARVEST}!A3:J")
-            inserted = updated = skipped = rejected = 0
+            if TAB_HARVEST in read_errors:
+                raise RuntimeError(read_errors[TAB_HARVEST])
+            rows = rows_by_tab[TAB_HARVEST]
+            inserted = updated = deleted = skipped = rejected = 0
 
             existing_harvest = HarvestRecord.objects(cycle_id=cycle_id)
-            existing_harvest_dates = {
-                str(r.harvest_data.get("date", "")) for r in existing_harvest
+            existing_harvest_keys = {
+                r.harvest_data.get("sheet_row_id") or str(r.harvest_data.get("date", ""))
+                for r in existing_harvest
             }
 
             new_harvest = []
@@ -746,6 +996,14 @@ class SheetService:
                 if not row or not _col(row, 0):
                     continue
                 date_str = _normalize_date(_col(row, 0))
+                row_key = _row_identity(row, 10, date_str or f"{TAB_HARVEST}:{sheet_row}")
+                if _is_delete_marker(_col(row, 11)):
+                    lookup = {"harvest_data__date": date_str} if not _safe_str(_col(row, 10)) else {"harvest_data__sheet_row_id": row_key}
+                    if not dry_run:
+                        deleted += HarvestRecord.objects(cycle_id=cycle_id, **lookup).delete()
+                    else:
+                        deleted += 1
+                    continue
                 if not date_str:
                     rejected += 1
                     rejected_rows_collector.append({
@@ -771,7 +1029,9 @@ class SheetService:
                 is_partial = is_partial_raw in ("Y", "YES", "1", "TRUE")
 
                 harvest_data = {
-                    "date": date_str, "doc": doc, "is_partial": is_partial,
+                    "date": date_str,
+                    "sheet_row_id": row_key,
+                    "doc": doc, "is_partial": is_partial,
                     "harvest_biomass_kg": biomass,
                     "abw_g": _safe_float(_col(row, 4)),
                     "sr_pct": _safe_float(_col(row, 5)),
@@ -782,16 +1042,20 @@ class SheetService:
                     "source": "google_sheets",
                 }
 
-                if date_str in existing_harvest_dates:
+                harvest_key = harvest_data["sheet_row_id"]
+                if harvest_key in existing_harvest_keys:
                     if not dry_run:
+                        lookup = {"harvest_data__date": date_str}
+                        if _safe_str(_col(row, 10)):
+                            lookup = {"harvest_data__sheet_row_id": harvest_key}
                         HarvestRecord.objects(
                             cycle_id=cycle_id,
-                            **{"harvest_data__date": date_str}
+                            **lookup
                         ).update_one(set__harvest_data=harvest_data, set__last_updated=datetime.utcnow())
                     updated += 1
                 else:
                     new_harvest.append(harvest_data)
-                    existing_harvest_dates.add(date_str)
+                    existing_harvest_keys.add(harvest_key)
                     inserted += 1
 
             if new_harvest and not dry_run:
@@ -805,12 +1069,12 @@ class SheetService:
             total_inserted += inserted
             total_updated += updated
             summary[TAB_HARVEST] = {
-                "inserted": inserted, "updated": updated,
+                "inserted": inserted, "updated": updated, "deleted": deleted,
                 "skipped": skipped, "rejected": rejected,
             }
             if not dry_run:
                 _append_sync_log(service, spreadsheet_id, TAB_HARVEST,
-                                 inserted + updated + skipped + rejected,
+                                 inserted + updated + deleted + skipped + rejected,
                                  inserted, updated, skipped, rejected, "ok")
         except Exception as exc:
             logger.exception("HARVEST sync error: %s", exc)
@@ -821,15 +1085,30 @@ class SheetService:
 
         # ── MORTALITY ─────────────────────────────────────────────────────────
         try:
-            rows = _get_sheet_values(service, spreadsheet_id, f"{TAB_MORTALITY}!A3:D")
-            inserted = updated = skipped = rejected = 0
+            if TAB_MORTALITY in read_errors:
+                raise RuntimeError(read_errors[TAB_MORTALITY])
+            rows = rows_by_tab[TAB_MORTALITY]
+            inserted = updated = deleted = skipped = rejected = 0
+            cycle_data = CycleData.objects(cycle_id=cycle_id).first()
+            existing_mortality_keys = set()
+            if cycle_data and cycle_data.result_data:
+                existing_mortality_keys = {
+                    r.get("sheet_row_id") or str(r.get("date", ""))
+                    for r in cycle_data.result_data
+                    if r.get("mortality_count") is not None
+                }
 
             mortality_rows = []
+            delete_keys = set()
             for row_idx, row in enumerate(rows):
                 sheet_row = row_idx + 3
                 if not row or not _col(row, 0):
                     continue
                 date_str = _normalize_date(_col(row, 0))
+                row_key = _row_identity(row, 4, date_str or f"{TAB_MORTALITY}:{sheet_row}")
+                if _is_delete_marker(_col(row, 5)):
+                    delete_keys.add(row_key)
+                    continue
                 if not date_str:
                     rejected += 1
                     rejected_rows_collector.append({
@@ -853,25 +1132,33 @@ class SheetService:
                 doc = _safe_int(_col(row, 1)) or _auto_fill_doc(date_str, start_date)
                 entry = {
                     "date": date_str, "doc": doc,
+                    "sheet_row_id": row_key,
                     "mortality_count": dead_count,
                     "mortality_notes": _safe_str(_col(row, 3)),
                     "source": "google_sheets",
                 }
                 mortality_rows.append(entry)
-                inserted += 1
+                mortality_key = entry["sheet_row_id"]
+                if mortality_key in existing_mortality_keys:
+                    updated += 1
+                else:
+                    inserted += 1
+                    existing_mortality_keys.add(mortality_key)
 
             if mortality_rows and not dry_run:
-                cycle_data = CycleData.objects(cycle_id=cycle_id).first()
                 _upsert_result_data(cycle_data, cycle_id, mortality_rows)
+            if delete_keys and not dry_run:
+                deleted = _delete_result_rows(cycle_data, cycle_id, delete_keys)
 
             total_inserted += inserted
+            total_updated += updated
             summary[TAB_MORTALITY] = {
-                "inserted": inserted, "updated": updated,
+                "inserted": inserted, "updated": updated, "deleted": deleted,
                 "skipped": skipped, "rejected": rejected,
             }
             if not dry_run:
                 _append_sync_log(service, spreadsheet_id, TAB_MORTALITY,
-                                 inserted + updated + skipped + rejected,
+                                 inserted + updated + deleted + skipped + rejected,
                                  inserted, updated, skipped, rejected, "ok")
         except Exception as exc:
             logger.exception("MORTALITY sync error: %s", exc)
@@ -881,12 +1168,24 @@ class SheetService:
                                  0, 0, 0, 0, 0, "error", str(exc))
 
         # ── Finalize ──────────────────────────────────────────────────────────
-        had_error = any("error" in v for v in summary.values())
-        all_tabs_ok = all("error" not in v for v in summary.values())
-        status_str = "ok" if all_tabs_ok else ("partial" if not had_error else "error")
+        tab_errors = [v for v in summary.values() if "error" in v]
+        successful_tabs = [v for v in summary.values() if "error" not in v]
+        has_row_issues = bool(rejected_rows_collector) or any(
+            v.get("rejected", 0) > 0 for v in successful_tabs
+        )
+        if tab_errors and successful_tabs:
+            status_str = "partial"
+        elif tab_errors:
+            status_str = "error"
+        elif has_row_issues:
+            status_str = "partial"
+        else:
+            status_str = "ok"
         finished_at = datetime.utcnow()
+        duration_seconds = (finished_at - started_at).total_seconds()
 
         if not dry_run:
+            _write_sheet_feedback(service, spreadsheet_id, rejected_rows_collector)
             integration.last_synced = finished_at
             integration.last_status = status_str
             integration.last_error = "; ".join(
@@ -901,18 +1200,24 @@ class SheetService:
                     if "error" not in tab_data:
                         processed = (
                             tab_data.get("inserted", 0) + tab_data.get("updated", 0)
-                            + tab_data.get("skipped", 0) + tab_data.get("rejected", 0)
+                            + tab_data.get("deleted", 0) + tab_data.get("skipped", 0)
+                            + tab_data.get("rejected", 0)
                         )
                         tab_summaries.append(TabSummary(
                             tab=tab_name,
                             processed=processed,
                             inserted=tab_data.get("inserted", 0),
                             updated=tab_data.get("updated", 0),
+                            deleted=tab_data.get("deleted", 0),
                             skipped=tab_data.get("skipped", 0),
                             rejected=tab_data.get("rejected", 0),
                         ))
                     else:
-                        tab_summaries.append(TabSummary(tab=tab_name, processed=0))
+                        tab_summaries.append(TabSummary(
+                            tab=tab_name,
+                            processed=0,
+                            error=tab_data.get("error"),
+                        ))
 
                 rejected_row_docs = [
                     RejectedRow(
@@ -925,27 +1230,40 @@ class SheetService:
                     for r in rejected_rows_collector
                 ]
 
-                sync_log = SheetSyncLog(
-                    cycle_id=cycle_id,
-                    started_at=started_at,
-                    finished_at=finished_at,
-                    status=status_str,
-                    tab_summaries=tab_summaries,
-                    rejected_rows=rejected_row_docs,
-                ).save()
+                sync_log_kwargs = {
+                    "cycle_id": cycle_id,
+                    "spreadsheet_id": spreadsheet_id,
+                    "source_fingerprint": source_fingerprint,
+                    "started_at": started_at,
+                    "finished_at": finished_at,
+                    "duration_seconds": duration_seconds,
+                    "status": status_str,
+                    "tab_summaries": tab_summaries,
+                    "rejected_rows": rejected_row_docs,
+                }
+                if sync_uuid:
+                    sync_log_kwargs["sync_id"] = sync_uuid
+
+                sync_log = SheetSyncLog(**sync_log_kwargs).save()
 
                 integration.last_sync_log_id = sync_log.sync_id
+                integration.active_sync_id = None
             except Exception as log_exc:
                 # Log failure must not roll back the sync itself
                 logger.warning("Failed to save SheetSyncLog: %s", log_exc)
+                integration.active_sync_id = None
 
             integration.save()
 
         return {
             "summary": summary,
             "rejected_rows": rejected_rows_collector,
+            "source_fingerprint": source_fingerprint,
+            "sync_id": str(sync_uuid) if sync_uuid else None,
+            "row_ids_backfilled": row_ids_backfilled,
             "started_at": started_at.isoformat(),
             "finished_at": finished_at.isoformat(),
+            "duration_seconds": duration_seconds,
             "status": status_str,
         }
 
@@ -1012,60 +1330,64 @@ class SheetService:
 
             # DAILY_LOG — row 1: column names, row 2: units/hints
             updates.append({
-                "range": f"{TAB_DAILY_LOG}!A1:S2",
+                "range": f"{TAB_DAILY_LOG}!A1:X2",
                 "values": [
                     ["Date", "DOC", "DO Morning", "DO Afternoon", "DO Average",
                      "Temp Morning", "Temp Afternoon", "Temp Average",
                      "pH Morning", "pH Afternoon", "Salinity", "NH3/Ammonia",
                      "Turbidity", "Feed Given", "Feed Leftover",
-                     "Feed Type", "Protein %", "Feeding Freq", "Notes"],
+                     "Feed Type", "Protein %", "Feeding Freq", "Notes", "Status", "Row ID",
+                     "Delete?", "Import Status", "Import Message"],
                     ["YYYY-MM-DD", "days", "mg/L", "mg/L", "mg/L",
                      "°C", "°C", "°C",
                      "", "", "ppt", "mg/L",
                      "Secchi cm", "kg", "kg",
-                     "", "%", "times/day", ""],
+                     "", "%", "times/day", "", "", "Do not edit", "Y to delete", "System", "System"],
                 ],
             })
 
             # ABW_SAMPLING
             updates.append({
-                "range": f"{TAB_ABW_SAMPLING}!A1:J2",
+                "range": f"{TAB_ABW_SAMPLING}!A1:N2",
                 "values": [
                     ["Date", "DOC", "Sample Count", "Total Weight", "ABW",
-                     "Min Weight", "Max Weight", "CV%", "Sampled By", "Notes"],
+                     "Min Weight", "Max Weight", "CV%", "Sampled By", "Notes", "Row ID",
+                     "Delete?", "Import Status", "Import Message"],
                     ["YYYY-MM-DD", "days", "shrimp", "g", "g (REQUIRED)",
-                     "g", "g", "%", "", ""],
+                     "g", "g", "%", "", "", "Do not edit", "Y to delete", "System", "System"],
                 ],
             })
 
             # MORTALITY
             updates.append({
-                "range": f"{TAB_MORTALITY}!A1:D2",
+                "range": f"{TAB_MORTALITY}!A1:H2",
                 "values": [
-                    ["Date", "DOC", "Dead Count", "Notes"],
-                    ["YYYY-MM-DD", "days", "shrimp (REQUIRED)", ""],
+                    ["Date", "DOC", "Dead Count", "Notes", "Row ID", "Delete?", "Import Status", "Import Message"],
+                    ["YYYY-MM-DD", "days", "shrimp (REQUIRED)", "", "Do not edit", "Y to delete", "System", "System"],
                 ],
             })
 
             # COST
             updates.append({
-                "range": f"{TAB_COST}!A1:I2",
+                "range": f"{TAB_COST}!A1:M2",
                 "values": [
                     ["Date", "Category", "Description", "Quantity", "Unit",
-                     "Unit Price (IDR)", "Total (IDR)", "Vendor", "Notes"],
+                     "Unit Price (IDR)", "Total (IDR)", "Vendor", "Notes", "Row ID",
+                     "Delete?", "Import Status", "Import Message"],
                     ["YYYY-MM-DD", "Feed/Chemical/Labor/Electricity/Other",
-                     "", "", "kg/L/pcs/day", "", "REQUIRED", "", ""],
+                     "", "", "kg/L/pcs/day", "", "REQUIRED", "", "", "Do not edit", "Y to delete", "System", "System"],
                 ],
             })
 
             # HARVEST
             updates.append({
-                "range": f"{TAB_HARVEST}!A1:J2",
+                "range": f"{TAB_HARVEST}!A1:N2",
                 "values": [
                     ["Date", "DOC", "Is Partial?", "Biomass (kg)", "ABW (g)",
-                     "SR (%)", "Bags/Count", "Buyer", "Price/kg (IDR)", "Notes"],
+                     "SR (%)", "Bags/Count", "Buyer", "Price/kg (IDR)", "Notes", "Row ID",
+                     "Delete?", "Import Status", "Import Message"],
                     ["YYYY-MM-DD", "days", "Y or N", "kg (REQUIRED)", "g",
-                     "%", "", "", "", ""],
+                     "%", "", "", "", "", "Do not edit", "Y to delete", "System", "System"],
                 ],
             })
 
@@ -1105,6 +1427,12 @@ class SheetService:
                         '*(F3:F500<>""),"Ready","Incomplete"))'
                     ]],
                 },
+                {
+                    "range": f"{TAB_DAILY_LOG}!U3",
+                    "values": [[
+                        f'=ARRAYFORMULA(IF(A3:A500="","", "{TAB_DAILY_LOG}-"&ROW(A3:A500)))'
+                    ]],
+                },
                 # ABW_SAMPLING: DOC auto-fill in B3
                 {"range": f"{TAB_ABW_SAMPLING}!B3", "values": [[doc_formula]]},
                 # ABW_SAMPLING: ABW auto-formula in E3 (Total Weight / Sample Count)
@@ -1115,8 +1443,32 @@ class SheetService:
                         'D3:D500/C3:C500,""))'
                     ]],
                 },
+                {
+                    "range": f"{TAB_ABW_SAMPLING}!K3",
+                    "values": [[
+                        f'=ARRAYFORMULA(IF(A3:A500="","", "{TAB_ABW_SAMPLING}-"&ROW(A3:A500)))'
+                    ]],
+                },
                 # MORTALITY: DOC auto-fill in B3
                 {"range": f"{TAB_MORTALITY}!B3", "values": [[doc_formula]]},
+                {
+                    "range": f"{TAB_MORTALITY}!E3",
+                    "values": [[
+                        f'=ARRAYFORMULA(IF(A3:A500="","", "{TAB_MORTALITY}-"&ROW(A3:A500)))'
+                    ]],
+                },
+                {
+                    "range": f"{TAB_COST}!J3",
+                    "values": [[
+                        f'=ARRAYFORMULA(IF(A3:A500="","", "{TAB_COST}-"&ROW(A3:A500)))'
+                    ]],
+                },
+                {
+                    "range": f"{TAB_HARVEST}!K3",
+                    "values": [[
+                        f'=ARRAYFORMULA(IF(A3:A500="","", "{TAB_HARVEST}-"&ROW(A3:A500)))'
+                    ]],
+                },
             ]
             service.spreadsheets().values().batchUpdate(
                 spreadsheetId=spreadsheet_id,

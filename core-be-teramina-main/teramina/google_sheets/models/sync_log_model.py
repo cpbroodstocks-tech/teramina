@@ -10,8 +10,10 @@ class TabSummary(EmbeddedDocument):
     processed = fields.IntField(default=0)
     inserted = fields.IntField(default=0)
     updated = fields.IntField(default=0)
+    deleted = fields.IntField(default=0)
     skipped = fields.IntField(default=0)
     rejected = fields.IntField(default=0)
+    error = fields.StringField()
 
 
 class RejectedRow(EmbeddedDocument):
@@ -25,8 +27,11 @@ class RejectedRow(EmbeddedDocument):
 class SheetSyncLog(Document):
     cycle_id = fields.StringField(required=True)
     sync_id = fields.UUIDField(default=uuid4)
+    spreadsheet_id = fields.StringField()
+    source_fingerprint = fields.StringField()
     started_at = fields.DateTimeField()
     finished_at = fields.DateTimeField()
+    duration_seconds = fields.FloatField()
     status = fields.StringField(default="pending")  # "ok" | "partial" | "error"
     tab_summaries = fields.EmbeddedDocumentListField(TabSummary)
     rejected_rows = fields.EmbeddedDocumentListField(RejectedRow)

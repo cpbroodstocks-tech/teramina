@@ -12,7 +12,11 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  FormControl,
   IconButton,
+  InputLabel,
+  MenuItem,
+  Select,
   Table,
   TableBody,
   TableCell,
@@ -52,6 +56,7 @@ const statusLabel = (s) => {
   if (s === "ok") return "Synced";
   if (s === "partial") return "Partial";
   if (s === "error") return "Error";
+  if (s === "queued") return "Queued";
   if (s === "syncing") return "Syncing…";
   return s || "Pending";
 };
@@ -157,6 +162,11 @@ const TabSummaryRow = ({ summary }) => (
         ↻{summary.updated} up
       </Typography>
     )}
+    {summary.deleted > 0 && (
+      <Typography variant="caption" color="warning.main">
+        -{summary.deleted} del
+      </Typography>
+    )}
     {summary.skipped > 0 && (
       <Typography variant="caption" color="text.secondary">
         /{summary.skipped} skip
@@ -165,6 +175,11 @@ const TabSummaryRow = ({ summary }) => (
     {summary.rejected > 0 && (
       <Typography variant="caption" color="error.main" sx={{ fontWeight: 700 }}>
         ✕{summary.rejected} err
+      </Typography>
+    )}
+    {summary.error && (
+      <Typography variant="caption" color="error.main" sx={{ flexBasis: "100%", ml: { xs: 0, sm: 15 } }}>
+        {summary.error}
       </Typography>
     )}
   </Box>
@@ -254,13 +269,14 @@ const GoogleSheets = () => {
   const [showIssues, setShowIssues] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewResult, setPreviewResult] = useState(null);
+  const [importMode, setImportMode] = useState("valid_rows_only");
 
   const prevStatusRef = useRef(null);
   const syncTriggeredRef = useRef(false);
   const pollCountRef = useRef(0);
   const pollTimerRef = useRef(null);
 
-  const { data: status, isLoading, dataUpdatedAt, refetch: refetchStatus } = useGoogleSheetsStatus(cycle_id);
+  const { data: status, isLoading, isError, dataUpdatedAt, refetch: refetchStatus } = useGoogleSheetsStatus(cycle_id);
   const { data: syncLog, refetch: refetchSyncLog } = useSyncLog(cycle_id);
   const { mutate: connect, isPending: connecting } = useConnectSheets(cycle_id);
   const { mutate: createTemplate, isPending: creatingTemplate } = useCreateSheetsTemplate(cycle_id);
@@ -280,7 +296,7 @@ const GoogleSheets = () => {
     const result = await refetchStatus();
     if (!syncTriggeredRef.current) return;
 
-    if (result.data?.last_status === "syncing") {
+    if (["queued", "syncing"].includes(result.data?.last_status)) {
       pollCountRef.current += 1;
       if (pollCountRef.current >= MAX_POLL_ATTEMPTS) {
         setToast({ open: true, variant: "warning", text: "Sync is taking longer than expected" });
@@ -298,7 +314,7 @@ const GoogleSheets = () => {
     const current = status?.last_status;
 
     if (syncTriggeredRef.current) {
-      if (current !== "syncing" && prev !== null) {
+      if (!["queued", "syncing"].includes(current) && prev !== null) {
         if (current === "ok") {
           setToast({ open: true, variant: "success", text: "Sync complete" });
         } else if (current === "partial") {
@@ -340,7 +356,7 @@ const GoogleSheets = () => {
   const handleReviewAndSync = () => {
     setPreviewResult(null);
     setPreviewOpen(true);
-    preview(undefined, {
+    preview(importMode, {
       onSuccess: (result) => setPreviewResult(result),
       onError: () => {
         setPreviewOpen(false);
@@ -367,7 +383,7 @@ const GoogleSheets = () => {
 
   // Legacy direct sync (kept for backward compat, used if preview is unavailable)
   const handleLegacySync = () => {
-    sync(undefined, {
+    sync(importMode, {
       onSuccess: () => {
         syncTriggeredRef.current = true;
         pollCountRef.current = 0;
@@ -390,6 +406,24 @@ const GoogleSheets = () => {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
         <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Box sx={{ py: 2 }}>
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>Google Sheets unavailable</Typography>
+            <Typography variant="body2" color="error" sx={{ mb: 2 }}>
+              Could not load Google Sheets status. Please try again.
+            </Typography>
+            <Button variant="outlined" onClick={() => refetchStatus()}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
       </Box>
     );
   }
@@ -434,7 +468,8 @@ const GoogleSheets = () => {
   }
 
   // ── Connected State ───────────────────────────────────────────────────────
-  const isSyncing = status?.last_status === "syncing" || syncing || previewing || confirming;
+  const isSyncing = ["queued", "syncing"].includes(status?.last_status) || syncing || previewing || confirming;
+  const syncLogLoadError = syncLog?.error ? syncLog.message : null;
   const tabSummaries = syncLog?.tab_summaries ?? status?.tab_summaries ?? [];
   const rejectedRows = syncLog?.rejected_rows ?? [];
   const hasIssues = rejectedRows.length > 0;
@@ -472,6 +507,18 @@ const GoogleSheets = () => {
               Last sync: {new Date(status.last_synced).toLocaleString("id-ID")}
             </Typography>
           )}
+          {(status.active_sync_id || status.last_sync_id) && (
+            <Typography variant="caption" color="textSecondary" sx={{ mb: 1, display: "block", fontFamily: "monospace" }}>
+              Sync ID: {status.active_sync_id || status.last_sync_id}
+            </Typography>
+          )}
+
+          {/* Summary counts */}
+          {syncLogLoadError && (
+            <Typography variant="caption" color="warning.main" display="block" sx={{ mb: 1 }}>
+              {syncLogLoadError}
+            </Typography>
+          )}
 
           {/* Summary counts */}
           {(tabSummaries.length > 0 || totalValid > 0) && (
@@ -507,6 +554,11 @@ const GoogleSheets = () => {
               {status.last_error}
             </Typography>
           )}
+          {status.last_status === "error" && status.last_error?.includes("Sheet changed since preview") && (
+            <Button size="small" variant="outlined" onClick={handleReviewAndSync} disabled={isSyncing} sx={{ mb: 1 }}>
+              Review Again
+            </Button>
+          )}
 
           {/* View Issues toggle */}
           {hasIssues && (
@@ -533,6 +585,19 @@ const GoogleSheets = () => {
           <Divider sx={{ my: 2 }} />
 
           {/* Actions */}
+          <FormControl size="small" sx={{ minWidth: 190, mb: 1.5 }}>
+            <InputLabel id="sheets-import-mode-label">Import mode</InputLabel>
+            <Select
+              labelId="sheets-import-mode-label"
+              label="Import mode"
+              value={importMode}
+              onChange={(event) => setImportMode(event.target.value)}
+              disabled={isSyncing}
+            >
+              <MenuItem value="valid_rows_only">Import valid rows</MenuItem>
+              <MenuItem value="strict">Strict import</MenuItem>
+            </Select>
+          </FormControl>
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
             <Button variant="contained" onClick={handleReviewAndSync} disabled={isSyncing}>
               {previewing ? (

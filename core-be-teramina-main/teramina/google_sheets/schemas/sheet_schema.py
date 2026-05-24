@@ -19,6 +19,8 @@ class SheetStatusSchema(BaseModel):
     last_status: str
     last_error: str
     rows_synced: int
+    active_sync_id: Optional[str] = None
+    last_sync_id: Optional[str] = None
 
 
 class TabSummarySchema(BaseModel):
@@ -26,8 +28,10 @@ class TabSummarySchema(BaseModel):
     processed: int
     inserted: int
     updated: int
+    deleted: int = 0
     skipped: int
     rejected: int
+    error: Optional[str] = None
 
 
 class RejectedRowSchema(BaseModel):
@@ -41,8 +45,11 @@ class RejectedRowSchema(BaseModel):
 class SheetSyncLogSchema(BaseModel):
     sync_id: str
     cycle_id: str
+    spreadsheet_id: Optional[str] = None
+    source_fingerprint: Optional[str] = None
     started_at: Optional[datetime]
     finished_at: Optional[datetime]
+    duration_seconds: Optional[float] = None
     status: str
     tab_summaries: list[TabSummarySchema]
     rejected_rows: list[RejectedRowSchema]

@@ -14,6 +14,7 @@ class SheetIntegration(Document):
     last_status = fields.StringField(default="pending")  # "ok" | "error" | "partial" | "pending"
     last_error = fields.StringField(default="")
     rows_synced = fields.IntField(default=0)
+    active_sync_id = fields.UUIDField()
     last_sync_log_id = fields.UUIDField()
     created_at = fields.DateTimeField(default=datetime.now)
 

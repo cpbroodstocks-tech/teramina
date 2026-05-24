@@ -44,11 +44,10 @@ export const useGoogleSheetsStatus = (cycle_id: string) =>
     queryFn: () =>
       axios
         .get("/sheets/status", { params: { cycle_id } })
-        .then((r: any) => r?.payload ?? { is_active: false })
-        .catch(() => ({ is_active: false })),
+        .then((r: any) => r?.payload ?? { is_active: false }),
     enabled: !!cycle_id,
     refetchInterval: (query) =>
-      (query.state.data as any)?.last_status === "syncing" ? 3000 : false,
+      ["queued", "syncing"].includes((query.state.data as any)?.last_status) ? 3000 : false,
     refetchIntervalInBackground: true,
     retry: false,
   });
@@ -74,8 +73,8 @@ export const useCreateSheetsTemplate = (cycle_id: string) => {
 export const useSyncSheets = (cycle_id: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      axios.post("/sheets/manual-sync", null, { params: { cycle_id } }).then((r: any) => r.payload),
+    mutationFn: (import_mode = "valid_rows_only") =>
+      axios.post("/sheets/manual-sync", null, { params: { cycle_id, import_mode } }).then((r: any) => r.payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: sheetsKeys.status(cycle_id) }),
   });
 };
@@ -96,15 +95,21 @@ export const useSyncLog = (cycle_id: string) =>
       axios
         .get("/sheets/sync-log", { params: { cycle_id } })
         .then((r: any) => r?.payload ?? null)
-        .catch(() => null),
+        .catch((error: any) => {
+          if (error?.response?.status === 404) return null;
+          return {
+            error: true,
+            message: error?.response?.data?.message || "Failed to load sync log",
+          };
+        }),
     enabled: !!cycle_id,
   });
 
 export const usePreviewSync = (cycle_id: string) =>
   useMutation({
-    mutationFn: () =>
+    mutationFn: (import_mode = "valid_rows_only") =>
       axios
-        .post("/sheets/preview-sync", null, { params: { cycle_id } })
+        .post("/sheets/preview-sync", null, { params: { cycle_id, import_mode } })
         .then((r: any) => r?.payload),
   });
 
