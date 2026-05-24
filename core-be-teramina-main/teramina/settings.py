@@ -325,6 +325,13 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = os.getenv("CELERY_BEAT_SCHEDULER", "celery.beat:PersistentScheduler")
+CELERY_IMPORTS = (
+    "teramina.dashboard.tasks.report_tasks",
+    "teramina.google_sheets.tasks.sync_tasks",
+    "teramina.benchmark.tasks.benchmark_tasks",
+    "teramina.agent.tasks.monitoring_tasks",
+    "teramina.feeding.tasks.feeding_ml_tasks",
+)
 
 CELERY_BEAT_SCHEDULE = {
     "sync-all-active-sheets": {
