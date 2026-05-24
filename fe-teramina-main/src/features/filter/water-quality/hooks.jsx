@@ -2,12 +2,10 @@ import dayjs from "dayjs";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { axios } from "helper/axios";
 import { useEffect, useRef, useState } from "react";
 import { useNDayAfter } from "hooks/useNDayAfter";
-import { useToastStore } from "store/toast.store";
 import { useFormatToQueryParams as formatToQueryParams } from "hooks/useFormatToQueryParams";
-import { useTranslation } from "react-i18next";
+import { fetchFilterUrl, fetchWaterQualityFilter } from "features/filter/queries";
 
 const DOC_LENGTH = 120;
 
@@ -20,9 +18,7 @@ const FILTER_SCHEMA = z.object({
   end_date: z.string().min(1),
 });
 
-const useFilter = (api) => {
-  const { t } = useTranslation();
-  const { setToast: toast } = useToastStore();
+const useFilter = () => {
   const N_DOC_AFTER = useNDayAfter(new Date(), DOC_LENGTH);
   const filterQueryParams = useRef({
     farm_id: "",
@@ -43,9 +39,9 @@ const useFilter = (api) => {
       },
       variables: [],
     },
-    data: {},
-    error: false,
   }));
+
+  const [submittedParams, setSubmittedParams] = useState(null);
 
   const { control, handleSubmit, reset, setValue, formState } = useForm({
     resolver: zodResolver(FILTER_SCHEMA),
@@ -53,59 +49,19 @@ const useFilter = (api) => {
   });
   const formValues = useWatch({ control });
 
-  const fetchMVPWithFilter = async (values) => {
-    setFilter((previousValue) => ({
-      ...previousValue,
-      loading: true,
-    }));
-
-    const body = {
-      cycles: values.cycle_id.join(","),
-      start_date: dayjs(values.start_date).format("YYYY-MM-DD"),
-      end_date: dayjs(values.end_date).format("YYYY-MM-DD"),
-      variables: values.variables.join(","),
-    };
-
-    try {
-      const response = await axios.get(
-        `${api}?${new URLSearchParams(body).toString()}`
-      );
-
-      if (!response) throw response;
-
-      setFilter((previousValue) => ({
-        ...previousValue,
-        data: response.payload,
-        error: false,
-      }));
-    } catch (err) {
-      const errorMessage =
-        err.response?.data?.message || t("SOMETHING_WENT_WRONG");
-      toast({
-        open: true,
-        variant: "error",
-        text: errorMessage,
-      });
-
-      setFilter((previousValue) => ({
-        ...previousValue,
-        error: true,
-      }));
-    } finally {
-      setFilter((previousValue) => ({
-        ...previousValue,
-        loading: false,
-      }));
-    }
-  };
-
-  const formik = {
+  const form = {
     values: formValues,
     handleSubmit: handleSubmit((values) => {
-      fetchMVPWithFilter(values);
+      setSubmittedParams({
+        cycles: values.cycle_id.join(","),
+        start_date: dayjs(values.start_date).format("YYYY-MM-DD"),
+        end_date: dayjs(values.end_date).format("YYYY-MM-DD"),
+        variables: values.variables.join(","),
+      });
     }),
     handleReset: () => {
       reset();
+      setSubmittedParams(null);
       setFilter((previousValue) => ({
         ...previousValue,
         filter: {
@@ -117,10 +73,7 @@ const useFilter = (api) => {
             end_date: dayjs(N_DOC_AFTER).format("MM/DD/YYYY"),
           },
         },
-        data: {},
-        error: false,
       }));
-
       filterQueryParams.current = {
         farm_id: "",
         pond_id: "",
@@ -143,19 +96,10 @@ const useFilter = (api) => {
 
     const indexToExclude = fields.indexOf(key);
 
-    /**
-     * SET THE TARGET FORMIK FIELD VALUE
-     * BUT NOT FOR FILTER QUERY PARAMS DATE REF
-     */
-
     if (key !== "start_date" || key !== "end_date")
       filterQueryParams.current[key] = value;
     setValue(key, value, { shouldDirty: true });
 
-    /**
-     * SET THE AFTER TARGET FORMIK FIELD VALUE TO EMPTY STRING
-     * BUT NOT FOR FILTER QUERY PARAMS DATE REF
-     */
     for (const field of fields.slice(indexToExclude + 1)) {
       if (field !== "start_date" || field !== "end_date")
         filterQueryParams.current[field] = "";
@@ -219,7 +163,7 @@ const useFilter = (api) => {
     let url = "/dashboard/wq-filter";
     url = `${url}?${formatToQueryParams(filterQueryParams.current)}`;
 
-    const response = await axios.get(url);
+    const response = await fetchFilterUrl(url);
     if (!response) throw response;
 
     const updateListItem = {};
@@ -251,23 +195,17 @@ const useFilter = (api) => {
   useEffect(() => {
     const fetchfilterListItem = async () => {
       try {
-        const filter = await axios.get("/dashboard/wq-filter");
-
+        const filter = await fetchWaterQualityFilter();
         if (!filter) throw filter;
-
         setFilter((previousValue) => ({
           ...previousValue,
           filter: {
             ...previousValue.filter,
             farms: filter.payload,
           },
-          error: false,
         }));
-      } catch (err) {
-        setFilter((previousValue) => ({
-          ...previousValue,
-          error: true,
-        }));
+      } catch {
+        // filter list unavailable — farms remains undefined
       } finally {
         setFilter((previousValue) => ({
           ...previousValue,
@@ -280,8 +218,9 @@ const useFilter = (api) => {
 
   return {
     ...filterList,
-    formik,
+    form,
     onFilterChange: handleFilterChange,
+    submittedParams,
   };
 };
 

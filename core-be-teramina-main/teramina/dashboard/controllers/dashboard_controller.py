@@ -1,8 +1,10 @@
 # pylint: disable=missing-function-docstring, unused-argument, E0401
 
+import base64
 from io import BytesIO
+from celery.result import AsyncResult
 from ninja import Router
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 
 from teramina.schemas.general_schema import (
     DataErrorSchema,
@@ -20,6 +22,7 @@ from teramina.dashboard.services.filter_service import FilterData
 from teramina.dashboard.services.forecast_service import ForecastDataService
 
 from teramina.helpers.report_service import generate_pdf_report_with_data
+from teramina.dashboard.tasks.report_tasks import generate_overview_report
 
 router = Router(tags=["Dashboard"])
 
@@ -76,8 +79,10 @@ def wq_filter_data(request, farm_id=None, pond_id=None, cycle_id=None):
 
 @router.get("/download-pdf-report", auth=AuthBearer())
 async def download_pdf_report(request, farm_id, pond_id=None, cycle_id=None, date=None):
+    user = get_signed_in_user(request)
     dashboard = DashboardOverview(
-        farm_id=farm_id, pond_id=pond_id, cycle_id=cycle_id, date=date
+        farm_id=farm_id, pond_id=pond_id, cycle_id=cycle_id, date=date,
+        user_id=str(user.id),
     )
 
     async def run_process():
@@ -97,4 +102,47 @@ async def download_pdf_report(request, farm_id, pond_id=None, cycle_id=None, dat
 
     # Start the process asynchronously
     response = await run_process()
+    return response
+
+
+@router.post("/create-report", auth=AuthBearer())
+def create_report(request, payload: dict):
+    user = get_signed_in_user(request)
+    task = generate_overview_report.delay(
+        payload.get("farm_id"),
+        payload.get("pond_id"),
+        payload.get("cycle_id"),
+        payload.get("date") or None,
+        str(user.id),
+    )
+    return {"task_id": task.id}
+
+
+@router.get("/get-report/{task_id}", auth=AuthBearer())
+def get_report(request, task_id: str):
+    result = AsyncResult(task_id)
+
+    if result.state in ("PENDING", "STARTED", "RETRY"):
+        return JsonResponse({"status": result.state})
+
+    if result.state == "FAILURE":
+        return JsonResponse(
+            {"status": "FAILURE", "error": str(result.result)},
+            status=500,
+        )
+
+    payload = result.result or {}
+    if not isinstance(payload, dict) or not payload.get("data_base64"):
+        return JsonResponse(
+            {"status": "FAILURE", "error": "Report result is unavailable"},
+            status=500,
+        )
+
+    pdf_bytes = base64.b64decode(payload["data_base64"])
+    response = HttpResponse(
+        pdf_bytes,
+        content_type=payload.get("content_type", "application/pdf"),
+    )
+    filename = payload.get("filename", "report_teramina.pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response

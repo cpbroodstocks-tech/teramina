@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import EastIcon from "@mui/icons-material/East";
+import BarChartIcon from "@mui/icons-material/BarChart";
 import ModalFarmAdd from "features/farm/modal-add-farm";
 import ModalFarmEdit from "features/farm/modal-edit-farm";
 import ModalFarmDelete from "features/farm/modal-delete-farm";
@@ -80,8 +81,25 @@ const FarmList = ({ data }) => {
                     <ModalFarmEdit data={farm} />
                     <ModalFarmDelete data={farm} />
                     <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<BarChartIcon fontSize="small" />}
+                      onClick={() => navigate(`/dashboard/farm/pl-report/${farm._id}`)}
+                      sx={{ fontSize: 12 }}
+                    >
+                      P&amp;L
+                    </Button>
+                    <Button
                       className={styles.btnViewMore}
-                      onClick={() => navigate(`/dashboard/pond/${farm._id}`)}
+                      onClick={() => {
+                        localStorage.setItem("farm_id", farm._id);
+                        localStorage.setItem("farm_name", farm.name);
+                        localStorage.removeItem("pond_id");
+                        localStorage.removeItem("pond_name");
+                        localStorage.removeItem("cycle_id");
+                        localStorage.removeItem("cycle_name");
+                        navigate(`/dashboard/pond/${farm._id}`);
+                      }}
                     >
                       <Typography
                         variant="span"

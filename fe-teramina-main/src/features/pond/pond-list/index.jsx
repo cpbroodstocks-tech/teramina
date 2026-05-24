@@ -123,7 +123,13 @@ const PondList = ({ data }) => {
                     <ModalPondDelete data={pond} />
                     <Button
                       className={styles.btnViewMore}
-                      onClick={() => navigate(`/dashboard/cycle/${pond._id}`)}
+                      onClick={() => {
+                        localStorage.setItem("pond_id", pond._id);
+                        localStorage.setItem("pond_name", pond.name);
+                        localStorage.removeItem("cycle_id");
+                        localStorage.removeItem("cycle_name");
+                        navigate(`/dashboard/cycle/${pond._id}`);
+                      }}
                     >
                       <Typography
                         variant="span"

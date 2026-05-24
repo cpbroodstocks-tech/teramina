@@ -4,7 +4,7 @@ import DatePickerPopUp from "features/filter/default/components/datepicker-popup
 import { useStyles } from "features/filter/default/styles";
 import { useTranslation } from "react-i18next";
 
-const Filter = ({ filter, formik, onFilterChange }) => {
+const Filter = ({ filter, form, onFilterChange }) => {
   const { t } = useTranslation();
   const { classes: styles } = useStyles();
   const { farms, ponds, cycles, daterange } = filter;
@@ -14,22 +14,29 @@ const Filter = ({ filter, formik, onFilterChange }) => {
     localStorage.setItem("pond_id", values.pond_id);
     localStorage.setItem("cycle_id", values.cycle_id);
     localStorage.setItem("date", JSON.stringify(values.date));
+
+    const farm = farms?.find((f) => f.id === values.farm_id);
+    const pond = ponds?.find((p) => p.id === values.pond_id);
+    const cycle = cycles?.find((c) => c.id === values.cycle_id);
+    if (farm) localStorage.setItem("farm_name", farm.name);
+    if (pond) localStorage.setItem("pond_name", pond.name);
+    if (cycle) localStorage.setItem("cycle_name", cycle.name);
   };
 
   useEffect(() => {
-    saveFilterValuesToLocalstorage(formik.values);
-  }, [formik.values]); // Run this effect whenever formik.values change
+    saveFilterValuesToLocalstorage(form.values);
+  }, [form.values]); // Run this effect whenever form.values change
 
   return (
     <Fragment>
-      <form onSubmit={formik.handleSubmit}>
+      <form onSubmit={form.handleSubmit}>
         <div className={styles.filterWrapper}>
           <FormControl className={styles.filterFormControl} size="small">
             <Select
               displayEmpty
               name="farm_id"
               defaultValue={""}
-              value={formik.values.farm_id}
+              value={form.values.farm_id}
               onChange={(e) => onFilterChange("farm_id", e.target.value)}
               className={styles.filterSelectOption}
             >
@@ -47,7 +54,7 @@ const Filter = ({ filter, formik, onFilterChange }) => {
           <FormControl className={styles.filterFormControl} size="small">
             <Select
               displayEmpty
-              value={formik.values.pond_id}
+              value={form.values.pond_id}
               onChange={(e) => onFilterChange("pond_id", e.target.value)}
               className={styles.filterSelectOption}
             >
@@ -65,7 +72,7 @@ const Filter = ({ filter, formik, onFilterChange }) => {
           <FormControl className={styles.filterFormControl} size="small">
             <Select
               displayEmpty
-              value={formik.values.cycle_id}
+              value={form.values.cycle_id}
               onChange={(e) => onFilterChange("cycle_id", e.target.value)}
               className={styles.filterSelectOption}
             >
@@ -80,9 +87,9 @@ const Filter = ({ filter, formik, onFilterChange }) => {
                 ))}
             </Select>
           </FormControl>
-          <DatePickerPopUp formik={formik} daterange={daterange} />
+          <DatePickerPopUp form={form} daterange={daterange} />
           <Button
-            disabled={!formik.dirty}
+            disabled={!form.dirty}
             type="submit"
             classes={{
               disabled: styles.filterButtonDisabled,
@@ -92,7 +99,7 @@ const Filter = ({ filter, formik, onFilterChange }) => {
             {t("APPLY_FILTER")}
           </Button>
           <Button
-            onClick={formik.handleReset}
+            onClick={form.handleReset}
             type="reset"
             className={styles.filterButton}
           >

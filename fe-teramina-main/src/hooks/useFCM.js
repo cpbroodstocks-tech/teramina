@@ -6,7 +6,7 @@
 import { useEffect } from "react";
 import { getMessaging, getToken } from "firebase/messaging";
 import { getApp } from "firebase/app";
-import { axios } from "helper/axios";
+import { registerFcmToken } from "features/user/queries";
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
@@ -22,7 +22,7 @@ export function useFCM() {
         const messaging = getMessaging(app);
         getToken(messaging, { vapidKey: VAPID_KEY }).then((token) => {
           if (token) {
-            axios.post(`/user/fcm-token?token=${encodeURIComponent(token)}`).then(() => {
+            registerFcmToken(token).then(() => {
               sessionStorage.setItem("fcm_registered", "1");
             });
           }

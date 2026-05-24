@@ -68,7 +68,7 @@
   "HOME.SECTION_TWO.SUBTITLE": "Join farmers already on the waitlist. We’ll reach out when your spot is ready.",
   "HOME.WAITLIST.EMAIL_PLACEHOLDER": "Enter your email",
   "HOME.WAITLIST.SUBMIT": "Join Waitlist",
-  "HOME.WAITLIST.SUCCESS": "You’re on the list! We’ll be in touch soon.",
+  "HOME.WAITLIST.SUCCESS": "Your email client should open — please send the message to join the waitlist.",
 
   "MENU.OVERVIEW": "Overview",
   "MENU.FARM_MANAGEMENT": "Farm Management",
@@ -77,6 +77,9 @@
   "MENU.FORECAST": "Forecast",
   "MENU.HARVEST": "Harvest",
   "MENU.WATER_QUALITY": "Water Quality",
+  "MENU.TODAY": "Today",
+  "MENU.MEMORY": "Memory",
+  "MENU.POND_TIMELINE": "Pond Timeline",
   "MENU.PROFILE": "Profile",
   "MENU.COST_DATA": "Finance Data",
 

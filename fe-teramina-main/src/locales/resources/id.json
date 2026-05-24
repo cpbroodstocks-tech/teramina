@@ -68,7 +68,7 @@
   "HOME.SECTION_TWO.SUBTITLE": "Bergabunglah dengan petambak yang sudah ada di daftar tunggu. Kami akan menghubungi Anda segera.",
   "HOME.WAITLIST.EMAIL_PLACEHOLDER": "Masukkan email Anda",
   "HOME.WAITLIST.SUBMIT": "Daftar Sekarang",
-  "HOME.WAITLIST.SUCCESS": "Anda sudah terdaftar! Kami akan segera menghubungi Anda.",
+  "HOME.WAITLIST.SUCCESS": "Klien email Anda akan terbuka — silakan kirim pesan untuk bergabung ke daftar tunggu.",
 
   "MENU.OVERVIEW": "Ringkasan",
   "MENU.FARM_MANAGEMENT": "Manajemen Tambak",
@@ -77,6 +77,9 @@
   "MENU.FORECAST": "Prakira",
   "MENU.HARVEST": "Panen",
   "MENU.WATER_QUALITY": "Kualitas Air",
+  "MENU.TODAY": "Hari Ini",
+  "MENU.MEMORY": "Memori",
+  "MENU.POND_TIMELINE": "Riwayat Kolam",
   "MENU.PROFILE": "Profil",
   "MENU.COST_DATA": "Data Keuangan",
 

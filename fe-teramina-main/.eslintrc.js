@@ -32,6 +32,7 @@ module.exports = {
     "react-hooks/set-state-in-effect": "off",
     "react/display-name": "off",
     "react-hooks/exhaustive-deps": "off",
+    "react-hooks/refs": "off",
     "react/no-unknown-property": "off",
     "react/prop-types": "off",
     "react/react-in-jsx-scope": "off",

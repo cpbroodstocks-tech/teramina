@@ -1,11 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
-import { axios } from "helper/axios";
+import { useUserDataStatus } from "features/user/queries";
 
 const useUserCheckData = () => {
-  const { isLoading, isError, data } = useQuery({
-    queryKey: ["user-data-status"],
-    queryFn: () => axios.get("/user/user-data-status").then((r) => r?.payload?.is_there_data),
-  });
+  const { isLoading, isError, data } = useUserDataStatus();
 
   return { loading: isLoading, error: isError, data };
 };

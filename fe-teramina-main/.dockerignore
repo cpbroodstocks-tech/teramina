@@ -1,0 +1,32 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies (rebuilt inside Docker)
+node_modules/
+
+# Build output (rebuilt inside Docker)
+dist/
+
+# Dev tooling
+.git/
+.gitignore
+*.md
+Dockerfile*
+.dockerignore
+
+# Test artifacts
+coverage/
+src/tests/
+
+# IDE
+.vscode/
+.idea/
+
+# Misc
+*.log
+AGENTS.md
+CLAUDE.md
+FE_DEV_PLAN.md
+PLATFORM_ALGORITHMS.md

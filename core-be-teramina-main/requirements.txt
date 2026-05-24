@@ -20,11 +20,9 @@ django-storages
 firebase_admin==6.0.1
 openpyxl==3.1.1
 matplotlib>=3.6.0
-faiss-cpu
 tiktoken
 openai
-pinecone-client==2.2.4
-langchain==0.0.350
+pinecone>=3.0.0
 fpdf
 uvicorn==0.23.2
 celery[redis]>=5.3.4
@@ -34,5 +32,6 @@ prophet>=1.1.5
 xgboost>=2.0.0
 shap>=0.44.0
 anthropic>=0.30.0
+sentry-sdk[django]>=2.0.0
 google-api-python-client>=2.100.0
 google-auth>=2.22.0

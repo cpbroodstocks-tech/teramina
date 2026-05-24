@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import browserAxios from "axios";
 import { axios } from "helper/axios";
 
 export const farmKeys = {
@@ -41,4 +42,10 @@ export const useDeleteFarm = () => {
       axios.delete(`/farm/delete-farm?farm_id=${farm_id}`).then((r: any) => r.payload),
     onSuccess: () => invalidate(),
   });
+};
+
+export const fetchCityRegion = async (url: string) => {
+  const response = await browserAxios.get(url);
+  if (!response) throw new Error("Failed to fetch city region");
+  return response.data;
 };

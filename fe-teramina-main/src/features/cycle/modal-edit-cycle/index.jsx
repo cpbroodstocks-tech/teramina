@@ -58,7 +58,7 @@ const CycleEdit = ({ data, onClose }) => {
     }
   };
 
-  const formik = useNewCycleForm({
+  const form = useNewCycleForm({
     onSubmit: handleSubmit,
     defaultValues: { name: data.name, date: dayjs(data.start_date) },
   });
@@ -67,7 +67,7 @@ const CycleEdit = ({ data, onClose }) => {
     <NewCycle
       formTitle="EDIT_CYCLE_DATA"
       actionText="SAVE"
-      formik={formik}
+      form={form}
       isModalComponent
     />
   );

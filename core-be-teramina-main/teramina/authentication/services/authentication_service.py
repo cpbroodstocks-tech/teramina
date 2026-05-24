@@ -18,6 +18,8 @@ def authenticate(email, password):
     """user authentication based on email and password"""
     try:
         login_valid = User.objects(email=email).first()
+        if not login_valid:
+            return None
         pwd_valid = check_password(password, login_valid.password)
 
         if login_valid and pwd_valid:

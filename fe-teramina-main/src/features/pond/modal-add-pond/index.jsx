@@ -30,10 +30,10 @@ const PondAdd = ({ onClose }) => {
     }
   };
 
-  const formik = useNewPondForm({
+  const form = useNewPondForm({
     onSubmit: handleSubmit,
   });
-  return <NewPond isModalComponent formik={formik} />;
+  return <NewPond isModalComponent form={form} />;
 };
 
 const ModalPondAdd = (props) => {

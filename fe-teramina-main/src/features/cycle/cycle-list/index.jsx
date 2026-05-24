@@ -20,12 +20,15 @@ import { useStyles } from "features/cycle/cycle-list/styles";
 import Search from "components/search";
 import { useDebounce } from "hooks/useDebounce";
 import { useTranslation } from "react-i18next";
+import PondMemoryPanel from "components/pond-memory-panel";
 
 const PondList = ({ data }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { classes: styles } = useStyles();
   const [search, setSearch] = useState("");
+  const farmId = data.farm_id || localStorage.getItem("farm_id") || "";
+  const pondId = data.pond_id || localStorage.getItem("pond_id") || "";
 
   const handleSearchChange = useDebounce(
     (event) => setSearch(event.target.value),
@@ -58,6 +61,7 @@ const PondList = ({ data }) => {
         <ModalCycleAdd data={data} />
         <Search onChange={handleSearchChange} />
       </div>
+      <PondMemoryPanel farmId={farmId} pondId={pondId} pondName={data.pond_name} />
       {/* List Farm */}
       <TableContainer component={Paper}>
         <Table className={styles.table}>
@@ -81,6 +85,8 @@ const PondList = ({ data }) => {
                       className={styles.btnViewMore}
                       onClick={() => {
                         localStorage.setItem("selectedCycleStartDate", cycle.start_date);
+                        localStorage.setItem("cycle_id", cycle._id);
+                        localStorage.setItem("cycle_name", cycle.name);
                         navigate(`/dashboard/cycle/detail/${cycle._id}`);
                       }}
                     >

@@ -1,11 +1,11 @@
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { axios } from "helper/axios";
 import { useLocalStorage } from "hooks/useLocalStorage";
 import { useFCM } from "hooks/useFCM";
 import { initializeTeraminaFirebase } from "libraries/firebase";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUserStore } from "store/user.store";
+import { fetchUserProfile, verifyFirebaseUser } from "features/user/queries";
 
 const useFirebase = () => {
   const { set, get, removeItem } = useLocalStorage()
@@ -30,25 +30,25 @@ const useFirebase = () => {
 
           if (!get("authentication") && currentUser) {
             const {stsTokenManager} = currentUser
-            const validate = await axios.post(`/user/firebase-verify-user?token=${stsTokenManager.accessToken}`);
+            const validate = await verifyFirebaseUser(stsTokenManager.accessToken);
 
             if (!validate) throw validate
 
-            set("authentication", validate.payload.token)
-            set("refresh_token", validate.payload.refresh_token)
+            set("authentication", validate.token)
+            set("refresh_token", validate.refresh_token)
 
-            const user = await axios.get("/user/get-profile")
+            const user = await fetchUserProfile()
             if (!user) throw user
 
-            setUser(user.payload)
+            setUser(user)
             return navigate("/dashboard")
           }
 
           if (get("authentication") && currentUser) {
-            const user = await axios.get("/user/get-profile")
+            const user = await fetchUserProfile()
             if (!user) throw user
 
-            return setUser(user.payload)
+            return setUser(user)
           }
         })
 

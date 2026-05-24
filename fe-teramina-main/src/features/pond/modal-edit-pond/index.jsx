@@ -83,7 +83,7 @@ const PondEdit = ({ data, onClose }) => {
     }
   };
 
-  const formik = useNewPondForm({
+  const form = useNewPondForm({
     onSubmit: handleSubmit,
     defaultValues: {
       name: data.name,
@@ -105,7 +105,7 @@ const PondEdit = ({ data, onClose }) => {
     <NewPond
       formTitle="EDIT_POND_DATA"
       actionText="SAVE"
-      formik={formik}
+      form={form}
       isModalComponent
     />
   );

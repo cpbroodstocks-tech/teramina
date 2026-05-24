@@ -34,6 +34,11 @@ from teramina.summarize.controllers.insight_controller import router as insight_
 from teramina.feeding.controllers.feeding_recommendation_controller import router as feed_rec_router
 from teramina.benchmark.controllers.benchmark_controller import router as benchmark_router
 from teramina.agent.controllers.agent_controller import router as agent_router
+from teramina.pl_report.controllers.pl_report_controller import router as pl_report_router
+from teramina.pl_report.controllers.farm_pl_controller import router as farm_pl_router
+from teramina.pl_report.controllers.share_controller import router as share_router
+from teramina.pl_report.controllers.year_pl_controller import router as year_pl_router
+from teramina.pl_report.controllers.pl_report_alias_controller import router as pl_alias_router
 
 api = NinjaAPI(
     title="Teramina Backend API",
@@ -63,3 +68,8 @@ api.add_router("/summarize", insight_router)
 api.add_router("/feeding", feed_rec_router)
 api.add_router("/benchmark", benchmark_router)
 api.add_router("/agent", agent_router)
+api.add_router("/cycle", pl_report_router)
+api.add_router("/cycles", pl_alias_router)
+api.add_router("/farm", farm_pl_router)
+api.add_router("/farm", year_pl_router)
+api.add_router("/report", share_router)

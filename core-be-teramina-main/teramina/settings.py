@@ -14,8 +14,10 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 
 from pathlib import Path
 
+import json
 import os
 import mongoengine
+import sentry_sdk
 from dotenv import load_dotenv
 
 # Load .env before reading any env vars so local dev works without shell exports
@@ -185,6 +187,20 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
 
+# Sentry — activates only when SENTRY_DSN is provided (prod/staging)
+_sentry_dsn = os.getenv("SENTRY_DSN")
+if _sentry_dsn:
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        traces_sample_rate=0.2,
+        send_default_pii=False,
+    )
+
+# Request size limits — protects workers from large payloads
+# Override via env: DATA_UPLOAD_MAX_MB / FILE_UPLOAD_MAX_MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("DATA_UPLOAD_MAX_MB", "10")) * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("FILE_UPLOAD_MAX_MB", "10")) * 1024 * 1024
+
 X_FRAME_OPTIONS = "DENY"
 
 CORS_ALLOW_METHODS = [
@@ -206,6 +222,8 @@ if not DEBUG and not CORS_ALLOWED_ORIGINS:
     raise RuntimeError("CORS_ALLOWED_ORIGINS must be set when DJANGO_DEBUG is False")
 
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS")
+if not DEBUG and not CSRF_TRUSTED_ORIGINS:
+    raise RuntimeError("CSRF_TRUSTED_ORIGINS must be set when DJANGO_DEBUG is False")
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -231,11 +249,13 @@ GS_PROJECT_ID = os.getenv("GS_PROJECT_ID")
 
 # use this code for local environment
 GS_APP_CRED = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-GS_CREDENTIALS = (
-    service_account.Credentials.from_service_account_file(GS_APP_CRED)
-    if GS_APP_CRED
-    else None
-)
+GS_APP_CRED_JSON = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+if GS_APP_CRED_JSON:
+    GS_CREDENTIALS = service_account.Credentials.from_service_account_info(json.loads(GS_APP_CRED_JSON))
+elif GS_APP_CRED:
+    GS_CREDENTIALS = service_account.Credentials.from_service_account_file(GS_APP_CRED)
+else:
+    GS_CREDENTIALS = None
 
 # use this code for deployment enviroment
 # creds = compute_engine.Credentials()
@@ -291,7 +311,7 @@ LOGGING = {
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0"),
+        "LOCATION": os.getenv("CACHE_REDIS_URL", os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")),
     }
 }
 
@@ -304,23 +324,38 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
-CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+CELERY_BEAT_SCHEDULER = os.getenv("CELERY_BEAT_SCHEDULER", "celery.beat:PersistentScheduler")
+CELERY_IMPORTS = (
+    "teramina.dashboard.tasks.report_tasks",
+    "teramina.google_sheets.tasks.sync_tasks",
+    "teramina.benchmark.tasks.benchmark_tasks",
+    "teramina.agent.tasks.monitoring_tasks",
+    "teramina.feeding.tasks.feeding_ml_tasks",
+)
 
 CELERY_BEAT_SCHEDULE = {
     "sync-all-active-sheets": {
-        "task": "teramina.google_sheets.tasks.sync_tasks.sync_all_active_sheets",
+        "task": "google_sheets.sync_all_active_sheets",
         "schedule": 1800,  # every 30 minutes
     },
     "recompute-benchmark-cohorts": {
-        "task": "teramina.benchmark.tasks.benchmark_tasks.recompute_cohorts",
+        "task": "benchmark.recompute_cohorts",
         "schedule": 86400,  # every 24 hours
     },
     "monitor-active-cycles": {
-        "task": "teramina.agent.tasks.monitoring_tasks.monitor_all_active_cycles",
+        "task": "agent.monitor_all_active_cycles",
         "schedule": 21600,  # every 6 hours
     },
     "retrain-feeding-model": {
         "task": "teramina.feeding.tasks.feeding_ml_tasks.retrain_feeding_model",
         "schedule": 604800,  # every 7 days
+    },
+    "weekly-farm-summary": {
+        "task": "agent.weekly_farm_summary",
+        "schedule": 604800,  # every 7 days
+    },
+    "detect-all-patterns": {
+        "task": "agent.detect_all_patterns",
+        "schedule": 86400,  # every 24 hours
     },
 }

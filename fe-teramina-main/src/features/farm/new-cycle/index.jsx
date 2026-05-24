@@ -9,7 +9,7 @@ import { useTranslation } from "react-i18next";
 
 const NewCycle = (props) => {
   const {
-    formik,
+    form,
     formTitle = "CREATE_NEW_CYCLE",
     actionText = "SUBMIT",
     loading = false,
@@ -22,7 +22,7 @@ const NewCycle = (props) => {
 
   return (
     <Fragment>
-      <form className={styles.container} onSubmit={formik.handleSubmit}>
+      <form className={styles.container} onSubmit={form.handleSubmit}>
         <Typography variant="h5" className={styles.title}>
           {t(formTitle)}
         </Typography>
@@ -35,9 +35,9 @@ const NewCycle = (props) => {
         <TextField
           variant="outlined"
           className={styles.input}
-          error={!!formik.formState.errors.name}
-          helperText={formik.formState.errors.name?.message}
-          {...formik.register("name")}
+          error={!!form.formState.errors.name}
+          helperText={form.formState.errors.name?.message}
+          {...form.register("name")}
         />
         <Typography
           variant="h6"
@@ -50,9 +50,9 @@ const NewCycle = (props) => {
             displayStaticWrapperAs="desktop"
             openTo="day"
             inputFormat="DD/MM/YYYY"
-            onChange={(newValue) => formik.setValue("date", newValue)}
+            onChange={(newValue) => form.setValue("date", newValue)}
             className={styles.calendar}
-            value={formik.watch("date")}
+            value={form.watch("date")}
             renderInput={(params) => <TextField {...params} />}
           />
         </LocalizationProvider>
@@ -77,9 +77,9 @@ const NewCycle = (props) => {
               type="submit"
               variant="contained"
               className={styles.btnSubmit}
-              disabled={formik.formState.isSubmitting}
+              disabled={form.formState.isSubmitting}
             >
-              {formik.formState.isSubmitting ? (
+              {form.formState.isSubmitting ? (
                 <CircularProgress
                   color="inherit"
                   classes={{ root: styles.circular }}
