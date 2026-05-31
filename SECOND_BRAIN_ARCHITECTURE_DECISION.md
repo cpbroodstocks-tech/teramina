@@ -6,7 +6,7 @@ Accepted for the current beta branch.
 
 ## Decision
 
-The current second-brain beta will continue on the existing Django Ninja + MongoEngine + MongoDB platform. `SECOND_BRAIN_DEV_PLAN.md` remains the strategic target architecture, while `MNEMON_DEV_PLAN.md`, `MNEMON_BETA_TODO.md`, and `MNEMON_BETA_RUNBOOK.md` are the active execution documents for the current branch.
+The current second-brain beta will continue on the existing Django Ninja + MongoEngine + MongoDB platform. `MNEMON_DEV_PLAN.md`, `MNEMON_BETA_TODO.md`, and `MNEMON_BETA_RUNBOOK.md` are the active execution documents for the current branch.
 
 `CYBERNETIC_PRODUCT_FRAMEWORK.md` is the product-level framework above these technical plans. Architecture decisions should support that framework: state, trajectory, margin, uncertainty, feedback, and risk-adjusted profit.
 
@@ -57,8 +57,7 @@ Revisit Postgres, TimescaleDB, and pgvector only after:
 ## Documentation Ownership
 
 - `CYBERNETIC_PRODUCT_FRAMEWORK.md`: product philosophy, feature contract, and decision standard.
-- `SECOND_BRAIN_DEV_PLAN.md`: strategic architecture and long-term roadmap.
+- `SECOND_BRAIN_ARCHITECTURE_DECISION.md`: current architecture boundary, deferred tracks, and migration gate.
 - `MNEMON_DEV_PLAN.md`: active MongoEngine Mnemon implementation plan.
 - `MNEMON_BETA_TODO.md`: current beta checklist.
 - `MNEMON_BETA_RUNBOOK.md`: rollout and smoke-test procedure.
-- `SECOND_BRAIN_MIGRATION_NOTES.md`: MongoDB memory backfill and lifecycle notes before future vector work.

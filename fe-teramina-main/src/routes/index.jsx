@@ -4,6 +4,10 @@ import { ReactSVG } from "react-svg";
 import { Navigate } from "react-router-dom";
 import OpacityIcon from "@mui/icons-material/Opacity";
 import PsychologyIcon from "@mui/icons-material/Psychology";
+import MenuBookIcon from "@mui/icons-material/MenuBook";
+import SupportAgentIcon from "@mui/icons-material/SupportAgent";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import TodayIcon from "@mui/icons-material/Today";
 import TimelineIcon from "@mui/icons-material/Timeline";
 import PrivateRoute from "routes/private";
@@ -18,6 +22,10 @@ import iconProfile from "/assets/images/icons/profile.svg";
 const Home = lazy(() => import("pages/home"));
 const SignIn = lazy(() => import("pages/signin"));
 const NotFound = lazy(() => import("pages/notfound"));
+const Services = lazy(() => import("pages/services"));
+const Knowledge = lazy(() => import("pages/knowledge"));
+const KnowledgeDetail = lazy(() => import("pages/knowledge/detail"));
+const AdvisoryIntake = lazy(() => import("pages/advisory-intake"));
 const Dashboard = lazy(() => import("pages/dashboard/home"));
 const Profile = lazy(() => import("pages/dashboard/profile"));
 const ProfileEdit = lazy(() => import("pages/dashboard/profile_edit"));
@@ -36,6 +44,12 @@ const HarvestSimulator = lazy(() => import("widgets/harvest-simulator"));
 const PLReport = lazy(() => import("pages/dashboard/pl_report"));
 const FarmPLReport = lazy(() => import("pages/dashboard/farm_pl_report"));
 const Memory = lazy(() => import("pages/dashboard/memory"));
+const Library = lazy(() => import("pages/dashboard/library"));
+const Advisory = lazy(() => import("pages/dashboard/advisory"));
+const Billing = lazy(() => import("pages/dashboard/billing"));
+const AdvisoryNew = lazy(() => import("pages/dashboard/advisory_new"));
+const AdvisoryDetail = lazy(() => import("pages/dashboard/advisory_detail"));
+const CommercialAdmin = lazy(() => import("pages/dashboard/commercial_admin"));
 const TodayView = lazy(() => import("pages/dashboard/today"));
 const PondTimeline = lazy(() => import("pages/dashboard/pond-timeline"));
 const SharePage = lazy(() => import("pages/share"));
@@ -60,6 +74,26 @@ const routes = [
     path: "/signup",
     label: "SIGN_UP",
     element: <Navigate to="/signin" replace />,
+  },
+  {
+    path: "/services",
+    label: "SERVICES",
+    element: <Services />,
+  },
+  {
+    path: "/knowledge",
+    label: "KNOWLEDGE",
+    element: <Knowledge />,
+  },
+  {
+    path: "/knowledge/:slug",
+    label: "KNOWLEDGE",
+    element: <KnowledgeDetail />,
+  },
+  {
+    path: "/advisory/intake/:service_slug",
+    label: "ADVISORY",
+    element: <AdvisoryIntake />,
   },
   {
     path: "/dashboard",
@@ -152,6 +186,49 @@ const routes = [
         element: <Memory />,
         icon: <PsychologyIcon fontSize="small" />,
         category: "parrent",
+      },
+      {
+        path: "library",
+        label: "MENU.LIBRARY",
+        element: <Library />,
+        icon: <MenuBookIcon fontSize="small" />,
+        category: "parrent",
+      },
+      {
+        path: "advisory",
+        label: "MENU.ADVISORY",
+        element: <Advisory />,
+        icon: <SupportAgentIcon fontSize="small" />,
+        category: "parrent",
+      },
+      {
+        path: "advisory/new",
+        label: "MENU.ADVISORY",
+        element: <AdvisoryNew />,
+        icon: <SupportAgentIcon fontSize="small" />,
+        category: "children",
+      },
+      {
+        path: "advisory/:case_id",
+        label: "MENU.ADVISORY",
+        element: <AdvisoryDetail />,
+        icon: <SupportAgentIcon fontSize="small" />,
+        category: "children",
+      },
+      {
+        path: "billing",
+        label: "MENU.BILLING",
+        element: <Billing />,
+        icon: <ReceiptLongIcon fontSize="small" />,
+        category: "parrent",
+      },
+      {
+        path: "commercial-admin",
+        label: "MENU.COMMERCIAL_ADMIN",
+        element: <CommercialAdmin />,
+        icon: <AdminPanelSettingsIcon fontSize="small" />,
+        category: "parrent",
+        adminOnly: true,
       },
       {
         path: "pond-timeline/:cycle_id",

@@ -60,13 +60,13 @@ Transform tasks into verifiable goals:
 This is a **shrimp farming management platform** (Teramina) with two sub-projects:
 
 - `fe-teramina-main/` — React 18 + Vite frontend
-- `core-be-teramina-main/` — Django 4 + Django Ninja backend
+- `core-be-teramina-main/` — Django + Django Ninja backend
 
 ---
 
 ## Frontend (`fe-teramina-main/`)
 
-**Stack:** React 18, Vite 3, MUI 5, Firebase auth, Axios, Formik+Yup, i18next, ECharts, React Router v6
+**Stack:** React 18, Vite 6, MUI 9, Firebase auth, Axios, TanStack Query, Zustand, React Hook Form + Zod, i18next, ECharts, React Router 7, Vitest/MSW
 
 ### Commands
 
@@ -77,6 +77,8 @@ yarn build         # Production build (outputs to dist/)
 yarn preview       # Preview production build on port 5173
 yarn lint          # ESLint check
 yarn lint:fix      # Auto-fix lint issues
+yarn typecheck     # TypeScript check
+yarn test          # Vitest test suite
 ```
 
 Pre-commit hooks (Husky) automatically run `lint:fix` then `lint` on staged files.
@@ -90,42 +92,47 @@ Pre-commit hooks (Husky) automatically run `lint:fix` then `lint` on staged file
 
 ```
 src/
-├── pages/          # Route-level page components
-├── containers/     # Stateful container components (data fetching, logic)
+├── features/       # Feature-owned pages, components, query hooks, schemas
+├── pages/          # Route-level shims and small shell pages
 ├── components/     # Reusable presentational components
-├── hoc/            # Higher-order components — withFilter (per section), withModal
 ├── hooks/          # Custom hooks (useDebounce, useFirebase, useLocalStorage, etc.)
-├── store/          # Context-based state (user, toast, farm-management, wizard)
-├── widgets/        # Dashboard widget components
+├── lib/            # Shared runtime libraries such as query client
+├── store/          # Zustand stores
 ├── routes/         # Route definitions
 ├── theme/          # MUI theme customization
 ├── helper/         # Utility functions
 ├── locales/        # i18n translation files
-└── libraries/      # Custom library wrappers
+├── libraries/      # Custom library wrappers
+└── tests/          # Vitest, React Testing Library, MSW tests
 ```
 
-**State management** uses React Context API (not Redux). Key contexts: user auth, toast notifications, farm management, wizard (multi-step forms).
+**State management** uses TanStack Query for server state and Zustand for client state. Avoid reintroducing Context stores for data fetching or global UI state.
 
-**Path aliases** (configured in `vite.config.js` and `jsconfig.json`): `components`, `containers`, `hoc`, `pages`, `routes`, `theme`, `libraries`, `helper`, `widgets`, `hooks`, `store`, `locales` — import directly without relative paths.
+**Path aliases** are configured in `vite.config.js` and `tsconfig.json`: `components`, `features`, `helper`, `hooks`, `lib`, `libraries`, `locales`, `pages`, `routes`, `store`, `theme`, and `widgets` (mapped to `features/dashboard`). Import through aliases when that matches existing local style.
 
 **Bundle splitting** in `vite.config.js` manually splits vendor chunks (MUI, Firebase, ECharts, etc.) to optimize loading.
+
+New frontend files should be TypeScript where practical. Existing `.js`/`.jsx` files do not need broad conversion unless the task already touches them.
 
 ---
 
 ## Backend (`core-be-teramina-main/`)
 
-**Stack:** Django 4.0.5, Django Ninja (type-safe REST), MongoEngine (MongoDB ORM), Uvicorn, Pandas/NumPy, LangChain + OpenAI, FAISS/Pinecone
+**Stack:** Django 5.2, Django Ninja, Pydantic 2, MongoEngine/MongoDB, Celery + Redis, Pandas/NumPy, Google Sheets API, Firebase Admin SDK, Anthropic/OpenAI, Pinecone-compatible retrieval helpers, Sentry
 
 ### Commands
 
 ```bash
 pip install -r requirements.txt
 
-python manage.py runserver                                                    # Dev server
-python3 manage.py runserver_plus --cert-file cert.pem --key-file key.pem     # Dev with HTTPS
+python manage.py runserver                 # Dev server
+python manage.py check                     # Django checks
+python manage.py check --deploy            # Production deployment checks
+python -m pytest -q                        # Backend test suite
+python3 manage.py runserver_plus --cert-file cert.pem --key-file key.pem  # Dev with HTTPS, when django-extensions supports it locally
 ```
 
-API docs available at `/api/docs` when running locally.
+API docs are available at `/api/docs` when running locally. Health checks are available at `/health/`.
 
 ### Architecture
 
@@ -150,12 +157,16 @@ Key modules:
 | `harvest/`, `feeding/` | Harvest and feeding operations |
 | `formulas/` | Mathematical models: biomass, weight, SGR, population, cost, revenue |
 | `dashboard/`, `water_quality_dashboard/` | Aggregated metric views |
+| `benchmark/` | Cohort benchmarking and scheduled recomputation |
+| `google_sheets/` | Sheet template creation, preview, sync, logs, and feedback |
+| `agent/` | Mnemon assistant, memory, alerts, tasks, timeline, and evals |
+| `pl_report/` | Cycle/farm/year profit-and-loss reports and share links |
 | `summarize/` | LangChain + OpenAI AI-generated farm insights |
 | `helpers/` | Shared utilities (data preprocessing, DB updater, report service, plots) |
 | `data_generator/` | Sample data generation for testing |
 
 **`formulas/harvest_optimization_formula.py`** implements Kalman filter–based state estimation for harvest optimization — the most mathematically complex part of the system.
 
-**Vector search** (`helpers/pinecone_data_indexing.py`, `helpers/data_indexing.py`) indexes farm reports into FAISS/Pinecone for semantic retrieval.
+**Second Brain / Mnemon** currently stays on MongoEngine + MongoDB. Postgres, TimescaleDB, pgvector, voice notes, offline daily log, Temporal workflows, native mobile, and full graph visualization are deferred until the beta gate in `SECOND_BRAIN_ARCHITECTURE_DECISION.md` is met.
 
-**Settings** (`teramina/settings.py`): MongoDB Atlas, Firebase Admin SDK, and Google Cloud Storage are all configured via environment variables. CORS is open to all origins.
+**Settings** (`teramina/settings.py`): MongoDB, Firebase Admin SDK, Google Cloud Storage, Redis/Celery, CORS/CSRF, Sentry, and production security settings are configured via environment variables. Do not relax production env validation without a deployment reason.

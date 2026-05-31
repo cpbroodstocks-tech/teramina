@@ -33,12 +33,27 @@ jobs:
           CSRF_TRUSTED_ORIGINS=${{ secrets.CSRF_TRUSTED_ORIGINS }}
           JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
           MONGODB_URI=${{ secrets.MONGODB_URI }}
+          FIREBASE_CREDENTIALS_JSON=${{ secrets.FIREBASE_CREDENTIALS_JSON }}
+          FIREBASE_CREDENTIALS_PATH=/secrets/firebase-sa.json
+          GOOGLE_APPLICATION_CREDENTIALS_JSON=${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+          GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcs-sa.json
           ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          open_ai_key=${{ secrets.OPENAI_API_KEY }}
+          TERAMINA_LLM_API=${{ secrets.TERAMINA_LLM_API }}
+          TERAMINA_API_KEY=${{ secrets.TERAMINA_API_KEY }}
+          SUMMARY_MODEL=${{ secrets.SUMMARY_MODEL }}
+          PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }}
+          PINECONE_INDEX=${{ secrets.PINECONE_INDEX }}
           GS_BUCKET_NAME=${{ secrets.GS_BUCKET_NAME }}
           GS_PROJECT_ID=${{ secrets.GS_PROJECT_ID }}
+          GS_VDB_BUCKET_NAME=${{ secrets.GS_VDB_BUCKET_NAME }}
           CELERY_BROKER_URL=${{ secrets.CELERY_BROKER_URL }}
           CELERY_RESULT_BACKEND=${{ secrets.CELERY_RESULT_BACKEND }}
+          CACHE_REDIS_URL=${{ secrets.CACHE_REDIS_URL }}
           SENTRY_DSN=${{ secrets.SENTRY_DSN }}
+          DATA_UPLOAD_MAX_MB=${{ secrets.DATA_UPLOAD_MAX_MB }}
+          FILE_UPLOAD_MAX_MB=${{ secrets.FILE_UPLOAD_MAX_MB }}
           ENVEOF
           EOF
 

@@ -168,6 +168,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.0/ref/settings/#default-auto-field
@@ -198,8 +199,8 @@ if _sentry_dsn:
 
 # Request size limits — protects workers from large payloads
 # Override via env: DATA_UPLOAD_MAX_MB / FILE_UPLOAD_MAX_MB
-DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("DATA_UPLOAD_MAX_MB", "10")) * 1024 * 1024
-FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("FILE_UPLOAD_MAX_MB", "10")) * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("DATA_UPLOAD_MAX_MB") or "10") * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("FILE_UPLOAD_MAX_MB") or "10") * 1024 * 1024
 
 X_FRAME_OPTIONS = "DENY"
 
@@ -262,6 +263,14 @@ else:
 
 # Use Google Cloud Storage as the default storage backend
 DEFAULT_FILE_STORAGE = "storages.backends.gcloud.GoogleCloudStorage"
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
 
 # MEDIA_ROOT = '/media/'
 # MEDIA_URL = 'https://storage.googleapis.com/teramina-mvp-1/media/'
@@ -311,15 +320,15 @@ LOGGING = {
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": os.getenv("CACHE_REDIS_URL", os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")),
+        "LOCATION": os.getenv("CACHE_REDIS_URL") or os.getenv("CELERY_BROKER_URL") or "redis://localhost:6379/0",
     }
 }
 
 # ---------------------------------------------------------------------------
 # Celery
 # ---------------------------------------------------------------------------
-CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL") or "redis://localhost:6379/0"
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND") or "redis://localhost:6379/0"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
