@@ -9,8 +9,17 @@ export const advisoryKeys = {
   history: (farmId: string, pondId: string, cycleId: string) => ["advisory-history", farmId, pondId, cycleId] as const,
   adminCases: ["advisory-admin-cases"] as const,
   adminReports: ["advisory-admin-reports"] as const,
+  adminAssistantBriefLogs: ["advisory-admin-assistant-brief-logs"] as const,
+  adminAssistantAnswerLogs: ["advisory-admin-assistant-answer-logs"] as const,
+  adminReportWorkflowEvents: ["advisory-admin-report-workflow-events"] as const,
   adminExpertReviews: ["advisory-admin-expert-reviews"] as const,
   adminRetainerCadences: ["advisory-admin-retainer-cadences"] as const,
+  adminHatcheries: ["advisory-admin-hatcheries"] as const,
+  adminHatcheryRecords: ["advisory-admin-hatchery-records"] as const,
+  adminInvestorScores: ["advisory-admin-investor-scores"] as const,
+  adminPhaseSixBenchmarks: ["advisory-admin-phase-six-benchmarks"] as const,
+  adminPhaseSixBenchmarksFiltered: (filters: Record<string, string>) => ["advisory-admin-phase-six-benchmarks", filters] as const,
+  adminPhaseSixRevisions: ["advisory-admin-phase-six-revisions"] as const,
 };
 
 export const useServicePackages = () =>
@@ -86,6 +95,32 @@ export const useAddAdvisoryCaseFile = () => {
   });
 };
 
+export const useAcceptBenchmarkConsent = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (caseId: string) =>
+      axios.post(`/advisory/cases/${caseId}/benchmark-consent`, {}).then((r: any) => r?.payload?.benchmark_consent ?? null),
+    onSuccess: (_, caseId) => {
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.case(caseId) });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.cases });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminPhaseSixBenchmarks });
+    },
+  });
+};
+
+export const useRevokeBenchmarkConsent = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (caseId: string) =>
+      axios.post(`/advisory/cases/${caseId}/benchmark-consent/revoke`, {}).then((r: any) => r?.payload?.benchmark_consent ?? null),
+    onSuccess: (_, caseId) => {
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.case(caseId) });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.cases });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminPhaseSixBenchmarks });
+    },
+  });
+};
+
 export const useAdminAdvisoryCases = (enabled = true) =>
   useQuery({
     queryKey: advisoryKeys.adminCases,
@@ -97,6 +132,27 @@ export const useAdminAdvisoryReports = (enabled = true) =>
   useQuery({
     queryKey: advisoryKeys.adminReports,
     queryFn: () => axios.get("/advisory/admin/reports").then((r: any) => r?.payload?.reports ?? []),
+    enabled,
+  });
+
+export const useAdminAssistantBriefLogs = (enabled = true) =>
+  useQuery({
+    queryKey: advisoryKeys.adminAssistantBriefLogs,
+    queryFn: () => axios.get("/advisory/admin/assistant-brief-logs").then((r: any) => r?.payload?.logs ?? []),
+    enabled,
+  });
+
+export const useAdminAssistantAnswerLogs = (enabled = true) =>
+  useQuery({
+    queryKey: advisoryKeys.adminAssistantAnswerLogs,
+    queryFn: () => axios.get("/advisory/admin/assistant-answer-logs").then((r: any) => r?.payload?.logs ?? []),
+    enabled,
+  });
+
+export const useAdminReportWorkflowEvents = (enabled = true) =>
+  useQuery({
+    queryKey: advisoryKeys.adminReportWorkflowEvents,
+    queryFn: () => axios.get("/advisory/admin/report-workflow-events").then((r: any) => r?.payload?.events ?? []),
     enabled,
   });
 
@@ -114,6 +170,41 @@ export const useAdminRetainerCadences = (enabled = true) =>
     enabled,
   });
 
+export const useAdminHatcheries = (enabled = true) =>
+  useQuery({
+    queryKey: advisoryKeys.adminHatcheries,
+    queryFn: () => axios.get("/advisory/admin/hatcheries").then((r: any) => r?.payload?.hatcheries ?? []),
+    enabled,
+  });
+
+export const useAdminHatcheryRecords = (enabled = true) =>
+  useQuery({
+    queryKey: advisoryKeys.adminHatcheryRecords,
+    queryFn: () => axios.get("/advisory/admin/hatchery-records").then((r: any) => r?.payload?.records ?? []),
+    enabled,
+  });
+
+export const useAdminInvestorScores = (enabled = true) =>
+  useQuery({
+    queryKey: advisoryKeys.adminInvestorScores,
+    queryFn: () => axios.get("/advisory/admin/investor-scores").then((r: any) => r?.payload?.scores ?? []),
+    enabled,
+  });
+
+export const useAdminPhaseSixBenchmarks = (enabled = true, filters: Record<string, string> = {}) =>
+  useQuery({
+    queryKey: advisoryKeys.adminPhaseSixBenchmarksFiltered(filters),
+    queryFn: () => axios.get("/advisory/admin/benchmarks/phase-six", { params: filters }).then((r: any) => r?.payload ?? null),
+    enabled,
+  });
+
+export const useAdminPhaseSixRevisions = (enabled = true) =>
+  useQuery({
+    queryKey: advisoryKeys.adminPhaseSixRevisions,
+    queryFn: () => axios.get("/advisory/admin/phase-six-revisions").then((r: any) => r?.payload?.revisions ?? []),
+    enabled,
+  });
+
 export const useUpdateAdvisoryCase = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -123,6 +214,7 @@ export const useUpdateAdvisoryCase = () => {
       queryClient.invalidateQueries({ queryKey: advisoryKeys.adminCases });
       queryClient.invalidateQueries({ queryKey: advisoryKeys.case(variables.caseId) });
       queryClient.invalidateQueries({ queryKey: advisoryKeys.cases });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminPhaseSixBenchmarks });
     },
   });
 };
@@ -133,11 +225,16 @@ export const useGenerateAdvisoryAssistantBrief = () =>
       axios.get(`/advisory/admin/cases/${caseId}/assistant-brief`).then((r: any) => r?.payload?.brief ?? null),
   });
 
-export const useAcceptAdvisoryAssistantBrief = () =>
-  useMutation({
+export const useAcceptAdvisoryAssistantBrief = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
     mutationFn: ({ logId, reportId = "" }: { logId: string; reportId?: string }) =>
       axios.post(`/advisory/admin/assistant-brief-logs/${logId}/accept`, { report_id: reportId }).then((r: any) => r?.payload?.brief_log ?? null),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminAssistantBriefLogs });
+    },
   });
+};
 
 export const useCreateReportFromAdvisoryAssistantBrief = () => {
   const queryClient = useQueryClient();
@@ -146,8 +243,21 @@ export const useCreateReportFromAdvisoryAssistantBrief = () => {
       axios.post(`/advisory/admin/assistant-brief-logs/${logId}/draft-report`, { status }).then((r: any) => r?.payload ?? null),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: advisoryKeys.adminCases });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminAssistantBriefLogs });
       queryClient.invalidateQueries({ queryKey: advisoryKeys.adminReports });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminReportWorkflowEvents });
       queryClient.invalidateQueries({ queryKey: advisoryKeys.cases });
+    },
+  });
+};
+
+export const useAskAdvisoryAssistant = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { question: string; case_id?: string; limit?: number }) =>
+      axios.post("/advisory/admin/assistant-answer", payload).then((r: any) => r?.payload?.answer ?? null),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminAssistantAnswerLogs });
     },
   });
 };
@@ -193,6 +303,178 @@ export const useCreateRetainerCadence = () => {
   });
 };
 
+export const useCreateHatcheryProfile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: {
+      case_id?: string;
+      user_id?: string;
+      name: string;
+      location?: string;
+      maturation_capacity?: number | null;
+      larval_capacity?: number | null;
+      biosecurity_level?: string;
+      water_source?: string;
+      notes?: string;
+      client_visible?: boolean;
+    }) => axios.post("/advisory/admin/hatcheries", payload).then((r: any) => r?.payload?.hatchery ?? null),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminHatcheries });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminPhaseSixBenchmarks });
+    },
+  });
+};
+
+export const useUpdateHatcheryProfile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ hatcheryId, payload }: {
+      hatcheryId: string;
+      payload: {
+        case_id?: string;
+        user_id?: string;
+        name: string;
+        location?: string;
+        maturation_capacity?: number | null;
+        larval_capacity?: number | null;
+        biosecurity_level?: string;
+        water_source?: string;
+        notes?: string;
+        client_visible?: boolean;
+        change_note?: string;
+      };
+    }) => axios.patch(`/advisory/admin/hatcheries/${hatcheryId}`, payload).then((r: any) => r?.payload ?? null),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminHatcheries });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminPhaseSixRevisions });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.cases });
+    },
+  });
+};
+
+export const useCreateHatcheryRecord = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: {
+      hatchery_id: string;
+      case_id?: string;
+      record_type: string;
+      record_date?: string | null;
+      batch_code?: string;
+      broodstock_source?: string;
+      metrics?: Record<string, any>;
+      notes?: string;
+      client_visible?: boolean;
+    }) => axios.post("/advisory/admin/hatchery-records", payload).then((r: any) => r?.payload?.record ?? null),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminHatcheries });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminHatcheryRecords });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminPhaseSixBenchmarks });
+    },
+  });
+};
+
+export const useUpdateHatcheryRecord = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ recordId, payload }: {
+      recordId: string;
+      payload: {
+        hatchery_id: string;
+        case_id?: string;
+        record_type: string;
+        record_date?: string | null;
+        batch_code?: string;
+        broodstock_source?: string;
+        metrics?: Record<string, any>;
+        notes?: string;
+        client_visible?: boolean;
+        change_note?: string;
+      };
+    }) => axios.patch(`/advisory/admin/hatchery-records/${recordId}`, payload).then((r: any) => r?.payload ?? null),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminHatcheryRecords });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminPhaseSixBenchmarks });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminPhaseSixRevisions });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.cases });
+    },
+  });
+};
+
+export const useCreateInvestorScore = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: {
+      case_id: string;
+      project_type?: string;
+      location?: string;
+      planned_capacity?: string;
+      capex_estimate_idr?: number | null;
+      opex_estimate_idr?: number | null;
+      technical_score?: number;
+      management_score?: number;
+      biosecurity_score?: number;
+      market_score?: number;
+      financial_score?: number;
+      red_flags?: string[];
+      recommendations?: string[];
+      assumptions?: string[];
+      client_visible?: boolean;
+    }) => axios.post("/advisory/admin/investor-scores", payload).then((r: any) => r?.payload?.score ?? null),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminCases });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminInvestorScores });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminPhaseSixBenchmarks });
+    },
+  });
+};
+
+export const useUpdateInvestorScore = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ scoreId, payload }: {
+      scoreId: string;
+      payload: {
+        case_id: string;
+        project_type?: string;
+        location?: string;
+        planned_capacity?: string;
+        capex_estimate_idr?: number | null;
+        opex_estimate_idr?: number | null;
+        technical_score?: number;
+        management_score?: number;
+        biosecurity_score?: number;
+        market_score?: number;
+        financial_score?: number;
+        red_flags?: string[];
+        recommendations?: string[];
+        assumptions?: string[];
+        client_visible?: boolean;
+        change_note?: string;
+      };
+    }) => axios.patch(`/advisory/admin/investor-scores/${scoreId}`, payload).then((r: any) => r?.payload ?? null),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminInvestorScores });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminPhaseSixBenchmarks });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminPhaseSixRevisions });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.cases });
+    },
+  });
+};
+
+export const useCreateInvestorScoreReport = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ scoreId, status = "expert_review_required" }: { scoreId: string; status?: string }) =>
+      axios.post(`/advisory/admin/investor-scores/${scoreId}/report`, { status }).then((r: any) => r?.payload ?? null),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminCases });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminReports });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminReportWorkflowEvents });
+    },
+  });
+};
+
 export const useCreateAdvisoryReport = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -216,6 +498,7 @@ export const useCreateAdvisoryReport = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: advisoryKeys.adminCases });
       queryClient.invalidateQueries({ queryKey: advisoryKeys.adminReports });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminReportWorkflowEvents });
       queryClient.invalidateQueries({ queryKey: advisoryKeys.cases });
     },
   });
@@ -229,6 +512,7 @@ export const useUpdateAdvisoryReportWorkflow = () => {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: advisoryKeys.adminCases });
       queryClient.invalidateQueries({ queryKey: advisoryKeys.adminReports });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminReportWorkflowEvents });
       queryClient.invalidateQueries({ queryKey: advisoryKeys.cases });
       if (data?.case?.id) {
         queryClient.invalidateQueries({ queryKey: advisoryKeys.case(data.case.id) });

@@ -9,8 +9,15 @@ from teramina.schemas.general_schema import DataErrorSchema, DataSuccessSchema
 from ..models.advisory_model import (
     AdvisoryAssistantBriefLog,
     AdvisoryCase,
+    AdvisoryAssistantAnswerLog,
     AdvisoryExpertReview,
     AdvisoryReport,
+    AdvisoryReportWorkflowEvent,
+    BenchmarkConsentRecord,
+    HatcheryOperationalRecord,
+    HatcheryProfile,
+    InvestorDueDiligenceScore,
+    PhaseSixRecordRevision,
     RetainerCadence,
     ServicePackage,
 )
@@ -106,6 +113,13 @@ CASE_MAIN_QUESTION_KEYS = {
     "retainer": "active_problem",
 }
 
+BENCHMARK_CONSENT_TYPE = "phase_six_benchmark"
+BENCHMARK_TERMS_VERSION = "phase-six-benchmark-v1"
+BENCHMARK_TERMS_TEXT = (
+    "I allow Teramina to use this case's approved Phase 6 hatchery and investor records in anonymized aggregate benchmarks. "
+    "Teramina will not disclose farm, hatchery, company, location, or personal identity without separate written permission."
+)
+
 
 def _has_value(value) -> bool:
     if value is None:
@@ -129,6 +143,23 @@ def _short_value(value, limit=180) -> str:
     else:
         value = str(value)
     return value if len(value) <= limit else f"{value[:limit].rstrip()}..."
+
+
+def _score(value) -> float:
+    try:
+        return max(0, min(float(value or 0), 100))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _risk_level(score: float) -> str:
+    if score >= 80:
+        return "low"
+    if score >= 60:
+        return "moderate"
+    if score >= 40:
+        return "high"
+    return "critical"
 
 
 class AdvisoryService:
@@ -257,6 +288,800 @@ class AdvisoryService:
         return 200, DataSuccessSchema(code=200, message="OK", payload={"cases": cases})
 
     @staticmethod
+    def admin_list_assistant_brief_logs(user, case_id="", status="", limit=50):
+        if not _is_admin(user):
+            return 401, DataErrorSchema(code=401, message="Unauthorized")
+
+        query = {}
+        if case_id:
+            query["case_id"] = case_id
+        if status:
+            query["status"] = status
+
+        try:
+            limit = max(1, min(int(limit), 100))
+        except (TypeError, ValueError):
+            limit = 50
+
+        logs = [
+            log.to_dict()
+            for log in AdvisoryAssistantBriefLog.objects(**query).order_by("-created_at")[:limit]
+        ]
+        return 200, DataSuccessSchema(code=200, message="OK", payload={"logs": logs})
+
+    @staticmethod
+    def admin_list_assistant_answer_logs(user, case_id="", asked_by="", limit=50):
+        if not _is_admin(user):
+            return 401, DataErrorSchema(code=401, message="Unauthorized")
+
+        query = {}
+        if case_id:
+            query["case_id"] = case_id
+        if asked_by:
+            query["asked_by"] = asked_by
+
+        try:
+            limit = max(1, min(int(limit), 100))
+        except (TypeError, ValueError):
+            limit = 50
+
+        logs = [
+            log.to_dict()
+            for log in AdvisoryAssistantAnswerLog.objects(**query).order_by("-created_at")[:limit]
+        ]
+        return 200, DataSuccessSchema(code=200, message="OK", payload={"logs": logs})
+
+    @staticmethod
+    def admin_list_report_workflow_events(user, report_id="", case_id="", limit=50):
+        if not _is_admin(user):
+            return 401, DataErrorSchema(code=401, message="Unauthorized")
+
+        query = {}
+        if report_id:
+            query["report_id"] = report_id
+        if case_id:
+            query["case_id"] = case_id
+
+        try:
+            limit = max(1, min(int(limit), 100))
+        except (TypeError, ValueError):
+            limit = 50
+
+        events = [
+            event.to_dict()
+            for event in AdvisoryReportWorkflowEvent.objects(**query).order_by("-changed_at")[:limit]
+        ]
+        return 200, DataSuccessSchema(code=200, message="OK", payload={"events": events})
+
+    @staticmethod
+    def create_hatchery_profile(user, data):
+        if not _is_admin(user):
+            return 401, DataErrorSchema(code=401, message="Unauthorized")
+
+        case = AdvisoryCase.objects(id=data.case_id).first() if data.case_id else None
+        if data.case_id and not case:
+            return 404, DataErrorSchema(code=404, message="Advisory case not found")
+
+        owner_id = case.user_id if case else (data.user_id or "")
+        if not owner_id:
+            return 400, DataErrorSchema(code=400, message="User or advisory case is required")
+
+        profile = HatcheryProfile(
+            user_id=owner_id,
+            case_id=data.case_id or "",
+            name=data.name,
+            location=data.location,
+            maturation_capacity=data.maturation_capacity,
+            larval_capacity=data.larval_capacity,
+            biosecurity_level=data.biosecurity_level,
+            water_source=data.water_source,
+            notes=data.notes,
+            client_visible=data.client_visible,
+            created_by=str(user.id),
+        )
+        try:
+            profile.save()
+        except ValidationError as exc:
+            return 400, DataErrorSchema(code=400, message=str(exc))
+        return 200, DataSuccessSchema(
+            code=200,
+            message="Hatchery profile created",
+            payload={"hatchery": profile.to_dict(include_private=True)},
+        )
+
+    @staticmethod
+    def admin_list_hatchery_profiles(user, case_id="", user_id=""):
+        if not _is_admin(user):
+            return 401, DataErrorSchema(code=401, message="Unauthorized")
+
+        query = {}
+        if case_id:
+            query["case_id"] = case_id
+        if user_id:
+            query["user_id"] = user_id
+        hatcheries = [
+            profile.to_dict(include_private=True)
+            for profile in HatcheryProfile.objects(**query).order_by("-created_at")
+        ]
+        return 200, DataSuccessSchema(code=200, message="OK", payload={"hatcheries": hatcheries})
+
+    @staticmethod
+    def update_hatchery_profile(user, hatchery_id: str, data):
+        if not _is_admin(user):
+            return 401, DataErrorSchema(code=401, message="Unauthorized")
+
+        profile = HatcheryProfile.objects(id=hatchery_id).first()
+        if not profile:
+            return 404, DataErrorSchema(code=404, message="Hatchery profile not found")
+
+        previous_data = profile.to_dict(include_private=True)
+        profile.name = data.name
+        profile.location = data.location
+        profile.maturation_capacity = data.maturation_capacity
+        profile.larval_capacity = data.larval_capacity
+        profile.biosecurity_level = data.biosecurity_level
+        profile.water_source = data.water_source
+        profile.notes = data.notes
+        profile.client_visible = data.client_visible
+        profile.updated_at = datetime.now()
+        try:
+            profile.save()
+        except ValidationError as exc:
+            return 400, DataErrorSchema(code=400, message=str(exc))
+
+        revision = AdvisoryService._log_phase_six_revision(
+            "hatchery_profile",
+            profile,
+            previous_data,
+            profile.to_dict(include_private=True),
+            str(user.id),
+            data.change_note or "Updated hatchery profile",
+        )
+        return 200, DataSuccessSchema(
+            code=200,
+            message="Hatchery profile updated",
+            payload={"hatchery": profile.to_dict(include_private=True), "revision": revision.to_dict()},
+        )
+
+    @staticmethod
+    def create_hatchery_record(user, data):
+        if not _is_admin(user):
+            return 401, DataErrorSchema(code=401, message="Unauthorized")
+
+        hatchery = HatcheryProfile.objects(id=data.hatchery_id).first()
+        if not hatchery:
+            return 404, DataErrorSchema(code=404, message="Hatchery profile not found")
+
+        case_id = data.case_id or hatchery.case_id
+        if case_id:
+            case = AdvisoryCase.objects(id=case_id).first()
+            if not case:
+                return 404, DataErrorSchema(code=404, message="Advisory case not found")
+            if case.user_id != hatchery.user_id:
+                return 400, DataErrorSchema(code=400, message="Hatchery and advisory case users do not match")
+
+        record = HatcheryOperationalRecord(
+            hatchery_id=data.hatchery_id,
+            case_id=case_id,
+            user_id=hatchery.user_id,
+            record_type=data.record_type,
+            record_date=data.record_date,
+            batch_code=data.batch_code,
+            broodstock_source=data.broodstock_source,
+            metrics=data.metrics or {},
+            notes=data.notes,
+            client_visible=data.client_visible,
+            created_by=str(user.id),
+        )
+        try:
+            record.save()
+        except ValidationError as exc:
+            return 400, DataErrorSchema(code=400, message=str(exc))
+        hatchery.updated_at = datetime.now()
+        hatchery.save()
+        return 200, DataSuccessSchema(
+            code=200,
+            message="Hatchery operational record created",
+            payload={"record": record.to_dict(include_private=True)},
+        )
+
+    @staticmethod
+    def admin_list_hatchery_records(user, hatchery_id="", case_id="", record_type=""):
+        if not _is_admin(user):
+            return 401, DataErrorSchema(code=401, message="Unauthorized")
+
+        query = {}
+        if hatchery_id:
+            query["hatchery_id"] = hatchery_id
+        if case_id:
+            query["case_id"] = case_id
+        if record_type:
+            query["record_type"] = record_type
+        records = [
+            record.to_dict(include_private=True)
+            for record in HatcheryOperationalRecord.objects(**query).order_by("-record_date", "-created_at")
+        ]
+        return 200, DataSuccessSchema(code=200, message="OK", payload={"records": records})
+
+    @staticmethod
+    def update_hatchery_record(user, record_id: str, data):
+        if not _is_admin(user):
+            return 401, DataErrorSchema(code=401, message="Unauthorized")
+
+        record = HatcheryOperationalRecord.objects(id=record_id).first()
+        if not record:
+            return 404, DataErrorSchema(code=404, message="Hatchery operational record not found")
+
+        previous_data = record.to_dict(include_private=True)
+        record.record_type = data.record_type
+        record.record_date = data.record_date
+        record.batch_code = data.batch_code
+        record.broodstock_source = data.broodstock_source
+        record.metrics = data.metrics or {}
+        record.notes = data.notes
+        record.client_visible = data.client_visible
+        record.updated_at = datetime.now()
+        try:
+            record.save()
+        except ValidationError as exc:
+            return 400, DataErrorSchema(code=400, message=str(exc))
+
+        revision = AdvisoryService._log_phase_six_revision(
+            "hatchery_record",
+            record,
+            previous_data,
+            record.to_dict(include_private=True),
+            str(user.id),
+            data.change_note or "Updated hatchery operational record",
+        )
+        return 200, DataSuccessSchema(
+            code=200,
+            message="Hatchery operational record updated",
+            payload={"record": record.to_dict(include_private=True), "revision": revision.to_dict()},
+        )
+
+    @staticmethod
+    def create_investor_due_diligence_score(user, data):
+        if not _is_admin(user):
+            return 401, DataErrorSchema(code=401, message="Unauthorized")
+
+        case = AdvisoryCase.objects(id=data.case_id).first()
+        if not case:
+            return 404, DataErrorSchema(code=404, message="Advisory case not found")
+        if case.case_type != "investor_due_diligence":
+            return 400, DataErrorSchema(code=400, message="Case is not an investor due-diligence case")
+
+        scores = [
+            _score(data.technical_score),
+            _score(data.management_score),
+            _score(data.biosecurity_score),
+            _score(data.market_score),
+            _score(data.financial_score),
+        ]
+        overall = round(sum(scores) / len(scores), 2)
+        score = InvestorDueDiligenceScore(
+            case_id=data.case_id,
+            user_id=case.user_id,
+            project_type=data.project_type,
+            location=data.location,
+            planned_capacity=data.planned_capacity,
+            capex_estimate_idr=data.capex_estimate_idr,
+            opex_estimate_idr=data.opex_estimate_idr,
+            technical_score=scores[0],
+            management_score=scores[1],
+            biosecurity_score=scores[2],
+            market_score=scores[3],
+            financial_score=scores[4],
+            overall_score=overall,
+            risk_level=_risk_level(overall),
+            red_flags=data.red_flags or [],
+            recommendations=data.recommendations or [],
+            assumptions=data.assumptions or [],
+            client_visible=data.client_visible,
+            created_by=str(user.id),
+        )
+        try:
+            score.save()
+        except ValidationError as exc:
+            return 400, DataErrorSchema(code=400, message=str(exc))
+        case.status = "in_review" if case.status == "inquiry" else case.status
+        case.updated_at = datetime.now()
+        case.save()
+        return 200, DataSuccessSchema(
+            code=200,
+            message="Investor due-diligence score created",
+            payload={"score": score.to_dict(include_private=True)},
+        )
+
+    @staticmethod
+    def admin_list_investor_due_diligence_scores(user, case_id="", risk_level=""):
+        if not _is_admin(user):
+            return 401, DataErrorSchema(code=401, message="Unauthorized")
+
+        query = {}
+        if case_id:
+            query["case_id"] = case_id
+        if risk_level:
+            query["risk_level"] = risk_level
+        scores = [
+            score.to_dict(include_private=True)
+            for score in InvestorDueDiligenceScore.objects(**query).order_by("-created_at")
+        ]
+        return 200, DataSuccessSchema(code=200, message="OK", payload={"scores": scores})
+
+    @staticmethod
+    def update_investor_due_diligence_score(user, score_id: str, data):
+        if not _is_admin(user):
+            return 401, DataErrorSchema(code=401, message="Unauthorized")
+
+        score = InvestorDueDiligenceScore.objects(id=score_id).first()
+        if not score:
+            return 404, DataErrorSchema(code=404, message="Investor due-diligence score not found")
+
+        previous_data = score.to_dict(include_private=True)
+        scores = [
+            _score(data.technical_score),
+            _score(data.management_score),
+            _score(data.biosecurity_score),
+            _score(data.market_score),
+            _score(data.financial_score),
+        ]
+        score.project_type = data.project_type
+        score.location = data.location
+        score.planned_capacity = data.planned_capacity
+        score.capex_estimate_idr = data.capex_estimate_idr
+        score.opex_estimate_idr = data.opex_estimate_idr
+        score.technical_score = scores[0]
+        score.management_score = scores[1]
+        score.biosecurity_score = scores[2]
+        score.market_score = scores[3]
+        score.financial_score = scores[4]
+        score.overall_score = round(sum(scores) / len(scores), 2)
+        score.risk_level = _risk_level(score.overall_score)
+        score.red_flags = data.red_flags or []
+        score.recommendations = data.recommendations or []
+        score.assumptions = data.assumptions or []
+        score.client_visible = data.client_visible
+        score.updated_at = datetime.now()
+        try:
+            score.save()
+        except ValidationError as exc:
+            return 400, DataErrorSchema(code=400, message=str(exc))
+
+        revision = AdvisoryService._log_phase_six_revision(
+            "investor_score",
+            score,
+            previous_data,
+            score.to_dict(include_private=True),
+            str(user.id),
+            data.change_note or "Updated investor due-diligence score",
+        )
+        return 200, DataSuccessSchema(
+            code=200,
+            message="Investor due-diligence score updated",
+            payload={"score": score.to_dict(include_private=True), "revision": revision.to_dict()},
+        )
+
+    @staticmethod
+    def admin_list_phase_six_revisions(user, record_kind="", record_id="", case_id="", limit=50):
+        if not _is_admin(user):
+            return 401, DataErrorSchema(code=401, message="Unauthorized")
+
+        query = {}
+        if record_kind:
+            query["record_kind"] = record_kind
+        if record_id:
+            query["record_id"] = record_id
+        if case_id:
+            query["case_id"] = case_id
+
+        try:
+            limit = max(1, min(int(limit), 100))
+        except (TypeError, ValueError):
+            limit = 50
+
+        revisions = [
+            revision.to_dict()
+            for revision in PhaseSixRecordRevision.objects(**query).order_by("-created_at")[:limit]
+        ]
+        return 200, DataSuccessSchema(code=200, message="OK", payload={"revisions": revisions})
+
+    @staticmethod
+    def _log_phase_six_revision(record_kind, record, previous_data, new_data, changed_by, change_note):
+        revision_number = PhaseSixRecordRevision.objects(record_kind=record_kind, record_id=str(record.id)).count() + 1
+        revision = PhaseSixRecordRevision(
+            record_kind=record_kind,
+            record_id=str(record.id),
+            case_id=getattr(record, "case_id", "") or "",
+            user_id=getattr(record, "user_id", "") or "",
+            revision_number=revision_number,
+            previous_data=previous_data,
+            new_data=new_data,
+            change_note=change_note,
+            changed_by=changed_by,
+        )
+        revision.save()
+        return revision
+
+    @staticmethod
+    def create_report_from_investor_score(user, score_id: str, data):
+        if not _is_admin(user):
+            return 401, DataErrorSchema(code=401, message="Unauthorized")
+
+        score = InvestorDueDiligenceScore.objects(id=score_id).first()
+        if not score:
+            return 404, DataErrorSchema(code=404, message="Investor due-diligence score not found")
+        case = AdvisoryCase.objects(id=score.case_id, user_id=score.user_id).first()
+        if not case:
+            return 404, DataErrorSchema(code=404, message="Advisory case not found")
+        if data.status not in ["draft", "expert_review_required"]:
+            return 400, DataErrorSchema(code=400, message="Investor score reports require expert review before delivery")
+
+        report = AdvisoryReport(
+            case_id=score.case_id,
+            user_id=score.user_id,
+            title=f"Investor Due Diligence Draft: {case.title or score.project_type.title()}",
+            executive_summary=(
+                f"Internal due-diligence draft for a {score.project_type} project in {score.location or 'the target region'}. "
+                f"Overall score is {score.overall_score} with {score.risk_level} risk."
+            ),
+            data_received=[
+                f"Project type: {score.project_type}",
+                f"Location: {score.location or '-'}",
+                f"Planned capacity: {score.planned_capacity or '-'}",
+                f"Capex estimate IDR: {score.capex_estimate_idr or '-'}",
+                f"Opex estimate IDR: {score.opex_estimate_idr or '-'}",
+            ],
+            key_findings=[
+                f"Technical score: {score.technical_score}",
+                f"Management score: {score.management_score}",
+                f"Biosecurity score: {score.biosecurity_score}",
+                f"Market score: {score.market_score}",
+                f"Financial score: {score.financial_score}",
+                f"Overall risk level: {score.risk_level}",
+            ],
+            likely_causes=list(score.red_flags or []),
+            technical_interpretation=(
+                "This score is a structured internal investment screen. It does not replace expert review, legal review, "
+                "or verified engineering and financial due diligence."
+            ),
+            economic_implication=(
+                f"Capex and opex assumptions should be stress-tested against survival, FCR, price, utilization, and ramp-up sensitivity. "
+                f"Current financial score is {score.financial_score}."
+            ),
+            corrective_action_plan=list(score.recommendations or []),
+            monitoring_plan=[
+                "Validate project assumptions against engineering drawings, production model, and management capacity.",
+                "Review biosecurity and disease-risk controls before investment close.",
+                "Run downside sensitivity before final go/no-go recommendation.",
+            ],
+            assumptions_and_limits=list(score.assumptions or []) + [
+                "Generated from structured investor due-diligence scores.",
+                "Internal draft only until reviewed and delivered through the advisory report workflow.",
+            ],
+            status=data.status,
+        )
+        report.save()
+        case.report_id = str(report.id)
+        case.status = "in_review"
+        case.updated_at = datetime.now()
+        case.save()
+        AdvisoryService._log_report_workflow_event(
+            report,
+            previous_status="",
+            new_status=report.status,
+            review_note=data.review_note or f"Created from investor score {score_id}.",
+            changed_by=str(user.id),
+        )
+        return 200, DataSuccessSchema(
+            code=200,
+            message="Investor due-diligence report draft created",
+            payload={"report": report.to_dict(include_private=True), "score": score.to_dict(include_private=True)},
+        )
+
+    @staticmethod
+    def admin_phase_six_benchmarks(user, record_type="", risk_level="", project_type="", from_month="", to_month=""):
+        if not _is_admin(user):
+            return 401, DataErrorSchema(code=401, message="Unauthorized")
+        if not AdvisoryService._is_valid_benchmark_month(from_month) or not AdvisoryService._is_valid_benchmark_month(to_month):
+            return 400, DataErrorSchema(code=400, message="Benchmark month filters must use YYYY-MM format")
+
+        active_consents = BenchmarkConsentRecord.objects(consent_type=BENCHMARK_CONSENT_TYPE, status="active")
+        consented_case_ids = sorted({consent.case_id for consent in active_consents})
+        hatchery_records = list(HatcheryOperationalRecord.objects(case_id__in=consented_case_ids))
+        investor_scores = list(InvestorDueDiligenceScore.objects(case_id__in=consented_case_ids))
+
+        hatchery_records = [
+            record
+            for record in hatchery_records
+            if (not record_type or record.record_type == record_type)
+            and AdvisoryService._is_in_benchmark_month_range(record.record_date or record.created_at, from_month, to_month)
+        ]
+        investor_scores = [
+            score
+            for score in investor_scores
+            if (not risk_level or score.risk_level == risk_level)
+            and (not project_type or score.project_type == project_type)
+            and AdvisoryService._is_in_benchmark_month_range(score.created_at, from_month, to_month)
+        ]
+
+        record_type_counts = {}
+        pl_quality_scores = []
+        for record in hatchery_records:
+            record_type_counts[record.record_type] = record_type_counts.get(record.record_type, 0) + 1
+            value = (record.metrics or {}).get("pl_quality_score")
+            if isinstance(value, (int, float)):
+                pl_quality_scores.append(float(value))
+
+        risk_counts = {}
+        for score in investor_scores:
+            risk_counts[score.risk_level] = risk_counts.get(score.risk_level, 0) + 1
+        average_investor_score = (
+            round(sum(score.overall_score for score in investor_scores) / len(investor_scores), 2)
+            if investor_scores
+            else None
+        )
+        trend = AdvisoryService._phase_six_benchmark_trend(hatchery_records, investor_scores)
+        filtered_case_ids = sorted(
+            {record.case_id for record in hatchery_records if record.case_id}
+            | {score.case_id for score in investor_scores if score.case_id}
+        )
+
+        return 200, DataSuccessSchema(
+            code=200,
+            message="OK",
+            payload={
+                "benchmark_scope": "consented_phase_six_records",
+                "source_case_count": len(filtered_case_ids),
+                "total_consented_case_count": len(consented_case_ids),
+                "filters": {
+                    "record_type": record_type,
+                    "risk_level": risk_level,
+                    "project_type": project_type,
+                    "from_month": from_month,
+                    "to_month": to_month,
+                },
+                "hatchery": {
+                    "record_count": len(hatchery_records),
+                    "record_type_counts": record_type_counts,
+                    "average_pl_quality_score": round(sum(pl_quality_scores) / len(pl_quality_scores), 2) if pl_quality_scores else None,
+                },
+                "investor": {
+                    "score_count": len(investor_scores),
+                    "risk_level_counts": risk_counts,
+                    "average_overall_score": average_investor_score,
+                },
+                "trend": trend,
+            },
+        )
+
+    @staticmethod
+    def _is_valid_benchmark_month(value):
+        if not value:
+            return True
+        parts = value.split("-")
+        if len(parts) != 2:
+            return False
+        year, month = parts
+        if len(year) != 4 or len(month) != 2 or not year.isdigit() or not month.isdigit():
+            return False
+        return 1 <= int(month) <= 12
+
+    @staticmethod
+    def _benchmark_month_key(value):
+        return value.strftime("%Y-%m") if value else ""
+
+    @staticmethod
+    def _is_in_benchmark_month_range(value, from_month="", to_month=""):
+        month = AdvisoryService._benchmark_month_key(value)
+        if from_month and month < from_month:
+            return False
+        if to_month and month > to_month:
+            return False
+        return True
+
+    @staticmethod
+    def _phase_six_benchmark_trend(hatchery_records, investor_scores):
+        months = {}
+        for record in hatchery_records:
+            month = AdvisoryService._benchmark_month_key(record.record_date or record.created_at)
+            bucket = months.setdefault(month, {"pl_quality_scores": [], "investor_scores": [], "hatchery_record_count": 0})
+            bucket["hatchery_record_count"] += 1
+            value = (record.metrics or {}).get("pl_quality_score")
+            if isinstance(value, (int, float)):
+                bucket["pl_quality_scores"].append(float(value))
+
+        for score in investor_scores:
+            month = AdvisoryService._benchmark_month_key(score.created_at)
+            bucket = months.setdefault(month, {"pl_quality_scores": [], "investor_scores": [], "hatchery_record_count": 0})
+            bucket["investor_scores"].append(float(score.overall_score))
+
+        trend = []
+        for month in sorted(months):
+            bucket = months[month]
+            pl_scores = bucket["pl_quality_scores"]
+            investor_values = bucket["investor_scores"]
+            trend.append({
+                "month": month,
+                "hatchery_record_count": bucket["hatchery_record_count"],
+                "average_pl_quality_score": round(sum(pl_scores) / len(pl_scores), 2) if pl_scores else None,
+                "investor_score_count": len(investor_values),
+                "average_overall_score": round(sum(investor_values) / len(investor_values), 2) if investor_values else None,
+            })
+        return trend
+
+    @staticmethod
+    def get_benchmark_consent(user, case_id: str):
+        case = AdvisoryCase.objects(id=case_id).first()
+        if not case:
+            return 404, DataErrorSchema(code=404, message="Advisory case not found")
+        if not _can_access_case(user, case):
+            return 401, DataErrorSchema(code=401, message="Unauthorized")
+
+        return 200, DataSuccessSchema(
+            code=200,
+            message="OK",
+            payload={"benchmark_consent": AdvisoryService._benchmark_consent_state(case)},
+        )
+
+    @staticmethod
+    def accept_benchmark_consent(user, case_id: str, data):
+        case = AdvisoryCase.objects(id=case_id, user_id=str(user.id)).first()
+        if not case:
+            return 404, DataErrorSchema(code=404, message="Advisory case not found")
+
+        active = AdvisoryService._active_benchmark_consent(case)
+        if active:
+            return 200, DataSuccessSchema(
+                code=200,
+                message="Benchmark consent already active",
+                payload={"benchmark_consent": AdvisoryService._benchmark_consent_state(case)},
+            )
+
+        terms_version = data.terms_version or BENCHMARK_TERMS_VERSION
+        consent = BenchmarkConsentRecord(
+            case_id=str(case.id),
+            user_id=case.user_id,
+            terms_version=terms_version,
+            terms_text=BENCHMARK_TERMS_TEXT,
+            accepted_by=str(user.id),
+        )
+        consent.save()
+        case.benchmark_consent = True
+        case.updated_at = datetime.now()
+        case.save()
+        return 200, DataSuccessSchema(
+            code=200,
+            message="Benchmark consent accepted",
+            payload={"benchmark_consent": AdvisoryService._benchmark_consent_state(case)},
+        )
+
+    @staticmethod
+    def revoke_benchmark_consent(user, case_id: str):
+        case = AdvisoryCase.objects(id=case_id, user_id=str(user.id)).first()
+        if not case:
+            return 404, DataErrorSchema(code=404, message="Advisory case not found")
+
+        for consent in BenchmarkConsentRecord.objects(case_id=str(case.id), consent_type=BENCHMARK_CONSENT_TYPE, status="active"):
+            consent.status = "revoked"
+            consent.revoked_by = str(user.id)
+            consent.revoked_at = datetime.now()
+            consent.updated_at = datetime.now()
+            consent.save()
+        case.benchmark_consent = False
+        case.updated_at = datetime.now()
+        case.save()
+        return 200, DataSuccessSchema(
+            code=200,
+            message="Benchmark consent revoked",
+            payload={"benchmark_consent": AdvisoryService._benchmark_consent_state(case)},
+        )
+
+    @staticmethod
+    def _active_benchmark_consent(case: AdvisoryCase):
+        return BenchmarkConsentRecord.objects(
+            case_id=str(case.id),
+            user_id=case.user_id,
+            consent_type=BENCHMARK_CONSENT_TYPE,
+            status="active",
+        ).order_by("-created_at").first()
+
+    @staticmethod
+    def _benchmark_consent_state(case: AdvisoryCase):
+        active = AdvisoryService._active_benchmark_consent(case)
+        if case.benchmark_consent != bool(active):
+            case.benchmark_consent = bool(active)
+            case.updated_at = datetime.now()
+            case.save()
+        return {
+            "active": bool(active),
+            "terms_version": active.terms_version if active else BENCHMARK_TERMS_VERSION,
+            "terms_text": active.terms_text if active else BENCHMARK_TERMS_TEXT,
+            "consent": active.to_dict() if active else None,
+        }
+
+    @staticmethod
+    def answer_assistant_question(user, data):
+        if not _is_admin(user):
+            return 401, DataErrorSchema(code=401, message="Unauthorized")
+        question = (data.question or "").strip()
+        if not question:
+            return 400, DataErrorSchema(code=400, message="Question is required")
+
+        case = None
+        if data.case_id:
+            case = AdvisoryCase.objects(id=data.case_id).first()
+            if not case:
+                return 404, DataErrorSchema(code=404, message="Advisory case not found")
+
+        try:
+            limit = max(1, min(int(data.limit), 10))
+        except (TypeError, ValueError):
+            limit = 6
+
+        retrieved_sources = (
+            AdvisoryRetrievalService.retrieve_for_case(case, question, limit=limit)
+            if case
+            else AdvisoryRetrievalService.retrieve_global(question, limit=limit)
+        )
+        citations = retrieved_sources.get("citations", [])
+        answer = AdvisoryService._controlled_answer_payload(question, citations, case)
+        answer["cited_sources"] = retrieved_sources
+        answer_log = AdvisoryService._log_assistant_answer(user, case, answer)
+        answer["answer_log_id"] = str(answer_log.id)
+        answer["answer_log"] = answer_log.to_dict()
+        return 200, DataSuccessSchema(code=200, message="OK", payload={"answer": answer})
+
+    @staticmethod
+    def _log_assistant_answer(user, case, answer):
+        log = AdvisoryAssistantAnswerLog(
+            case_id=str(case.id) if case else "",
+            user_id=case.user_id if case else "",
+            asked_by=str(user.id),
+            question=answer.get("question", ""),
+            status=answer.get("status", ""),
+            answer=answer.get("answer", ""),
+            answer_bullets=list(answer.get("answer_bullets") or []),
+            source_citations=list(answer.get("source_citations") or []),
+            cited_sources=dict(answer.get("cited_sources") or {}),
+            safety_flags=list(answer.get("safety_flags") or []),
+            assumptions_and_limits=list(answer.get("assumptions_and_limits") or []),
+        )
+        log.save()
+        return log
+
+    @staticmethod
+    def _controlled_answer_payload(question: str, citations, case):
+        bullets = []
+        for citation in citations[:4]:
+            snippet = citation.get("source_snippet") or citation.get("snippet") or "Review the cited source before using this answer."
+            bullets.append(f"{citation.get('title', 'Source')}: {snippet}")
+
+        if not bullets:
+            bullets = ["No indexed Teramina source matched strongly enough. Add or reindex source material before using this answer."]
+
+        disease_terms = ["disease", "wssv", "ehp", "ahpnd", "ems", "imnv", "vibrio", "mortality"]
+        safety_flags = []
+        if any(term in question.lower() for term in disease_terms):
+            safety_flags.append("Disease-related guidance requires lab data and expert review before client use.")
+
+        return {
+            "status": "source_cited_internal_draft",
+            "case_id": str(case.id) if case else "",
+            "question": question,
+            "answer": "This internal answer is assembled only from indexed Teramina advisory sources. Review citations before use.",
+            "answer_bullets": bullets,
+            "source_citations": citations,
+            "safety_flags": safety_flags,
+            "assumptions_and_limits": [
+                "Internal operator draft only.",
+                "Use only with visible source citations.",
+                "Do not treat this as disease diagnosis or production guarantee.",
+                "Escalate high-stakes technical advice to expert review before client delivery.",
+            ],
+        }
+
+    @staticmethod
     def get_case(case_id: str, user_id: str):
         case = AdvisoryCase.objects(id=case_id, user_id=user_id).first()
         if not case:
@@ -270,6 +1095,18 @@ class AdvisoryService:
             cadence.to_dict()
             for cadence in RetainerCadence.objects(case_id=case_id, user_id=user_id).order_by("next_review_at", "-created_at")
         ]
+        hatcheries = [
+            profile.to_dict()
+            for profile in HatcheryProfile.objects(case_id=case_id, user_id=user_id, client_visible=True).order_by("-created_at")
+        ]
+        hatchery_records = [
+            record.to_dict()
+            for record in HatcheryOperationalRecord.objects(case_id=case_id, user_id=user_id, client_visible=True).order_by("-record_date", "-created_at")
+        ]
+        investor_scores = [
+            score.to_dict()
+            for score in InvestorDueDiligenceScore.objects(case_id=case_id, user_id=user_id, client_visible=True).order_by("-created_at")
+        ]
         return 200, DataSuccessSchema(
             code=200,
             message="OK",
@@ -278,6 +1115,10 @@ class AdvisoryService:
                 "report": report.to_dict() if report else None,
                 "expert_reviews": expert_reviews,
                 "retainer_cadences": retainer_cadences,
+                "hatchery_profiles": hatcheries,
+                "hatchery_records": hatchery_records,
+                "investor_scores": investor_scores,
+                "benchmark_consent": AdvisoryService._benchmark_consent_state(case),
             },
         )
 
@@ -344,7 +1185,27 @@ class AdvisoryService:
             cadence.to_dict(include_private=True)
             for cadence in RetainerCadence.objects(case_id=case_id).order_by("next_review_at", "-created_at")
         ]
-        brief = AdvisoryService._build_brief_payload(case, expert_reviews, reports, cadences)
+        hatcheries = [
+            profile.to_dict(include_private=True)
+            for profile in HatcheryProfile.objects(case_id=case_id).order_by("-created_at")
+        ]
+        hatchery_records = [
+            record.to_dict(include_private=True)
+            for record in HatcheryOperationalRecord.objects(case_id=case_id).order_by("-record_date", "-created_at")
+        ]
+        investor_scores = [
+            score.to_dict(include_private=True)
+            for score in InvestorDueDiligenceScore.objects(case_id=case_id).order_by("-created_at")
+        ]
+        brief = AdvisoryService._build_brief_payload(
+            case,
+            expert_reviews,
+            reports,
+            cadences,
+            hatcheries,
+            hatchery_records,
+            investor_scores,
+        )
         brief_log = AdvisoryService._log_assistant_brief(user, case, brief)
         brief["brief_log_id"] = str(brief_log.id)
         brief["brief_log"] = brief_log.to_dict()
@@ -432,6 +1293,13 @@ class AdvisoryService:
         case.status = "in_review"
         case.updated_at = datetime.now()
         case.save()
+        AdvisoryService._log_report_workflow_event(
+            report,
+            previous_status="",
+            new_status=report.status,
+            review_note=f"Created from assistant brief log {str(brief_log.id)}.",
+            changed_by=str(user.id),
+        )
         return 200, DataSuccessSchema(
             code=200,
             message="Assistant draft report created",
@@ -439,7 +1307,10 @@ class AdvisoryService:
         )
 
     @staticmethod
-    def _build_brief_payload(case: AdvisoryCase, expert_reviews, reports, cadences):
+    def _build_brief_payload(case: AdvisoryCase, expert_reviews, reports, cadences, hatcheries=None, hatchery_records=None, investor_scores=None):
+        hatcheries = hatcheries or []
+        hatchery_records = hatchery_records or []
+        investor_scores = investor_scores or []
         intake = dict(case.intake_data or {})
         main_question = intake.get(CASE_MAIN_QUESTION_KEYS.get(case.case_type, "main_problem")) or intake.get("main_problem") or ""
         required_keys = CASE_REQUIRED_INTAKE.get(case.case_type, [])
@@ -477,6 +1348,13 @@ class AdvisoryService:
             data_received.append(f"Linked pond ID: {case.pond_id}")
         if case.cycle_id:
             data_received.append(f"Linked cycle ID: {case.cycle_id}")
+        if hatcheries:
+            data_received.append(f"Hatchery profiles: {len(hatcheries)}")
+        if hatchery_records:
+            data_received.append(f"Hatchery operational records: {len(hatchery_records)}")
+        if investor_scores:
+            latest_score = investor_scores[0]
+            data_received.append(f"Investor due-diligence score: {latest_score.get('overall_score')} ({latest_score.get('risk_level')})")
 
         source_query = AdvisoryService._retrieval_query_for_case(case, intake_summary, main_question)
         retrieved_sources = AdvisoryRetrievalService.retrieve_for_case(case, source_query, limit=6)
@@ -498,6 +1376,14 @@ class AdvisoryService:
             findings.extend(expert_findings[:5])
         else:
             findings.append("No structured expert findings have been delivered yet.")
+        if hatchery_records:
+            record_types = sorted({record.get("record_type", "") for record in hatchery_records if record.get("record_type")})
+            findings.append(f"Linked hatchery records available: {', '.join(record_types)}.")
+        if investor_scores:
+            latest_score = investor_scores[0]
+            findings.append(
+                f"Latest investor due-diligence score is {latest_score.get('overall_score')} with {latest_score.get('risk_level')} risk."
+            )
 
         corrective_actions = []
         if missing_data:
@@ -532,6 +1418,9 @@ class AdvisoryService:
             "existing_reports": reports,
             "expert_reviews": expert_reviews,
             "retainer_cadences": cadences,
+            "hatchery_profiles": hatcheries,
+            "hatchery_records": hatchery_records,
+            "investor_scores": investor_scores,
             "draft_report": draft_report,
         }
 
@@ -735,6 +1624,7 @@ class AdvisoryService:
         if not case:
             return 404, DataErrorSchema(code=404, message="Advisory case not found")
 
+        previous_status = report.status
         report.status = data.status
         report.review_note = data.review_note or ""
         report.reviewed_by = str(user.id)
@@ -749,6 +1639,13 @@ class AdvisoryService:
         case.save()
         if report.status == "delivered":
             AdvisoryRetrievalService.index_report(report, case)
+        AdvisoryService._log_report_workflow_event(
+            report,
+            previous_status=previous_status,
+            new_status=report.status,
+            review_note=report.review_note,
+            changed_by=str(user.id),
+        )
 
         return 200, DataSuccessSchema(
             code=200,
@@ -789,7 +1686,26 @@ class AdvisoryService:
             case.status = "report_ready"
         case.updated_at = datetime.now()
         case.save()
+        AdvisoryService._log_report_workflow_event(
+            report,
+            previous_status="",
+            new_status=report.status,
+            review_note="Report created manually.",
+            changed_by=str(user.id),
+        )
         return 200, DataSuccessSchema(code=200, message="Advisory report created", payload={"report": report.to_dict()})
+
+    @staticmethod
+    def _log_report_workflow_event(report: AdvisoryReport, previous_status: str, new_status: str, review_note: str, changed_by: str):
+        AdvisoryReportWorkflowEvent(
+            report_id=str(report.id),
+            case_id=report.case_id,
+            user_id=report.user_id,
+            previous_status=previous_status or "",
+            new_status=new_status,
+            review_note=review_note or "",
+            changed_by=changed_by,
+        ).save()
 
     @staticmethod
     def get_report(report_id: str, user_id: str):

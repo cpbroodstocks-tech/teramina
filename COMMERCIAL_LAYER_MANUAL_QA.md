@@ -199,10 +199,73 @@ V1 report creation is admin-driven.
 15. Enter a review note and set workflow status to `delivered`.
 16. Submit `Update Report Workflow`.
 17. Confirm the case status changes to `report_ready`.
-18. Sign in as the case owner.
-19. Open `/dashboard/advisory/<case_id>`.
-20. Confirm the case status is `report_ready`.
-21. Confirm the delivered report summary appears.
+18. In `Advisory Audit Trail`, confirm the assistant brief log and report workflow event appear.
+19. In `Controlled Assistant`, ask a source-cited internal question.
+20. Confirm answer bullets, citations, and any safety flags appear.
+21. In `Advisory Audit Trail`, confirm the assistant answer log appears with source and safety-flag counts.
+22. Sign in as the case owner.
+23. Open `/dashboard/advisory/<case_id>`.
+24. Confirm the case status is `report_ready`.
+25. Confirm the delivered report summary appears.
+
+## Phase 6 Hatchery And Investor Records
+
+Hatchery intelligence:
+
+1. Sign in as a user with `role_user=admin`.
+2. Open `/dashboard/commercial-admin`.
+3. In `Hatchery Intelligence`, create a hatchery profile linked to a hatchery advisory case.
+4. Set `Client visibility` to `Visible to case owner` only when the profile is approved for client viewing.
+5. Confirm the profile appears under `Hatchery Profiles`.
+6. Add a hatchery record for one of:
+   - `broodstock_batch`;
+   - `maturation_performance`;
+   - `spawning_log`;
+   - `nauplii_output`;
+   - `pl_quality_test`.
+7. Confirm the KPI fields change to match the selected record type.
+8. Set `Record visibility` to `Visible to case owner` only when the record is approved for client viewing.
+9. Confirm the record appears under `Recent Hatchery Records`.
+10. Click `Edit Hatchery` or `Edit Record`, update at least one field, add a change note, and submit the update.
+11. Confirm the updated record appears and `Phase 6 Revisions` shows the change note.
+12. Sign in as the case owner and open `/dashboard/advisory/<case_id>`.
+13. Confirm only visible hatchery profiles and records appear under `Hatchery Intelligence`.
+14. Generate an assistant brief for the linked case.
+15. Confirm the brief includes hatchery profile and record context in the draft report data received or findings.
+
+Investor due diligence:
+
+1. Create or select an advisory case with `case_type=investor_due_diligence`.
+2. In `Investor Due Diligence`, enter project type, location, planned capacity, cost estimates, five scores, red flags,
+   recommendations, and assumptions.
+3. Submit `Create Investor Score`.
+4. Confirm the record appears under `Recent Investor Scores` with overall score and risk level.
+5. Click `Create DD Report`.
+6. Confirm a draft report appears with `expert_review_required` status under `Deliver Report`.
+7. Set `Score visibility` to `Visible to case owner` only when the score is approved for client viewing.
+8. Click `Edit Score`, update at least one score or risk field, add a change note, and submit the update.
+9. Confirm the overall score and risk level recalculate and `Phase 6 Revisions` shows the change note.
+10. Sign in as the case owner and confirm visible investor scores appear in `/dashboard/advisory/<case_id>`.
+11. Generate an assistant brief for the linked investor case.
+12. Confirm the brief includes the investor score in the draft report data received or findings.
+
+Phase 6 benchmarks:
+
+1. Sign in as the case owner and open `/dashboard/advisory/<case_id>`.
+2. In `Benchmark Consent`, review the anonymized aggregate benchmark terms.
+3. Click `Accept Benchmark Terms`.
+4. Sign in as an admin and open `/dashboard/commercial-admin`.
+5. Confirm `Phase 6 Benchmarks` counts only cases with active owner consent records.
+6. Confirm hatchery record-type chips and investor risk-level chips match the consented records.
+7. Use the hatchery type, investor risk, project type, and month filters.
+8. Confirm `Filtered source cases`, `Total consented`, and `Benchmark Trend` match the selected segment and month range.
+9. Sign in again as the case owner, click `Revoke Consent`, and confirm the case leaves the benchmark aggregate.
+
+Client assistant preview:
+
+1. Sign in as the case owner and open a case with a delivered source-cited report.
+2. Confirm delivered report citations appear under `Source Citations`.
+3. Confirm `Ask Teramina Assistant` appears as disabled and does not allow client questions.
 
 ## Regression Checks
 

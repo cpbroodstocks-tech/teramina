@@ -40,6 +40,17 @@ class AdvisoryRetrievalService:
     """Mnemon-aligned retrieval for commercial knowledge and advisory records."""
 
     @staticmethod
+    def retrieve_global(query: str, limit=6, provider=None):
+        AdvisoryRetrievalService._refresh_global_sources(provider=provider)
+        sources = AdvisorySourceEmbedding.objects(access_scope="global")
+        return AdvisoryRetrievalService._rank_sources(
+            list(sources),
+            query=query,
+            limit=limit,
+            provider=provider,
+        )
+
+    @staticmethod
     def retrieve_for_case(case: AdvisoryCase, query: str, limit=6, provider=None):
         AdvisoryRetrievalService._refresh_case_sources(case, provider=provider)
         sources = AdvisorySourceEmbedding.objects(
@@ -56,6 +67,11 @@ class AdvisoryRetrievalService:
             limit=limit,
             provider=provider,
         )
+
+    @staticmethod
+    def _refresh_global_sources(provider=None):
+        for item in ContentItem.objects(status="published").order_by("-published_at", "title")[:100]:
+            AdvisoryRetrievalService.index_content_item(item, provider=provider)
 
     @staticmethod
     def _refresh_case_sources(case: AdvisoryCase, provider=None):

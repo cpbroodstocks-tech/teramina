@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -239,12 +239,57 @@ describe("Commercial public surfaces", () => {
                 notes: "Prepare latest pond logs before the call.",
               },
             ],
+            hatchery_profiles: [
+              {
+                id: "hatchery-1",
+                name: "Client Hatchery",
+                location: "Lampung",
+                biosecurity_level: "high",
+                notes: "Profile approved for client visibility.",
+              },
+            ],
+            hatchery_records: [
+              {
+                id: "record-1",
+                record_type: "pl_quality_test",
+                batch_code: "PL-2026-06",
+                metrics: { pl_quality_score: 82, pcr_status: "pending" },
+                notes: "Uniform PL size.",
+              },
+            ],
+            investor_scores: [
+              {
+                id: "score-1",
+                project_type: "integrated",
+                location: "Sulawesi",
+                planned_capacity: "500 tons/year",
+                overall_score: 65,
+                risk_level: "moderate",
+                red_flags: ["No verified farm manager yet"],
+                recommendations: ["Validate pond engineering assumptions"],
+              },
+            ],
+            benchmark_consent: {
+              active: false,
+              terms_version: "phase-six-benchmark-v1",
+              terms_text: "I allow Teramina to use this case's approved Phase 6 records in anonymized aggregate benchmarks.",
+              consent: null,
+            },
             report: {
               id: "report-1",
               title: "Diagnostic Report",
               executive_summary: "Likely oxygen pressure issue.",
               key_findings: ["Oxygen risk increased after biomass passed 2 tons"],
               corrective_action_plan: ["Increase night aeration review"],
+              source_citations: [
+                {
+                  source_ref: "content_item:content-1",
+                  title: "Farm Failure Framework",
+                  document_id: "content-1",
+                  access_scope: "global",
+                  source_snippet: "Reconstruct mortality timelines and data gaps.",
+                },
+              ],
               status: "delivered",
             },
           },
@@ -267,6 +312,15 @@ describe("Commercial public surfaces", () => {
     expect(screen.getByText("Water quality log")).toBeInTheDocument();
     expect(screen.getByText("Disease pressure is plausible but unconfirmed.")).toBeInTheDocument();
     expect(screen.getByText("Review feed curve")).toBeInTheDocument();
+    expect(screen.getByText("Client Hatchery")).toBeInTheDocument();
+    expect(screen.getByText("Pl Quality Score: 82")).toBeInTheDocument();
+    expect(screen.getByText("Investor Due Diligence")).toBeInTheDocument();
+    expect(screen.getByText("No verified farm manager yet")).toBeInTheDocument();
+    expect(screen.getByText("Benchmark Consent")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Accept Benchmark Terms" })).toBeInTheDocument();
+    expect(screen.getByText("Ask Teramina Assistant")).toBeInTheDocument();
+    expect(screen.getAllByText("Source Citations").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Farm Failure Framework").length).toBeGreaterThan(0);
   });
 
   it("renders user invoices in dashboard billing", async () => {
@@ -305,6 +359,7 @@ describe("Commercial admin surface", () => {
     let acceptedLogId = "";
     let draftReportLogId = "";
     let reportWorkflowId = "";
+    let assistantQuestion = "";
 
     server.use(
       http.get("*/user/get-profile", () =>
@@ -384,6 +439,14 @@ describe("Commercial admin surface", () => {
                 user_id: "user-1",
                 intake_data: { main_problem: "FCR increased" },
               },
+              {
+                id: "case-investor-1",
+                title: "Integrated farm feasibility",
+                case_type: "investor_due_diligence",
+                status: "in_review",
+                user_id: "user-2",
+                intake_data: { main_investment_question: "Is this project investable?" },
+              },
             ],
           },
         })
@@ -441,6 +504,64 @@ describe("Commercial admin surface", () => {
           },
         });
       }),
+      http.post("*/advisory/admin/assistant-answer", async ({ request }) => {
+        const payload = await request.json() as { question: string };
+        assistantQuestion = payload.question;
+        return HttpResponse.json({
+          payload: {
+            answer: {
+              status: "source_cited_internal_draft",
+              answer: "This internal answer is assembled only from indexed Teramina advisory sources.",
+              answer_bullets: ["Farm Failure Framework: Reconstruct mortality timelines and data gaps."],
+              source_citations: [
+                {
+                  source_ref: "content_item:content-1",
+                  title: "Farm Failure Framework",
+                  document_id: "content-1",
+                  source_snippet: "Reconstruct mortality timelines and data gaps.",
+                },
+              ],
+              safety_flags: ["Disease-related guidance requires lab data and expert review before client use."],
+            },
+          },
+        });
+      }),
+      http.get("*/advisory/admin/assistant-brief-logs", () =>
+        HttpResponse.json({
+          payload: {
+            logs: [
+              {
+                id: "log-1",
+                case_id: "case-1",
+                status: "accepted",
+                generated_by: "admin-user",
+                accepted_report_id: "report-draft-1",
+                source_citations: [{ source_ref: "content_item:content-1" }],
+                draft_report: {
+                  title: "Assistant Draft: Weak FCR review",
+                },
+              },
+            ],
+          },
+        })
+      ),
+      http.get("*/advisory/admin/assistant-answer-logs", () =>
+        HttpResponse.json({
+          payload: {
+            logs: [
+              {
+                id: "answer-log-1",
+                case_id: "case-1",
+                asked_by: "admin-user",
+                question: "How should I investigate mortality?",
+                status: "source_cited_internal_draft",
+                source_citations: [{ source_ref: "content_item:content-1" }],
+                safety_flags: ["Disease-related guidance requires lab data and expert review before client use."],
+              },
+            ],
+          },
+        })
+      ),
       http.get("*/advisory/admin/expert-reviews", () =>
         HttpResponse.json({
           payload: {
@@ -485,6 +606,23 @@ describe("Commercial admin surface", () => {
           },
         });
       }),
+      http.get("*/advisory/admin/report-workflow-events", () =>
+        HttpResponse.json({
+          payload: {
+            events: [
+              {
+                id: "event-1",
+                report_id: "report-draft-1",
+                case_id: "case-1",
+                previous_status: "expert_review_required",
+                new_status: "delivered",
+                review_note: "Expert reviewed and cleared.",
+                changed_by: "admin-user",
+              },
+            ],
+          },
+        })
+      ),
       http.get("*/advisory/admin/retainer-cadences", () =>
         HttpResponse.json({
           payload: {
@@ -495,6 +633,112 @@ describe("Commercial admin surface", () => {
                 cadence_type: "monthly",
                 status: "active",
                 next_review_at: "2026-05-15T00:00:00",
+              },
+            ],
+          },
+        })
+      ),
+      http.get("*/advisory/admin/hatcheries", () =>
+        HttpResponse.json({
+          payload: {
+            hatcheries: [
+              {
+                id: "hatchery-1",
+                case_id: "case-1",
+                user_id: "user-1",
+                name: "Lampung Nauplii Center",
+                location: "Lampung",
+                maturation_capacity: 1200,
+                larval_capacity: 50000000,
+                biosecurity_level: "high",
+                client_visible: true,
+              },
+            ],
+          },
+        })
+      ),
+      http.get("*/advisory/admin/hatchery-records", () =>
+        HttpResponse.json({
+          payload: {
+            records: [
+              {
+                id: "hatchery-record-1",
+                hatchery_id: "hatchery-1",
+                case_id: "case-1",
+                record_type: "pl_quality_test",
+                batch_code: "PL-2026-06",
+                metrics: { pl_quality_score: 82 },
+                notes: "Uniform size, PCR pending.",
+                client_visible: true,
+              },
+            ],
+          },
+        })
+      ),
+      http.get("*/advisory/admin/investor-scores", () =>
+        HttpResponse.json({
+          payload: {
+            scores: [
+              {
+                id: "score-1",
+                case_id: "case-investor-1",
+                project_type: "integrated",
+                location: "Sulawesi",
+                planned_capacity: "500 tons/year",
+                overall_score: 65,
+                risk_level: "moderate",
+                red_flags: ["No verified farm manager yet"],
+                client_visible: true,
+              },
+            ],
+          },
+        })
+      ),
+      http.get("*/advisory/admin/benchmarks/phase-six", () =>
+        HttpResponse.json({
+          payload: {
+            benchmark_scope: "consented_phase_six_records",
+            source_case_count: 1,
+            total_consented_case_count: 1,
+            hatchery: {
+              record_count: 1,
+              record_type_counts: { pl_quality_test: 1 },
+              average_pl_quality_score: 82,
+            },
+            investor: {
+              score_count: 1,
+              risk_level_counts: { moderate: 1 },
+              average_overall_score: 65,
+            },
+            filters: {
+              record_type: "",
+              risk_level: "",
+              project_type: "",
+              from_month: "",
+              to_month: "",
+            },
+            trend: [
+              {
+                month: "2026-06",
+                hatchery_record_count: 1,
+                average_pl_quality_score: 82,
+                investor_score_count: 1,
+                average_overall_score: 65,
+              },
+            ],
+          },
+        })
+      ),
+      http.get("*/advisory/admin/phase-six-revisions", () =>
+        HttpResponse.json({
+          payload: {
+            revisions: [
+              {
+                id: "revision-1",
+                record_kind: "hatchery_record",
+                record_id: "hatchery-record-1",
+                revision_number: 1,
+                change_note: "PCR result received",
               },
             ],
           },
@@ -534,6 +778,18 @@ describe("Commercial admin surface", () => {
     expect(await screen.findByText("Check PCR result availability")).toBeInTheDocument();
     expect(screen.getByText("Farm Failure Framework (Farm, en)")).toBeInTheDocument();
     expect(screen.getByText("Files: 1")).toBeInTheDocument();
+    expect(screen.getByText("Advisory Audit Trail")).toBeInTheDocument();
+    expect(screen.getByText("Report Workflow History")).toBeInTheDocument();
+    expect(screen.getByText("Assistant Answer Logs")).toBeInTheDocument();
+    expect(screen.getByText("Case case-1 | asked by admin-user")).toBeInTheDocument();
+    expect(screen.getByText("Sources: 1 | accepted report: report-draft-1")).toBeInTheDocument();
+    expect(screen.getByText("Sources: 1 | safety flags: 1")).toBeInTheDocument();
+    expect(screen.getByText("Expert reviewed and cleared.")).toBeInTheDocument();
+    expect(await screen.findByText("Controlled Assistant")).toBeInTheDocument();
+    fireEvent.change(await screen.findByTestId("assistant-question"), { target: { value: "How should I investigate mortality?" } });
+    await userEvent.click(screen.getByRole("button", { name: "Ask Assistant" }));
+    await waitFor(() => expect(assistantQuestion).toBe("How should I investigate mortality?"));
+    expect(await screen.findByText("Farm Failure Framework: Reconstruct mortality timelines and data gaps.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Use Draft In Report Form" }));
     await waitFor(() => expect(acceptedLogId).toBe("log-1"));
     await userEvent.click(screen.getByRole("button", { name: "Create Internal Draft Report" }));
@@ -542,8 +798,26 @@ describe("Commercial admin surface", () => {
     await waitFor(() => expect(reportWorkflowId).toBe("report-draft-1:delivered"));
     expect(screen.getByText("Expert Review Forms")).toBeInTheDocument();
     expect(screen.getByText("Retainer Cadence")).toBeInTheDocument();
+    expect(screen.getByText("Hatchery Intelligence")).toBeInTheDocument();
+    expect(screen.getAllByText("Lampung Nauplii Center").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("pl_quality_test").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Edit Hatchery" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit Record" })).toBeInTheDocument();
+    expect(screen.getByText("Phase 6 Revisions")).toBeInTheDocument();
+    expect(screen.getByText("PCR result received")).toBeInTheDocument();
+    expect(screen.getByText("Investor Due Diligence")).toBeInTheDocument();
+    expect(screen.getByText("No verified farm manager yet")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit Score" })).toBeInTheDocument();
+    expect(screen.getByText("Phase 6 Benchmarks")).toBeInTheDocument();
+    expect(screen.getByText("Filtered source cases")).toBeInTheDocument();
+    expect(screen.getByText("Total consented: 1")).toBeInTheDocument();
+    expect(screen.getByText("pl_quality_test: 1")).toBeInTheDocument();
+    expect(screen.getByText("moderate: 1")).toBeInTheDocument();
+    expect(screen.getByText("Benchmark Trend")).toBeInTheDocument();
+    expect(screen.getByText("2026-06")).toBeInTheDocument();
+    expect(screen.getByText("Hatchery 1 | Investor 1")).toBeInTheDocument();
     expect(screen.getByText("Deliver Report")).toBeInTheDocument();
-  }, 10000);
+  }, 15000);
 
   it("blocks commercial admin page for non-admin users", async () => {
     server.use(

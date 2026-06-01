@@ -408,7 +408,8 @@ Behavior:
 - Service detail page shows deliverables, required data, price range, and call to action.
 - Knowledge page lists free and paid content with filters.
 - Content detail page shows free content directly and paid content as locked unless access is granted.
-- Intake page requires authentication before submission; unauthenticated users should be redirected to sign in with intended path preserved if current route handling supports it.
+- Intake page requires authentication before submission.
+- Unauthenticated users should be redirected to sign in with intended path preserved if current route handling supports it.
 
 ### Dashboard Routes
 
@@ -663,14 +664,18 @@ Required new tests:
 ### Phase 5 — AI-Assisted Advisory
 
 - Internal assistant brief generation exists for admin users.
-- Assistant briefs summarize advisory intake, missing data, linked files, expert review records, existing reports, retainer cadence, and Mnemon-aligned cited source references.
+- Assistant briefs summarize advisory intake, missing data, linked files, expert review records, existing reports, retainer cadence,
+  and Mnemon-aligned cited source references.
 - Assistant drafts can seed the advisory report form, but remain internal first-pass material with generated/accepted audit records.
 - Uploaded case file metadata is normalized with case-private ownership fields and checked before assistant draft use.
 - Assistant-generated report records stay internal with `expert_review_required` status until an admin delivers a reviewed report.
 - Admin users can transition reviewed reports to `delivered`, which marks the case `report_ready` and indexes the delivered report as a case-private advisory source.
+- Operator users can browse assistant brief logs and report workflow events from the commercial admin surface.
+- Admin users can ask controlled source-cited internal assistant questions against Teramina advisory sources.
+- Client advisory detail renders delivered report citations and a disabled assistant preview for future source-cited client AI.
 - Retrieval stays on the active MongoEngine/MongoDB Mnemon track; Postgres/pgvector remains deferred.
 - Commercial documents and advisory outputs are indexed as advisory source embeddings, not farmer-visible `AgentMemory`.
-- Allow client-facing AI only after citation, access isolation, and safety behavior are validated.
+- Client-facing AI remains disabled until citation, access isolation, and safety behavior are validated.
 
 #### Completed First Slice
 
@@ -685,17 +690,52 @@ Required new tests:
 - [x] Add client/data isolation checks for uploaded case documents.
 - [x] Add internal report drafting with citation blocks and expert-review-required status.
 - [x] Add review/publish workflow for converting `expert_review_required` reports into delivered client reports.
+- [x] Add source snippets and document IDs to future conversational assistant citation payloads.
+- [x] Add operator UI for browsing assistant brief logs and report workflow history.
+- [x] Add controlled internal assistant answers with citations, safety flags, and admin-only access.
+- [x] Add persisted assistant answer logs for internal assistant audit review.
+- [x] Add citation rendering to delivered report and disabled future client-facing assistant UI.
+- [x] Keep client-facing assistant access disabled while the quality/isolation gate remains closed.
 - [x] Cover assistant brief behavior in backend and frontend tests.
 
 #### Remaining Todo List
 
-- Add source snippets and document IDs to any future conversational assistant answers.
-- Add operator UI for browsing assistant brief logs and report workflow history.
+- No open Phase 5 implementation items. Do not enable client-facing assistant access without a separate quality and isolation review.
 
 ### Phase 6 — Hatchery And Investor Modules
 
-- Add hatchery profile, broodstock batches, maturation performance, spawning logs, nauplii output, PL quality tests.
-- Add investor feasibility and due-diligence scoring reports.
+- Admin hatchery profiles exist for advisory-linked hatchery clients.
+- Admin hatchery operational records exist for broodstock batches, maturation performance, spawning logs, nauplii output,
+  and PL quality tests.
+- Admin investor feasibility and due-diligence score records exist for investor advisory cases.
+- Assistant briefs include linked hatchery records and investor scores when those records are attached to the case.
+- Client advisory case detail shows hatchery and investor records only when an admin marks each record `client_visible`.
+- Investor due-diligence scores can generate internal draft advisory reports with `expert_review_required` status.
+- Phase 6 benchmark aggregation exists only for cases with active owner-accepted benchmark consent records.
+- Phase 6 benchmark dashboard supports validated segment/month filters, filtered source-case counts, total consented-case counts,
+  and monthly trends for consented records.
+
+#### Completed First Slice
+
+- [x] Add hatchery profile records with owner user, linked case, capacity, biosecurity, water source, and notes.
+- [x] Add hatchery operational records with typed KPI records and flexible metric payloads.
+- [x] Add investor due-diligence scores with technical, management, biosecurity, market, and financial scoring.
+- [x] Compute investor overall score and risk level for internal review.
+- [x] Add Commercial Admin controls for hatchery profile, hatchery KPI records, and investor scoring.
+- [x] Cover Phase 6 service behavior in backend tests and admin rendering in frontend tests.
+- [x] Add explicit client visibility gates and client advisory detail rendering for approved Phase 6 records.
+- [x] Replace the generic hatchery metric key/value UI with KPI fields per hatchery record type.
+- [x] Add due-diligence report generation from investor scores, assumptions, red flags, and recommendation fields.
+- [x] Add consent-scoped benchmark aggregation for anonymized hatchery and investor records.
+- [x] Add formal client benchmark consent terms acceptance and revocation flow.
+- [x] Add benchmark breakdowns by hatchery record type and investor risk level.
+- [x] Add editable Phase 6 hatchery/investor records with revision history.
+- [x] Add trend and segment filters to benchmark dashboards for consented records.
+- [x] Make benchmark case counts filter-aware while preserving total consented case count.
+
+#### Remaining Todo List
+
+- No open Phase 6 implementation items.
 
 ---
 

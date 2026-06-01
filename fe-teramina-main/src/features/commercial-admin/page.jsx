@@ -15,15 +15,31 @@ import {
 import { useUserProfile } from "features/user/queries";
 import {
   useAcceptAdvisoryAssistantBrief,
+  useAdminAssistantAnswerLogs,
+  useAdminAssistantBriefLogs,
   useAdminAdvisoryCases,
   useAdminExpertReviews,
   useGenerateAdvisoryAssistantBrief,
+  useAskAdvisoryAssistant,
+  useAdminHatcheries,
+  useAdminHatcheryRecords,
+  useAdminInvestorScores,
+  useAdminPhaseSixBenchmarks,
+  useAdminPhaseSixRevisions,
   useCreateAdvisoryReport,
   useCreateExpertReview,
+  useCreateHatcheryProfile,
+  useCreateHatcheryRecord,
+  useCreateInvestorScore,
+  useCreateInvestorScoreReport,
   useCreateReportFromAdvisoryAssistantBrief,
   useCreateRetainerCadence,
   useAdminAdvisoryReports,
+  useAdminReportWorkflowEvents,
   useAdminRetainerCadences,
+  useUpdateHatcheryProfile,
+  useUpdateHatcheryRecord,
+  useUpdateInvestorScore,
   useUpdateAdvisoryCase,
   useUpdateAdvisoryReportWorkflow,
 } from "features/advisory/queries";
@@ -62,7 +78,32 @@ const expertReviewTypes = ["technical", "disease", "economics", "hatchery", "inv
 const retainerCadenceTypes = ["weekly", "biweekly", "monthly", "custom"];
 const retainerCadenceStatuses = ["active", "paused", "completed", "cancelled"];
 const reportStatuses = ["draft", "expert_review_required", "delivered"];
+const hatcheryRecordTypes = ["broodstock_batch", "maturation_performance", "spawning_log", "nauplii_output", "pl_quality_test"];
+const investorProjectTypes = ["farm", "hatchery", "integrated"];
+const investorRiskLevels = ["low", "moderate", "high", "critical"];
 const formatIdr = (value) => `Rp ${Number(value || 0).toLocaleString("id-ID")}`;
+const numberOrNull = (value) => (value === "" || value === null || value === undefined ? null : Number(value));
+const boolFromSelect = (value) => value === "true";
+const datetimeInputValue = (value) => (value ? value.slice(0, 16) : "");
+
+const hatcheryMetricFields = {
+  broodstock_batch: ["female_count", "male_count", "mortality_count"],
+  maturation_performance: ["mating_rate", "spawning_rate"],
+  spawning_log: ["spawning_rate", "hatching_rate"],
+  nauplii_output: ["nauplii_count", "hatching_rate"],
+  pl_quality_test: ["pl_quality_score", "pcr_status"],
+};
+
+const buildHatcheryMetrics = (form) => {
+  const metrics = {};
+  (hatcheryMetricFields[form.record_type] || []).forEach((field) => {
+    const value = form[field];
+    if (value === "") return;
+    const numericValue = Number(value);
+    metrics[field] = Number.isNaN(numericValue) ? value : numericValue;
+  });
+  return metrics;
+};
 
 const AdminSection = ({ title, description, children }) => (
   <Paper variant="outlined" sx={{ p: 3 }}>
@@ -83,8 +124,15 @@ const CommercialAdminPage = () => {
   const { data: accessGrants = [] } = useAdminContentAccess(isAdmin);
   const { data: cases = [], isLoading: casesLoading } = useAdminAdvisoryCases(isAdmin);
   const { data: adminReports = [] } = useAdminAdvisoryReports(isAdmin);
+  const { data: assistantBriefLogs = [] } = useAdminAssistantBriefLogs(isAdmin);
+  const { data: assistantAnswerLogs = [] } = useAdminAssistantAnswerLogs(isAdmin);
+  const { data: reportWorkflowEvents = [] } = useAdminReportWorkflowEvents(isAdmin);
   const { data: expertReviews = [] } = useAdminExpertReviews(isAdmin);
   const { data: retainerCadences = [] } = useAdminRetainerCadences(isAdmin);
+  const { data: hatcheries = [] } = useAdminHatcheries(isAdmin);
+  const { data: hatcheryRecords = [] } = useAdminHatcheryRecords(isAdmin);
+  const { data: investorScores = [] } = useAdminInvestorScores(isAdmin);
+  const { data: phaseSixRevisions = [] } = useAdminPhaseSixRevisions(isAdmin);
   const { data: invoices = [] } = useAdminInvoices(isAdmin);
   const createContent = useCreateContentItem();
   const [selectedContentId, setSelectedContentId] = useState("");
@@ -95,12 +143,20 @@ const CommercialAdminPage = () => {
   const transitionContentWorkflow = useTransitionContentWorkflow();
   const updateCase = useUpdateAdvisoryCase();
   const assistantBrief = useGenerateAdvisoryAssistantBrief();
+  const assistantAnswer = useAskAdvisoryAssistant();
   const acceptAssistantBrief = useAcceptAdvisoryAssistantBrief();
   const createAssistantDraftReport = useCreateReportFromAdvisoryAssistantBrief();
   const createReport = useCreateAdvisoryReport();
   const updateReportWorkflow = useUpdateAdvisoryReportWorkflow();
   const createExpertReview = useCreateExpertReview();
   const createRetainerCadence = useCreateRetainerCadence();
+  const createHatcheryProfile = useCreateHatcheryProfile();
+  const createHatcheryRecord = useCreateHatcheryRecord();
+  const createInvestorScore = useCreateInvestorScore();
+  const createInvestorScoreReport = useCreateInvestorScoreReport();
+  const updateHatcheryProfile = useUpdateHatcheryProfile();
+  const updateHatcheryRecord = useUpdateHatcheryRecord();
+  const updateInvestorScore = useUpdateInvestorScore();
   const createInvoice = useCreateInvoice();
   const markInvoicePaid = useMarkInvoicePaid();
 
@@ -153,6 +209,10 @@ const CommercialAdminPage = () => {
     expert_notes: "",
   });
   const [assistantCaseId, setAssistantCaseId] = useState("");
+  const [assistantAnswerForm, setAssistantAnswerForm] = useState({
+    case_id: "",
+    question: "",
+  });
   const [reportForm, setReportForm] = useState({
     case_id: "",
     title: "",
@@ -186,6 +246,67 @@ const CommercialAdminPage = () => {
     agenda: "",
     notes: "",
   });
+  const [hatcheryProfileForm, setHatcheryProfileForm] = useState({
+    case_id: "",
+    user_id: "",
+    name: "",
+    location: "",
+    maturation_capacity: "",
+    larval_capacity: "",
+    biosecurity_level: "",
+    water_source: "",
+    notes: "",
+    client_visible: "false",
+    change_note: "",
+  });
+  const [editingHatcheryProfileId, setEditingHatcheryProfileId] = useState("");
+  const [hatcheryRecordForm, setHatcheryRecordForm] = useState({
+    hatchery_id: "",
+    record_type: "broodstock_batch",
+    record_date: "",
+    batch_code: "",
+    broodstock_source: "",
+    client_visible: "false",
+    female_count: "",
+    male_count: "",
+    mortality_count: "",
+    mating_rate: "",
+    spawning_rate: "",
+    hatching_rate: "",
+    nauplii_count: "",
+    pl_quality_score: "",
+    pcr_status: "",
+    notes: "",
+    change_note: "",
+  });
+  const [editingHatcheryRecordId, setEditingHatcheryRecordId] = useState("");
+  const [investorScoreForm, setInvestorScoreForm] = useState({
+    case_id: "",
+    project_type: "farm",
+    location: "",
+    planned_capacity: "",
+    capex_estimate_idr: "",
+    opex_estimate_idr: "",
+    technical_score: "",
+    management_score: "",
+    biosecurity_score: "",
+    market_score: "",
+    financial_score: "",
+    red_flags: "",
+    recommendations: "",
+    assumptions: "",
+    client_visible: "false",
+    change_note: "",
+  });
+  const [editingInvestorScoreId, setEditingInvestorScoreId] = useState("");
+  const [phaseSixBenchmarkFilters, setPhaseSixBenchmarkFilters] = useState({
+    record_type: "",
+    risk_level: "",
+    project_type: "",
+    from_month: "",
+    to_month: "",
+  });
+  const { data: phaseSixBenchmarks } = useAdminPhaseSixBenchmarks(isAdmin, phaseSixBenchmarkFilters);
   const [invoiceForm, setInvoiceForm] = useState({
     user_id: "",
     invoice_type: "content_access",
@@ -222,6 +343,12 @@ const CommercialAdminPage = () => {
       setAssistantCaseId(cases[0].id);
     }
   }, [assistantCaseId, cases]);
+
+  useEffect(() => {
+    if (!hatcheryRecordForm.hatchery_id && hatcheries.length) {
+      setHatcheryRecordForm((prev) => ({ ...prev, hatchery_id: hatcheries[0].id }));
+    }
+  }, [hatcheries, hatcheryRecordForm.hatchery_id]);
 
   useEffect(() => {
     if (!reportWorkflowForm.report_id && adminReports.length) {
@@ -389,7 +516,10 @@ const CommercialAdminPage = () => {
     event.preventDefault();
     await updateCase.mutateAsync({
       caseId: caseForm.caseId,
-      payload: { status: caseForm.status, expert_notes: caseForm.expert_notes },
+      payload: {
+        status: caseForm.status,
+        expert_notes: caseForm.expert_notes,
+      },
     });
   };
 
@@ -420,6 +550,15 @@ const CommercialAdminPage = () => {
     await createAssistantDraftReport.mutateAsync({
       logId: assistantBrief.data.brief_log_id,
       status: "expert_review_required",
+    });
+  };
+
+  const submitAssistantAnswer = async (event) => {
+    event.preventDefault();
+    await assistantAnswer.mutateAsync({
+      case_id: assistantAnswerForm.case_id,
+      question: assistantAnswerForm.question,
+      limit: 6,
     });
   };
 
@@ -483,6 +622,215 @@ const CommercialAdminPage = () => {
       notes: retainerCadenceForm.notes,
     });
     setRetainerCadenceForm((prev) => ({ ...prev, agenda: "", notes: "" }));
+  };
+
+  const hatcheryProfilePayload = () => ({
+    case_id: hatcheryProfileForm.case_id,
+    user_id: hatcheryProfileForm.user_id,
+    name: hatcheryProfileForm.name,
+    location: hatcheryProfileForm.location,
+    maturation_capacity: numberOrNull(hatcheryProfileForm.maturation_capacity),
+    larval_capacity: numberOrNull(hatcheryProfileForm.larval_capacity),
+    biosecurity_level: hatcheryProfileForm.biosecurity_level,
+    water_source: hatcheryProfileForm.water_source,
+    notes: hatcheryProfileForm.notes,
+    client_visible: boolFromSelect(hatcheryProfileForm.client_visible),
+    change_note: hatcheryProfileForm.change_note,
+  });
+
+  const submitHatcheryProfile = async (event) => {
+    event.preventDefault();
+    if (editingHatcheryProfileId) {
+      await updateHatcheryProfile.mutateAsync({
+        hatcheryId: editingHatcheryProfileId,
+        payload: hatcheryProfilePayload(),
+      });
+      setEditingHatcheryProfileId("");
+    } else {
+      await createHatcheryProfile.mutateAsync(hatcheryProfilePayload());
+    }
+    setHatcheryProfileForm((prev) => ({ ...prev, name: "", location: "", notes: "", change_note: "" }));
+  };
+
+  const editHatcheryProfile = (hatchery) => {
+    setEditingHatcheryProfileId(hatchery.id);
+    setHatcheryProfileForm({
+      case_id: hatchery.case_id || "",
+      user_id: hatchery.user_id || "",
+      name: hatchery.name || "",
+      location: hatchery.location || "",
+      maturation_capacity: hatchery.maturation_capacity ?? "",
+      larval_capacity: hatchery.larval_capacity ?? "",
+      biosecurity_level: hatchery.biosecurity_level || "",
+      water_source: hatchery.water_source || "",
+      notes: hatchery.notes || "",
+      client_visible: hatchery.client_visible ? "true" : "false",
+      change_note: "",
+    });
+  };
+
+  const resetHatcheryProfileEdit = () => {
+    setEditingHatcheryProfileId("");
+    setHatcheryProfileForm((prev) => ({
+      ...prev,
+      name: "",
+      location: "",
+      maturation_capacity: "",
+      larval_capacity: "",
+      biosecurity_level: "",
+      water_source: "",
+      notes: "",
+      client_visible: "false",
+      change_note: "",
+    }));
+  };
+
+  const hatcheryRecordPayload = () => ({
+    hatchery_id: hatcheryRecordForm.hatchery_id,
+    record_type: hatcheryRecordForm.record_type,
+    record_date: hatcheryRecordForm.record_date ? new Date(hatcheryRecordForm.record_date).toISOString() : null,
+    batch_code: hatcheryRecordForm.batch_code,
+    broodstock_source: hatcheryRecordForm.broodstock_source,
+    metrics: buildHatcheryMetrics(hatcheryRecordForm),
+    notes: hatcheryRecordForm.notes,
+    client_visible: boolFromSelect(hatcheryRecordForm.client_visible),
+    change_note: hatcheryRecordForm.change_note,
+  });
+
+  const resetHatcheryRecordForm = () => {
+    setHatcheryRecordForm((prev) => ({
+      ...prev,
+      batch_code: "",
+      broodstock_source: "",
+      female_count: "",
+      male_count: "",
+      mortality_count: "",
+      mating_rate: "",
+      spawning_rate: "",
+      hatching_rate: "",
+      nauplii_count: "",
+      pl_quality_score: "",
+      pcr_status: "",
+      notes: "",
+      change_note: "",
+    }));
+  };
+
+  const submitHatcheryRecord = async (event) => {
+    event.preventDefault();
+    if (editingHatcheryRecordId) {
+      await updateHatcheryRecord.mutateAsync({
+        recordId: editingHatcheryRecordId,
+        payload: hatcheryRecordPayload(),
+      });
+      setEditingHatcheryRecordId("");
+    } else {
+      await createHatcheryRecord.mutateAsync(hatcheryRecordPayload());
+    }
+    resetHatcheryRecordForm();
+  };
+
+  const editHatcheryRecord = (record) => {
+    const metrics = record.metrics || {};
+    setEditingHatcheryRecordId(record.id);
+    setHatcheryRecordForm({
+      hatchery_id: record.hatchery_id || "",
+      record_type: record.record_type || "broodstock_batch",
+      record_date: datetimeInputValue(record.record_date),
+      batch_code: record.batch_code || "",
+      broodstock_source: record.broodstock_source || "",
+      client_visible: record.client_visible ? "true" : "false",
+      female_count: metrics.female_count ?? "",
+      male_count: metrics.male_count ?? "",
+      mortality_count: metrics.mortality_count ?? "",
+      mating_rate: metrics.mating_rate ?? "",
+      spawning_rate: metrics.spawning_rate ?? "",
+      hatching_rate: metrics.hatching_rate ?? "",
+      nauplii_count: metrics.nauplii_count ?? "",
+      pl_quality_score: metrics.pl_quality_score ?? "",
+      pcr_status: metrics.pcr_status ?? "",
+      notes: record.notes || "",
+      change_note: "",
+    });
+  };
+
+  const resetHatcheryRecordEdit = () => {
+    setEditingHatcheryRecordId("");
+    resetHatcheryRecordForm();
+  };
+
+  const investorScorePayload = () => ({
+    case_id: investorScoreForm.case_id,
+    project_type: investorScoreForm.project_type,
+    location: investorScoreForm.location,
+    planned_capacity: investorScoreForm.planned_capacity,
+    capex_estimate_idr: numberOrNull(investorScoreForm.capex_estimate_idr),
+    opex_estimate_idr: numberOrNull(investorScoreForm.opex_estimate_idr),
+    technical_score: Number(investorScoreForm.technical_score || 0),
+    management_score: Number(investorScoreForm.management_score || 0),
+    biosecurity_score: Number(investorScoreForm.biosecurity_score || 0),
+    market_score: Number(investorScoreForm.market_score || 0),
+    financial_score: Number(investorScoreForm.financial_score || 0),
+    red_flags: listFromText(investorScoreForm.red_flags),
+    recommendations: listFromText(investorScoreForm.recommendations),
+    assumptions: listFromText(investorScoreForm.assumptions),
+    client_visible: boolFromSelect(investorScoreForm.client_visible),
+    change_note: investorScoreForm.change_note,
+  });
+
+  const submitInvestorScore = async (event) => {
+    event.preventDefault();
+    if (editingInvestorScoreId) {
+      await updateInvestorScore.mutateAsync({
+        scoreId: editingInvestorScoreId,
+        payload: investorScorePayload(),
+      });
+      setEditingInvestorScoreId("");
+    } else {
+      await createInvestorScore.mutateAsync(investorScorePayload());
+    }
+    setInvestorScoreForm((prev) => ({ ...prev, red_flags: "", recommendations: "", assumptions: "", change_note: "" }));
+  };
+
+  const editInvestorScore = (score) => {
+    setEditingInvestorScoreId(score.id);
+    setInvestorScoreForm({
+      case_id: score.case_id || "",
+      project_type: score.project_type || "farm",
+      location: score.location || "",
+      planned_capacity: score.planned_capacity || "",
+      capex_estimate_idr: score.capex_estimate_idr ?? "",
+      opex_estimate_idr: score.opex_estimate_idr ?? "",
+      technical_score: score.technical_score ?? "",
+      management_score: score.management_score ?? "",
+      biosecurity_score: score.biosecurity_score ?? "",
+      market_score: score.market_score ?? "",
+      financial_score: score.financial_score ?? "",
+      red_flags: (score.red_flags || []).join("\n"),
+      recommendations: (score.recommendations || []).join("\n"),
+      assumptions: (score.assumptions || []).join("\n"),
+      client_visible: score.client_visible ? "true" : "false",
+      change_note: "",
+    });
+  };
+
+  const resetInvestorScoreEdit = () => {
+    setEditingInvestorScoreId("");
+    setInvestorScoreForm((prev) => ({
+      ...prev,
+      location: "",
+      planned_capacity: "",
+      capex_estimate_idr: "",
+      opex_estimate_idr: "",
+      red_flags: "",
+      recommendations: "",
+      assumptions: "",
+      change_note: "",
+    }));
+  };
+
+  const createInvestorDraftReport = async (scoreId) => {
+    await createInvestorScoreReport.mutateAsync({ scoreId, status: "expert_review_required" });
   };
 
   return (
@@ -999,6 +1347,65 @@ const CommercialAdminPage = () => {
           </Box>
         </AdminSection>
 
+        <AdminSection title="Controlled Assistant" description="Ask an internal source-cited question against Teramina advisory knowledge.">
+          {assistantAnswer.isError && <Alert severity="error">Failed to generate assistant answer.</Alert>}
+          <Box sx={{ display: "grid", gap: 3, gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" } }}>
+            <Stack component="form" gap={2} onSubmit={submitAssistantAnswer}>
+              <TextField
+                select
+                label="Case scope"
+                value={assistantAnswerForm.case_id}
+                onChange={(e) => setAssistantAnswerForm((prev) => ({ ...prev, case_id: e.target.value }))}
+              >
+                <MenuItem value="">Knowledge only</MenuItem>
+                {cases.map((item) => <MenuItem key={item.id} value={item.id}>{item.title}</MenuItem>)}
+              </TextField>
+              <TextField
+                id="assistant-question"
+                label="Assistant question"
+                value={assistantAnswerForm.question}
+                onChange={(e) => setAssistantAnswerForm((prev) => ({ ...prev, question: e.target.value }))}
+                multiline
+                minRows={3}
+                slotProps={{ htmlInput: { "data-testid": "assistant-question" } }}
+                required
+              />
+              <Button type="submit" variant="contained" disabled={!assistantAnswerForm.question || assistantAnswer.isPending}>
+                {assistantAnswer.isPending ? "Asking..." : "Ask Assistant"}
+              </Button>
+              <Alert severity="info">
+                Internal source-cited drafting only. Do not use for disease diagnosis or client delivery without expert review.
+              </Alert>
+            </Stack>
+
+            <Stack gap={1.5}>
+              {assistantAnswer.data ? (
+                <>
+                  <Typography variant="h6" fontWeight={700}>{assistantAnswer.data.status}</Typography>
+                  <Typography variant="body2">{assistantAnswer.data.answer}</Typography>
+                  <Typography variant="subtitle2">Answer Draft</Typography>
+                  <Stack component="ul" sx={{ pl: 2, my: 0 }}>
+                    {(assistantAnswer.data.answer_bullets || []).map((item) => (
+                      <Typography key={item} component="li" variant="body2">{item}</Typography>
+                    ))}
+                  </Stack>
+                  <Typography variant="subtitle2">Citations</Typography>
+                  {(assistantAnswer.data.source_citations || []).map((item) => (
+                    <Typography key={item.source_ref} variant="body2" color="text.secondary">
+                      {item.title} | {item.document_id} | {item.source_snippet}
+                    </Typography>
+                  ))}
+                  {!!assistantAnswer.data.safety_flags?.length && (
+                    <Alert severity="warning">{assistantAnswer.data.safety_flags.join(" ")}</Alert>
+                  )}
+                </>
+              ) : (
+                <Alert severity="info">Ask a question to generate a controlled source-cited internal answer.</Alert>
+              )}
+            </Stack>
+          </Box>
+        </AdminSection>
+
         <AdminSection title="Expert Review Forms" description="Capture structured technical review notes before or alongside the final advisory report.">
           {createExpertReview.isError && <Alert severity="error">Failed to create expert review.</Alert>}
           {createExpertReview.isSuccess && <Alert severity="success">Expert review created.</Alert>}
@@ -1176,6 +1583,569 @@ const CommercialAdminPage = () => {
           </Box>
         </AdminSection>
 
+        <AdminSection title="Hatchery Intelligence" description="Capture hatchery profiles and operational KPI records for advisory cases.">
+          <Box sx={{ display: "grid", gap: 3, gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" } }}>
+            <Stack gap={2}>
+              {createHatcheryProfile.isError && <Alert severity="error">Failed to create hatchery profile.</Alert>}
+              {createHatcheryProfile.isSuccess && <Alert severity="success">Hatchery profile created.</Alert>}
+              {updateHatcheryProfile.isError && <Alert severity="error">Failed to update hatchery profile.</Alert>}
+              {updateHatcheryProfile.isSuccess && <Alert severity="success">Hatchery profile updated.</Alert>}
+              <Stack component="form" gap={2} onSubmit={submitHatcheryProfile}>
+                <Stack direction="row" gap={1} sx={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                  <Typography variant="h6" fontWeight={700}>{editingHatcheryProfileId ? "Edit Hatchery Profile" : "Create Hatchery Profile"}</Typography>
+                  {editingHatcheryProfileId && <Button size="small" onClick={resetHatcheryProfileEdit}>Cancel Edit</Button>}
+                </Stack>
+                <TextField
+                  select
+                  label="Linked case"
+                  value={hatcheryProfileForm.case_id}
+                  onChange={(e) => setHatcheryProfileForm((prev) => ({ ...prev, case_id: e.target.value }))}
+                  disabled={!!editingHatcheryProfileId}
+                >
+                  <MenuItem value="">No case</MenuItem>
+                  {cases.map((item) => <MenuItem key={item.id} value={item.id}>{item.title}</MenuItem>)}
+                </TextField>
+                <TextField
+                  label="Owner user ID"
+                  value={hatcheryProfileForm.user_id}
+                  onChange={(e) => setHatcheryProfileForm((prev) => ({ ...prev, user_id: e.target.value }))}
+                  helperText="Required only when no case is linked."
+                  disabled={!!editingHatcheryProfileId}
+                />
+                <TextField
+                  label="Hatchery name"
+                  value={hatcheryProfileForm.name}
+                  onChange={(e) => setHatcheryProfileForm((prev) => ({ ...prev, name: e.target.value }))}
+                  required
+                />
+                <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
+                  <TextField
+                    label="Location"
+                    value={hatcheryProfileForm.location}
+                    onChange={(e) => setHatcheryProfileForm((prev) => ({ ...prev, location: e.target.value }))}
+                    fullWidth
+                  />
+                  <TextField
+                    label="Biosecurity level"
+                    value={hatcheryProfileForm.biosecurity_level}
+                    onChange={(e) => setHatcheryProfileForm((prev) => ({ ...prev, biosecurity_level: e.target.value }))}
+                    fullWidth
+                  />
+                </Stack>
+                <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
+                  <TextField
+                    label="Maturation capacity"
+                    type="number"
+                    value={hatcheryProfileForm.maturation_capacity}
+                    onChange={(e) => setHatcheryProfileForm((prev) => ({ ...prev, maturation_capacity: e.target.value }))}
+                    fullWidth
+                  />
+                  <TextField
+                    label="Larval capacity"
+                    type="number"
+                    value={hatcheryProfileForm.larval_capacity}
+                    onChange={(e) => setHatcheryProfileForm((prev) => ({ ...prev, larval_capacity: e.target.value }))}
+                    fullWidth
+                  />
+                </Stack>
+                <TextField
+                  label="Water source"
+                  value={hatcheryProfileForm.water_source}
+                  onChange={(e) => setHatcheryProfileForm((prev) => ({ ...prev, water_source: e.target.value }))}
+                />
+                <TextField
+                  select
+                  label="Client visibility"
+                  value={hatcheryProfileForm.client_visible}
+                  onChange={(e) => setHatcheryProfileForm((prev) => ({ ...prev, client_visible: e.target.value }))}
+                >
+                  <MenuItem value="false">Internal only</MenuItem>
+                  <MenuItem value="true">Visible to case owner</MenuItem>
+                </TextField>
+                <TextField
+                  label="Hatchery notes"
+                  value={hatcheryProfileForm.notes}
+                  onChange={(e) => setHatcheryProfileForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  multiline
+                  minRows={3}
+                />
+                {editingHatcheryProfileId && (
+                  <TextField
+                    label="Change note"
+                    value={hatcheryProfileForm.change_note}
+                    onChange={(e) => setHatcheryProfileForm((prev) => ({ ...prev, change_note: e.target.value }))}
+                  />
+                )}
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={!hatcheryProfileForm.name || createHatcheryProfile.isPending || updateHatcheryProfile.isPending}
+                >
+                  {editingHatcheryProfileId ? "Update Hatchery" : "Create Hatchery"}
+                </Button>
+              </Stack>
+
+              <Stack component="form" gap={2} onSubmit={submitHatcheryRecord}>
+                <Stack direction="row" gap={1} sx={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                  <Typography variant="h6" fontWeight={700}>{editingHatcheryRecordId ? "Edit Hatchery Record" : "Add Hatchery Record"}</Typography>
+                  {editingHatcheryRecordId && <Button size="small" onClick={resetHatcheryRecordEdit}>Cancel Edit</Button>}
+                </Stack>
+                {createHatcheryRecord.isError && <Alert severity="error">Failed to create hatchery record.</Alert>}
+                {createHatcheryRecord.isSuccess && <Alert severity="success">Hatchery record created.</Alert>}
+                {updateHatcheryRecord.isError && <Alert severity="error">Failed to update hatchery record.</Alert>}
+                {updateHatcheryRecord.isSuccess && <Alert severity="success">Hatchery record updated.</Alert>}
+                <TextField
+                  select
+                  label="Hatchery"
+                  value={hatcheryRecordForm.hatchery_id}
+                  onChange={(e) => setHatcheryRecordForm((prev) => ({ ...prev, hatchery_id: e.target.value }))}
+                  required
+                  disabled={!!editingHatcheryRecordId}
+                >
+                  {hatcheries.map((item) => <MenuItem key={item.id} value={item.id}>{item.name}</MenuItem>)}
+                </TextField>
+                <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
+                  <TextField
+                    select
+                    label="Record type"
+                    value={hatcheryRecordForm.record_type}
+                    onChange={(e) => setHatcheryRecordForm((prev) => ({ ...prev, record_type: e.target.value }))}
+                    fullWidth
+                  >
+                    {hatcheryRecordTypes.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+                  </TextField>
+                  <TextField
+                    label="Record date"
+                    type="datetime-local"
+                    value={hatcheryRecordForm.record_date}
+                    onChange={(e) => setHatcheryRecordForm((prev) => ({ ...prev, record_date: e.target.value }))}
+                    slotProps={{ inputLabel: { shrink: true } }}
+                    fullWidth
+                  />
+                </Stack>
+                <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
+                  <TextField
+                    label="Batch code"
+                    value={hatcheryRecordForm.batch_code}
+                    onChange={(e) => setHatcheryRecordForm((prev) => ({ ...prev, batch_code: e.target.value }))}
+                    fullWidth
+                  />
+                  <TextField
+                    label="Broodstock source"
+                    value={hatcheryRecordForm.broodstock_source}
+                    onChange={(e) => setHatcheryRecordForm((prev) => ({ ...prev, broodstock_source: e.target.value }))}
+                    fullWidth
+                  />
+                </Stack>
+                {hatcheryRecordForm.record_type === "broodstock_batch" && (
+                  <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
+                    <TextField
+                      label="Female count"
+                      type="number"
+                      value={hatcheryRecordForm.female_count}
+                      onChange={(e) => setHatcheryRecordForm((prev) => ({ ...prev, female_count: e.target.value }))}
+                      fullWidth
+                    />
+                    <TextField
+                      label="Male count"
+                      type="number"
+                      value={hatcheryRecordForm.male_count}
+                      onChange={(e) => setHatcheryRecordForm((prev) => ({ ...prev, male_count: e.target.value }))}
+                      fullWidth
+                    />
+                    <TextField
+                      label="Mortality count"
+                      type="number"
+                      value={hatcheryRecordForm.mortality_count}
+                      onChange={(e) => setHatcheryRecordForm((prev) => ({ ...prev, mortality_count: e.target.value }))}
+                      fullWidth
+                    />
+                  </Stack>
+                )}
+                {["maturation_performance", "spawning_log"].includes(hatcheryRecordForm.record_type) && (
+                  <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
+                    <TextField
+                      label="Mating rate"
+                      type="number"
+                      value={hatcheryRecordForm.mating_rate}
+                      onChange={(e) => setHatcheryRecordForm((prev) => ({ ...prev, mating_rate: e.target.value }))}
+                      fullWidth
+                    />
+                    <TextField
+                      label="Spawning rate"
+                      type="number"
+                      value={hatcheryRecordForm.spawning_rate}
+                      onChange={(e) => setHatcheryRecordForm((prev) => ({ ...prev, spawning_rate: e.target.value }))}
+                      fullWidth
+                    />
+                    <TextField
+                      label="Hatching rate"
+                      type="number"
+                      value={hatcheryRecordForm.hatching_rate}
+                      onChange={(e) => setHatcheryRecordForm((prev) => ({ ...prev, hatching_rate: e.target.value }))}
+                      fullWidth
+                    />
+                  </Stack>
+                )}
+                {hatcheryRecordForm.record_type === "nauplii_output" && (
+                  <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
+                    <TextField
+                      label="Nauplii count"
+                      type="number"
+                      value={hatcheryRecordForm.nauplii_count}
+                      onChange={(e) => setHatcheryRecordForm((prev) => ({ ...prev, nauplii_count: e.target.value }))}
+                      fullWidth
+                    />
+                    <TextField
+                      label="Hatching rate"
+                      type="number"
+                      value={hatcheryRecordForm.hatching_rate}
+                      onChange={(e) => setHatcheryRecordForm((prev) => ({ ...prev, hatching_rate: e.target.value }))}
+                      fullWidth
+                    />
+                  </Stack>
+                )}
+                {hatcheryRecordForm.record_type === "pl_quality_test" && (
+                  <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
+                    <TextField
+                      label="PL quality score"
+                      type="number"
+                      value={hatcheryRecordForm.pl_quality_score}
+                      onChange={(e) => setHatcheryRecordForm((prev) => ({ ...prev, pl_quality_score: e.target.value }))}
+                      fullWidth
+                    />
+                    <TextField
+                      label="PCR status"
+                      value={hatcheryRecordForm.pcr_status}
+                      onChange={(e) => setHatcheryRecordForm((prev) => ({ ...prev, pcr_status: e.target.value }))}
+                      fullWidth
+                    />
+                  </Stack>
+                )}
+                <TextField
+                  select
+                  label="Record visibility"
+                  value={hatcheryRecordForm.client_visible}
+                  onChange={(e) => setHatcheryRecordForm((prev) => ({ ...prev, client_visible: e.target.value }))}
+                >
+                  <MenuItem value="false">Internal only</MenuItem>
+                  <MenuItem value="true">Visible to case owner</MenuItem>
+                </TextField>
+                <TextField
+                  label="Record notes"
+                  value={hatcheryRecordForm.notes}
+                  onChange={(e) => setHatcheryRecordForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  multiline
+                  minRows={3}
+                />
+                {editingHatcheryRecordId && (
+                  <TextField
+                    label="Change note"
+                    value={hatcheryRecordForm.change_note}
+                    onChange={(e) => setHatcheryRecordForm((prev) => ({ ...prev, change_note: e.target.value }))}
+                  />
+                )}
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={!hatcheryRecordForm.hatchery_id || createHatcheryRecord.isPending || updateHatcheryRecord.isPending}
+                >
+                  {editingHatcheryRecordId ? "Update Hatchery Record" : "Create Hatchery Record"}
+                </Button>
+              </Stack>
+            </Stack>
+
+            <Stack gap={1.5}>
+              <Typography variant="subtitle2">Hatchery Profiles</Typography>
+              {hatcheries.slice(0, 5).map((hatchery) => (
+                <Paper key={hatchery.id} variant="outlined" sx={{ p: 1.5 }}>
+                  <Stack direction="row" gap={1} sx={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                    <Typography variant="body2" fontWeight={700}>{hatchery.name}</Typography>
+                    <Button size="small" onClick={() => editHatcheryProfile(hatchery)}>Edit Hatchery</Button>
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">
+                    {hatchery.location || "-"} | biosecurity: {hatchery.biosecurity_level || "-"}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Maturation {hatchery.maturation_capacity || "-"} | larval {hatchery.larval_capacity || "-"}
+                  </Typography>
+                </Paper>
+              ))}
+              {!hatcheries.length && <Alert severity="info">No hatchery profiles yet.</Alert>}
+              <Typography variant="subtitle2">Recent Hatchery Records</Typography>
+              {hatcheryRecords.slice(0, 5).map((record) => (
+                <Paper key={record.id} variant="outlined" sx={{ p: 1.5 }}>
+                  <Stack direction="row" gap={1} sx={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                    <Typography variant="body2" fontWeight={700}>{record.record_type}</Typography>
+                    <Chip size="small" label={record.batch_code || record.hatchery_id} />
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">{record.notes || "-"}</Typography>
+                  <Button size="small" onClick={() => editHatcheryRecord(record)}>Edit Record</Button>
+                </Paper>
+              ))}
+              {!hatcheryRecords.length && <Alert severity="info">No hatchery records yet.</Alert>}
+              <Typography variant="subtitle2">Phase 6 Revisions</Typography>
+              {phaseSixRevisions.slice(0, 5).map((revision) => (
+                <Paper key={revision.id} variant="outlined" sx={{ p: 1.5 }}>
+                  <Stack direction="row" gap={1} sx={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                    <Typography variant="body2" fontWeight={700}>{revision.record_kind}</Typography>
+                    <Chip size="small" label={`Revision ${revision.revision_number}`} />
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">{revision.change_note || "Updated record"}</Typography>
+                </Paper>
+              ))}
+              {!phaseSixRevisions.length && <Alert severity="info">No Phase 6 revisions yet.</Alert>}
+            </Stack>
+          </Box>
+        </AdminSection>
+
+        <AdminSection title="Investor Due Diligence" description="Score technical, management, biosecurity, market, and financial risk for investment cases.">
+          {createInvestorScore.isError && <Alert severity="error">Failed to create investor score.</Alert>}
+          {createInvestorScore.isSuccess && <Alert severity="success">Investor score created.</Alert>}
+          {updateInvestorScore.isError && <Alert severity="error">Failed to update investor score.</Alert>}
+          {updateInvestorScore.isSuccess && <Alert severity="success">Investor score updated.</Alert>}
+          <Box sx={{ display: "grid", gap: 3, gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" } }}>
+            <Stack component="form" gap={2} onSubmit={submitInvestorScore}>
+              <Stack direction="row" gap={1} sx={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                <Typography variant="h6" fontWeight={700}>{editingInvestorScoreId ? "Edit Investor Score" : "Create Investor Score"}</Typography>
+                {editingInvestorScoreId && <Button size="small" onClick={resetInvestorScoreEdit}>Cancel Edit</Button>}
+              </Stack>
+              <TextField
+                select
+                label="Investor case"
+                value={investorScoreForm.case_id}
+                onChange={(e) => setInvestorScoreForm((prev) => ({ ...prev, case_id: e.target.value }))}
+                required
+                disabled={!!editingInvestorScoreId}
+              >
+                {cases
+                  .filter((item) => item.case_type === "investor_due_diligence")
+                  .map((item) => <MenuItem key={item.id} value={item.id}>{item.title}</MenuItem>)}
+              </TextField>
+              <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
+                <TextField
+                  select
+                  label="Project type"
+                  value={investorScoreForm.project_type}
+                  onChange={(e) => setInvestorScoreForm((prev) => ({ ...prev, project_type: e.target.value }))}
+                  fullWidth
+                >
+                  {investorProjectTypes.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+                </TextField>
+                <TextField
+                  label="Location"
+                  value={investorScoreForm.location}
+                  onChange={(e) => setInvestorScoreForm((prev) => ({ ...prev, location: e.target.value }))}
+                  fullWidth
+                />
+              </Stack>
+              <TextField
+                label="Planned capacity"
+                value={investorScoreForm.planned_capacity}
+                onChange={(e) => setInvestorScoreForm((prev) => ({ ...prev, planned_capacity: e.target.value }))}
+              />
+              <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
+                <TextField
+                  label="Capex estimate IDR"
+                  type="number"
+                  value={investorScoreForm.capex_estimate_idr}
+                  onChange={(e) => setInvestorScoreForm((prev) => ({ ...prev, capex_estimate_idr: e.target.value }))}
+                  fullWidth
+                />
+                <TextField
+                  label="Opex estimate IDR"
+                  type="number"
+                  value={investorScoreForm.opex_estimate_idr}
+                  onChange={(e) => setInvestorScoreForm((prev) => ({ ...prev, opex_estimate_idr: e.target.value }))}
+                  fullWidth
+                />
+              </Stack>
+              <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
+                {["technical_score", "management_score", "biosecurity_score", "market_score", "financial_score"].map((field) => (
+                  <TextField
+                    key={field}
+                    label={field.replace("_", " ")}
+                    type="number"
+                    value={investorScoreForm[field]}
+                    onChange={(e) => setInvestorScoreForm((prev) => ({ ...prev, [field]: e.target.value }))}
+                    fullWidth
+                  />
+                ))}
+              </Stack>
+              <TextField
+                label="Red flags, one per line"
+                value={investorScoreForm.red_flags}
+                onChange={(e) => setInvestorScoreForm((prev) => ({ ...prev, red_flags: e.target.value }))}
+                multiline
+                minRows={3}
+              />
+              <TextField
+                label="Recommendations, one per line"
+                value={investorScoreForm.recommendations}
+                onChange={(e) => setInvestorScoreForm((prev) => ({ ...prev, recommendations: e.target.value }))}
+                multiline
+                minRows={3}
+              />
+              <TextField
+                label="Assumptions, one per line"
+                value={investorScoreForm.assumptions}
+                onChange={(e) => setInvestorScoreForm((prev) => ({ ...prev, assumptions: e.target.value }))}
+                multiline
+                minRows={3}
+              />
+              <TextField
+                select
+                label="Score visibility"
+                value={investorScoreForm.client_visible}
+                onChange={(e) => setInvestorScoreForm((prev) => ({ ...prev, client_visible: e.target.value }))}
+              >
+                <MenuItem value="false">Internal only</MenuItem>
+                <MenuItem value="true">Visible to case owner</MenuItem>
+              </TextField>
+              {editingInvestorScoreId && (
+                <TextField
+                  label="Change note"
+                  value={investorScoreForm.change_note}
+                  onChange={(e) => setInvestorScoreForm((prev) => ({ ...prev, change_note: e.target.value }))}
+                />
+              )}
+              <Button
+                type="submit"
+                variant="contained"
+                disabled={!investorScoreForm.case_id || createInvestorScore.isPending || updateInvestorScore.isPending}
+              >
+                {editingInvestorScoreId ? "Update Investor Score" : "Create Investor Score"}
+              </Button>
+            </Stack>
+
+            <Stack gap={1.5}>
+              <Typography variant="subtitle2">Recent Investor Scores</Typography>
+              {investorScores.slice(0, 5).map((score) => (
+                <Paper key={score.id} variant="outlined" sx={{ p: 1.5 }}>
+                  <Stack direction="row" gap={1} sx={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                    <Typography variant="body2" fontWeight={700}>{score.project_type} | {score.location || "-"}</Typography>
+                    <Chip size="small" label={`${score.overall_score} / ${score.risk_level}`} />
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">{score.planned_capacity || "-"}</Typography>
+                  {!!score.red_flags?.length && <Typography variant="body2">{score.red_flags[0]}</Typography>}
+                  <Stack direction="row" gap={1} sx={{ mt: 1, flexWrap: "wrap" }}>
+                    <Chip size="small" variant="outlined" label={score.client_visible ? "client visible" : "internal"} />
+                    <Button size="small" onClick={() => editInvestorScore(score)}>Edit Score</Button>
+                    <Button size="small" onClick={() => createInvestorDraftReport(score.id)} disabled={createInvestorScoreReport.isPending}>
+                      Create DD Report
+                    </Button>
+                  </Stack>
+                </Paper>
+              ))}
+              {!investorScores.length && <Alert severity="info">No investor due-diligence scores yet.</Alert>}
+              {createInvestorScoreReport.isError && <Alert severity="error">Failed to create investor report draft.</Alert>}
+              {createInvestorScoreReport.isSuccess && <Alert severity="success">Investor report draft created.</Alert>}
+            </Stack>
+          </Box>
+        </AdminSection>
+
+        <AdminSection title="Phase 6 Benchmarks" description="Aggregate only hatchery and investor records from cases with anonymized benchmark consent.">
+          {phaseSixBenchmarks ? (
+            <Stack gap={2}>
+              <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "repeat(5, 1fr)" } }}>
+                <TextField
+                  select
+                  label="Hatchery type"
+                  value={phaseSixBenchmarkFilters.record_type}
+                  onChange={(e) => setPhaseSixBenchmarkFilters((prev) => ({ ...prev, record_type: e.target.value }))}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  {hatcheryRecordTypes.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+                </TextField>
+                <TextField
+                  select
+                  label="Investor risk"
+                  value={phaseSixBenchmarkFilters.risk_level}
+                  onChange={(e) => setPhaseSixBenchmarkFilters((prev) => ({ ...prev, risk_level: e.target.value }))}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  {investorRiskLevels.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+                </TextField>
+                <TextField
+                  select
+                  label="Project type"
+                  value={phaseSixBenchmarkFilters.project_type}
+                  onChange={(e) => setPhaseSixBenchmarkFilters((prev) => ({ ...prev, project_type: e.target.value }))}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  {investorProjectTypes.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+                </TextField>
+                <TextField
+                  label="From month"
+                  type="month"
+                  value={phaseSixBenchmarkFilters.from_month}
+                  onChange={(e) => setPhaseSixBenchmarkFilters((prev) => ({ ...prev, from_month: e.target.value }))}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                />
+                <TextField
+                  label="To month"
+                  type="month"
+                  value={phaseSixBenchmarkFilters.to_month}
+                  onChange={(e) => setPhaseSixBenchmarkFilters((prev) => ({ ...prev, to_month: e.target.value }))}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                />
+              </Box>
+              <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" } }}>
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Typography variant="caption" color="text.secondary">Filtered source cases</Typography>
+                  <Typography variant="h5" fontWeight={700}>{phaseSixBenchmarks.source_case_count || 0}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Total consented: {phaseSixBenchmarks.total_consented_case_count ?? phaseSixBenchmarks.source_case_count ?? 0}
+                  </Typography>
+                </Paper>
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Typography variant="caption" color="text.secondary">Hatchery records</Typography>
+                  <Typography variant="h5" fontWeight={700}>{phaseSixBenchmarks.hatchery?.record_count || 0}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Avg PL score: {phaseSixBenchmarks.hatchery?.average_pl_quality_score ?? "-"}
+                  </Typography>
+                  <Stack direction="row" gap={0.5} sx={{ mt: 1, flexWrap: "wrap" }}>
+                    {Object.entries(phaseSixBenchmarks.hatchery?.record_type_counts || {}).map(([type, count]) => (
+                      <Chip key={type} size="small" variant="outlined" label={`${type}: ${count}`} />
+                    ))}
+                  </Stack>
+                </Paper>
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Typography variant="caption" color="text.secondary">Investor scores</Typography>
+                  <Typography variant="h5" fontWeight={700}>{phaseSixBenchmarks.investor?.score_count || 0}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Avg score: {phaseSixBenchmarks.investor?.average_overall_score ?? "-"}
+                  </Typography>
+                  <Stack direction="row" gap={0.5} sx={{ mt: 1, flexWrap: "wrap" }}>
+                    {Object.entries(phaseSixBenchmarks.investor?.risk_level_counts || {}).map(([level, count]) => (
+                      <Chip key={level} size="small" variant="outlined" label={`${level}: ${count}`} />
+                    ))}
+                  </Stack>
+                </Paper>
+              </Box>
+              <Stack gap={1}>
+                <Typography variant="subtitle2">Benchmark Trend</Typography>
+                {(phaseSixBenchmarks.trend || []).map((item) => (
+                  <Paper key={item.month} variant="outlined" sx={{ p: 1.5 }}>
+                    <Stack direction="row" gap={1} sx={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                      <Typography variant="body2" fontWeight={700}>{item.month}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Hatchery {item.hatchery_record_count} | Investor {item.investor_score_count}
+                      </Typography>
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary">
+                      Avg PL {item.average_pl_quality_score ?? "-"} | Avg DD {item.average_overall_score ?? "-"}
+                    </Typography>
+                  </Paper>
+                ))}
+                {!phaseSixBenchmarks.trend?.length && <Alert severity="info">No benchmark trend rows for the selected filters.</Alert>}
+              </Stack>
+            </Stack>
+          ) : (
+            <Alert severity="info">No consented Phase 6 benchmark data is available yet.</Alert>
+          )}
+        </AdminSection>
+
         <AdminSection title="Deliver Report" description="Create a structured advisory report and mark it delivered when ready for the client.">
           {createReport.isError && <Alert severity="error">Failed to create report.</Alert>}
           {createReport.isSuccess && <Alert severity="success">Report created.</Alert>}
@@ -1282,6 +2252,65 @@ const CommercialAdminPage = () => {
                 ))}
                 {!adminReports.length && <Alert severity="info">No advisory reports yet.</Alert>}
               </Stack>
+            </Stack>
+          </Box>
+        </AdminSection>
+
+        <AdminSection title="Advisory Audit Trail" description="Browse assistant usage and report workflow events for operator review.">
+          <Box sx={{ display: "grid", gap: 3, gridTemplateColumns: { xs: "1fr", lg: "repeat(3, 1fr)" } }}>
+            <Stack gap={1.5}>
+              <Typography variant="h6" fontWeight={700}>Assistant Brief Logs</Typography>
+              {assistantBriefLogs.slice(0, 6).map((log) => (
+                <Paper key={log.id} variant="outlined" sx={{ p: 1.5 }}>
+                  <Stack direction="row" gap={1} sx={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                    <Typography variant="body2" fontWeight={700}>{log.draft_report?.title || log.case_id}</Typography>
+                    <Chip size="small" label={log.status} />
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">
+                    Case {log.case_id} | generated by {log.generated_by || "-"}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Sources: {(log.source_citations || []).length} | accepted report: {log.accepted_report_id || "-"}
+                  </Typography>
+                </Paper>
+              ))}
+              {!assistantBriefLogs.length && <Alert severity="info">No assistant brief logs yet.</Alert>}
+            </Stack>
+
+            <Stack gap={1.5}>
+              <Typography variant="h6" fontWeight={700}>Assistant Answer Logs</Typography>
+              {assistantAnswerLogs.slice(0, 6).map((log) => (
+                <Paper key={log.id} variant="outlined" sx={{ p: 1.5 }}>
+                  <Stack direction="row" gap={1} sx={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                    <Typography variant="body2" fontWeight={700}>{log.question}</Typography>
+                    <Chip size="small" label={log.status} />
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">
+                    Case {log.case_id || "global"} | asked by {log.asked_by || "-"}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Sources: {(log.source_citations || []).length} | safety flags: {(log.safety_flags || []).length}
+                  </Typography>
+                </Paper>
+              ))}
+              {!assistantAnswerLogs.length && <Alert severity="info">No assistant answer logs yet.</Alert>}
+            </Stack>
+
+            <Stack gap={1.5}>
+              <Typography variant="h6" fontWeight={700}>Report Workflow History</Typography>
+              {reportWorkflowEvents.slice(0, 6).map((event) => (
+                <Paper key={event.id} variant="outlined" sx={{ p: 1.5 }}>
+                  <Stack direction="row" gap={1} sx={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                    <Typography variant="body2" fontWeight={700}>{event.report_id}</Typography>
+                    <Chip size="small" label={`${event.previous_status || "new"} -> ${event.new_status}`} />
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">
+                    Case {event.case_id} | changed by {event.changed_by || "-"}
+                  </Typography>
+                  {event.review_note && <Typography variant="body2">{event.review_note}</Typography>}
+                </Paper>
+              ))}
+              {!reportWorkflowEvents.length && <Alert severity="info">No report workflow history yet.</Alert>}
             </Stack>
           </Box>
         </AdminSection>

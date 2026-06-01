@@ -12,7 +12,14 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useAddAdvisoryCaseFile, useAdvisoryCase, useAdvisoryCases, useServicePackages } from "./queries";
+import {
+  useAcceptBenchmarkConsent,
+  useAddAdvisoryCaseFile,
+  useAdvisoryCase,
+  useAdvisoryCases,
+  useRevokeBenchmarkConsent,
+  useServicePackages,
+} from "./queries";
 import { servicePackageFallbacks } from "./catalog";
 
 const formatLabel = (key) =>
@@ -123,6 +130,134 @@ const RetainerCadenceList = ({ cadences = [] }) => {
   );
 };
 
+const HatcheryIntelligenceList = ({ profiles = [], records = [] }) => {
+  if (!profiles.length && !records.length) return null;
+  return (
+    <Paper variant="outlined" sx={{ p: 3 }}>
+      <Stack gap={1.5}>
+        <Typography variant="h5" fontWeight={700}>Hatchery Intelligence</Typography>
+        {profiles.map((profile) => (
+          <Box key={profile.id}>
+            <Typography fontWeight={700}>{profile.name}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {profile.location || "-"} | biosecurity: {profile.biosecurity_level || "-"}
+            </Typography>
+            {profile.notes && <Typography sx={{ whiteSpace: "pre-wrap" }}>{profile.notes}</Typography>}
+          </Box>
+        ))}
+        {!!records.length && <Typography variant="subtitle2">Operational Records</Typography>}
+        {records.map((record) => (
+          <Box key={record.id}>
+            <Stack direction="row" gap={1} sx={{ flexWrap: "wrap" }}>
+              <Chip size="small" label={record.record_type} />
+              {record.batch_code && <Chip size="small" variant="outlined" label={record.batch_code} />}
+            </Stack>
+            <Stack gap={0.5} sx={{ mt: 1 }}>
+              {Object.entries(record.metrics || {}).map(([key, value]) => (
+                <Typography key={key} variant="body2">
+                  {formatLabel(key)}: {String(value)}
+                </Typography>
+              ))}
+            </Stack>
+            {record.notes && <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{record.notes}</Typography>}
+          </Box>
+        ))}
+      </Stack>
+    </Paper>
+  );
+};
+
+const InvestorScoreList = ({ scores = [] }) => {
+  if (!scores.length) return null;
+  return (
+    <Paper variant="outlined" sx={{ p: 3 }}>
+      <Stack gap={1.5}>
+        <Typography variant="h5" fontWeight={700}>Investor Due Diligence</Typography>
+        {scores.map((score) => (
+          <Box key={score.id}>
+            <Stack direction="row" gap={1} sx={{ flexWrap: "wrap" }}>
+              <Chip size="small" label={`${score.overall_score} overall`} />
+              <Chip size="small" variant="outlined" label={`${score.risk_level} risk`} />
+              <Chip size="small" variant="outlined" label={score.project_type} />
+            </Stack>
+            <Typography sx={{ mt: 1 }}>{score.location || "-"} | {score.planned_capacity || "-"}</Typography>
+            <ReportList title="Red flags" items={score.red_flags || []} />
+            <ReportList title="Recommendations" items={score.recommendations || []} />
+          </Box>
+        ))}
+      </Stack>
+    </Paper>
+  );
+};
+
+const CitationList = ({ citations = [] }) => {
+  if (!citations.length) return null;
+  return (
+    <Stack gap={1}>
+      <Typography variant="subtitle2">Source Citations</Typography>
+      {citations.map((citation) => (
+        <Box key={citation.source_ref || citation.document_id || citation.title} sx={{ pl: 1.5, borderLeft: 2, borderColor: "divider" }}>
+          <Typography variant="body2" fontWeight={700}>{citation.title || citation.document_id || "Teramina source"}</Typography>
+          <Typography variant="caption" color="text.secondary">
+            {citation.document_id || citation.source_id || "-"} | {citation.access_scope || "source cited"}
+          </Typography>
+          {(citation.source_snippet || citation.snippet) && (
+            <Typography variant="body2" color="text.secondary">{citation.source_snippet || citation.snippet}</Typography>
+          )}
+        </Box>
+      ))}
+    </Stack>
+  );
+};
+
+const ClientAssistantPreview = ({ citations = [] }) => (
+  <Paper variant="outlined" sx={{ p: 3 }}>
+    <Stack gap={1.5}>
+      <Stack direction="row" gap={1} sx={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+        <Typography variant="h5" fontWeight={700}>Ask Teramina Assistant</Typography>
+        <Chip size="small" label="disabled" />
+      </Stack>
+      <Alert severity="info">Client-facing assistant access is not enabled for this case.</Alert>
+      <CitationList citations={citations} />
+    </Stack>
+  </Paper>
+);
+
+const BenchmarkConsentPanel = ({ caseId, consent }) => {
+  const acceptConsent = useAcceptBenchmarkConsent();
+  const revokeConsent = useRevokeBenchmarkConsent();
+  if (!consent) return null;
+  return (
+    <Paper variant="outlined" sx={{ p: 3 }}>
+      <Stack gap={1.5}>
+        <Stack direction="row" gap={1} sx={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+          <Typography variant="h5" fontWeight={700}>Benchmark Consent</Typography>
+          <Chip size="small" color={consent.active ? "success" : "default"} label={consent.active ? "active" : "not active"} />
+        </Stack>
+        <Typography variant="body2" color="text.secondary">{consent.terms_text}</Typography>
+        {acceptConsent.isError && <Alert severity="error">Failed to accept benchmark consent.</Alert>}
+        {revokeConsent.isError && <Alert severity="error">Failed to revoke benchmark consent.</Alert>}
+        <Stack direction={{ xs: "column", sm: "row" }} gap={1}>
+          <Button
+            variant="contained"
+            disabled={consent.active || acceptConsent.isPending}
+            onClick={() => acceptConsent.mutate(caseId)}
+          >
+            {acceptConsent.isPending ? "Accepting..." : "Accept Benchmark Terms"}
+          </Button>
+          <Button
+            variant="outlined"
+            disabled={!consent.active || revokeConsent.isPending}
+            onClick={() => revokeConsent.mutate(caseId)}
+          >
+            {revokeConsent.isPending ? "Revoking..." : "Revoke Consent"}
+          </Button>
+        </Stack>
+      </Stack>
+    </Paper>
+  );
+};
+
 export const DashboardAdvisoryPage = () => {
   const { data = [], isLoading, isError } = useAdvisoryCases();
 
@@ -218,6 +353,10 @@ export const DashboardAdvisoryDetailPage = () => {
   const report = data?.report;
   const expertReviews = data?.expert_reviews || [];
   const retainerCadences = data?.retainer_cadences || [];
+  const hatcheryProfiles = data?.hatchery_profiles || [];
+  const hatcheryRecords = data?.hatchery_records || [];
+  const investorScores = data?.investor_scores || [];
+  const benchmarkConsent = data?.benchmark_consent;
   const submitFile = async (event) => {
     event.preventDefault();
     await addFile.mutateAsync({ caseId: case_id, payload: fileForm });
@@ -274,6 +413,9 @@ export const DashboardAdvisoryDetailPage = () => {
         )}
         <ExpertReviewList reviews={expertReviews} />
         <RetainerCadenceList cadences={retainerCadences} />
+        <HatcheryIntelligenceList profiles={hatcheryProfiles} records={hatcheryRecords} />
+        <InvestorScoreList scores={investorScores} />
+        <BenchmarkConsentPanel caseId={case_id} consent={benchmarkConsent} />
         {report ? (
           <Paper variant="outlined" sx={{ p: 3 }}>
             <Stack gap={1.5}>
@@ -281,12 +423,14 @@ export const DashboardAdvisoryDetailPage = () => {
               <Typography>{report.executive_summary}</Typography>
               <ReportList title="Key findings" items={report.key_findings || []} />
               <ReportList title="Corrective action plan" items={report.corrective_action_plan || []} />
+              <CitationList citations={report.source_citations || []} />
               {report.file_url && <Button href={report.file_url} target="_blank" rel="noreferrer" variant="contained">Open Report</Button>}
             </Stack>
           </Paper>
         ) : item ? (
           <Alert severity="info">No advisory report has been delivered for this case yet.</Alert>
         ) : null}
+        {item && <ClientAssistantPreview citations={report?.source_citations || []} />}
       </Stack>
     </Container>
   );

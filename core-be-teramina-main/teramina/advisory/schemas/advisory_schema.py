@@ -70,6 +70,12 @@ class AdvisoryAssistantDraftReportSchema(Schema):
     status: str = "expert_review_required"
 
 
+class AdvisoryAssistantAnswerSchema(Schema):
+    question: str
+    case_id: str = ""
+    limit: int = 6
+
+
 class AdvisoryReportWorkflowSchema(Schema):
     status: str
     review_note: str = ""
@@ -94,3 +100,67 @@ class RetainerCadenceSchema(Schema):
     next_review_at: Optional[datetime] = None
     agenda: list[str] = []
     notes: str = ""
+
+
+class HatcheryProfileSchema(Schema):
+    case_id: str = ""
+    user_id: str = ""
+    name: str
+    location: str = ""
+    maturation_capacity: Optional[int] = None
+    larval_capacity: Optional[int] = None
+    biosecurity_level: str = ""
+    water_source: str = ""
+    notes: str = ""
+    client_visible: bool = False
+
+
+class HatcheryProfileUpdateSchema(HatcheryProfileSchema):
+    change_note: str = ""
+
+
+class HatcheryOperationalRecordSchema(Schema):
+    hatchery_id: str
+    case_id: str = ""
+    record_type: str
+    record_date: Optional[datetime] = None
+    batch_code: str = ""
+    broodstock_source: str = ""
+    metrics: dict = {}
+    notes: str = ""
+    client_visible: bool = False
+
+
+class HatcheryOperationalRecordUpdateSchema(HatcheryOperationalRecordSchema):
+    change_note: str = ""
+
+
+class InvestorDueDiligenceScoreSchema(Schema):
+    case_id: str
+    project_type: str = "farm"
+    location: str = ""
+    planned_capacity: str = ""
+    capex_estimate_idr: Optional[int] = None
+    opex_estimate_idr: Optional[int] = None
+    technical_score: float = 0
+    management_score: float = 0
+    biosecurity_score: float = 0
+    market_score: float = 0
+    financial_score: float = 0
+    red_flags: list[str] = []
+    recommendations: list[str] = []
+    assumptions: list[str] = []
+    client_visible: bool = False
+
+
+class InvestorDueDiligenceScoreUpdateSchema(InvestorDueDiligenceScoreSchema):
+    change_note: str = ""
+
+
+class InvestorDueDiligenceReportSchema(Schema):
+    status: str = "expert_review_required"
+    review_note: str = ""
+
+
+class BenchmarkConsentSchema(Schema):
+    terms_version: str = "phase-six-benchmark-v1"

@@ -5,22 +5,39 @@ import pytest
 from django.core.management import call_command
 
 from teramina.advisory.models.advisory_model import (
+    AdvisoryAssistantAnswerLog,
     AdvisoryAssistantBriefLog,
     AdvisoryCase,
     AdvisoryExpertReview,
     AdvisoryReport,
+    AdvisoryReportWorkflowEvent,
     AdvisorySourceEmbedding,
+    BenchmarkConsentRecord,
+    HatcheryOperationalRecord,
+    HatcheryProfile,
+    InvestorDueDiligenceScore,
+    PhaseSixRecordRevision,
     RetainerCadence,
     ServicePackage,
 )
 from teramina.advisory.schemas.advisory_schema import (
     AdvisoryAssistantBriefAcceptSchema,
+    AdvisoryAssistantAnswerSchema,
     AdvisoryAssistantDraftReportSchema,
+    BenchmarkConsentSchema,
     AdvisoryCaseCreateSchema,
     AdvisoryCaseFileSchema,
+    AdvisoryCaseUpdateSchema,
     AdvisoryExpertReviewSchema,
+    HatcheryOperationalRecordUpdateSchema,
     AdvisoryReportSchema,
     AdvisoryReportWorkflowSchema,
+    HatcheryOperationalRecordSchema,
+    HatcheryProfileSchema,
+    HatcheryProfileUpdateSchema,
+    InvestorDueDiligenceReportSchema,
+    InvestorDueDiligenceScoreSchema,
+    InvestorDueDiligenceScoreUpdateSchema,
     RetainerCadenceSchema,
     ServicePackageSchema,
 )
@@ -49,7 +66,14 @@ def clean_commercial_collections():
     ContentRevision.drop_collection()
     ContentItem.drop_collection()
     AdvisoryAssistantBriefLog.drop_collection()
+    AdvisoryAssistantAnswerLog.drop_collection()
+    AdvisoryReportWorkflowEvent.drop_collection()
     AdvisorySourceEmbedding.drop_collection()
+    BenchmarkConsentRecord.drop_collection()
+    InvestorDueDiligenceScore.drop_collection()
+    PhaseSixRecordRevision.drop_collection()
+    HatcheryOperationalRecord.drop_collection()
+    HatcheryProfile.drop_collection()
     RetainerCadence.drop_collection()
     AdvisoryExpertReview.drop_collection()
     AdvisoryReport.drop_collection()
@@ -61,7 +85,14 @@ def clean_commercial_collections():
     ContentRevision.drop_collection()
     ContentItem.drop_collection()
     AdvisoryAssistantBriefLog.drop_collection()
+    AdvisoryAssistantAnswerLog.drop_collection()
+    AdvisoryReportWorkflowEvent.drop_collection()
     AdvisorySourceEmbedding.drop_collection()
+    BenchmarkConsentRecord.drop_collection()
+    InvestorDueDiligenceScore.drop_collection()
+    PhaseSixRecordRevision.drop_collection()
+    HatcheryOperationalRecord.drop_collection()
+    HatcheryProfile.drop_collection()
     RetainerCadence.drop_collection()
     AdvisoryExpertReview.drop_collection()
     AdvisoryReport.drop_collection()
@@ -557,6 +588,318 @@ class TestAdvisoryWorkflow:
         assert code == 200
         assert case_detail.payload["retainer_cadences"][0]["agenda"] == ["Review feed curve", "Check mortality trend"]
 
+    def test_admin_can_create_hatchery_profile_and_operational_record(self, admin_user):
+        _, body = AdvisoryService.create_case(
+            "user-1",
+            AdvisoryCaseCreateSchema(case_type="hatchery_review", title="Maturation performance review"),
+        )
+
+        code, profile = AdvisoryService.create_hatchery_profile(
+            admin_user,
+            HatcheryProfileSchema(
+                case_id=body.payload["case"]["id"],
+                name="Lampung Nauplii Center",
+                location="Lampung",
+                maturation_capacity=1200,
+                larval_capacity=50000000,
+                biosecurity_level="high",
+                water_source="filtered seawater",
+                client_visible=True,
+            ),
+        )
+
+        assert code == 200
+        assert profile.payload["hatchery"]["user_id"] == "user-1"
+
+        code, record = AdvisoryService.create_hatchery_record(
+            admin_user,
+            HatcheryOperationalRecordSchema(
+                hatchery_id=profile.payload["hatchery"]["id"],
+                record_type="pl_quality_test",
+                batch_code="PL-2026-06",
+                metrics={"pl_quality_score": 82, "pcr_status": "pending"},
+                notes="Uniform size, disease result not attached yet.",
+                client_visible=True,
+            ),
+        )
+
+        assert code == 200
+        assert record.payload["record"]["case_id"] == body.payload["case"]["id"]
+        assert record.payload["record"]["metrics"]["pl_quality_score"] == 82
+
+        code, records = AdvisoryService.admin_list_hatchery_records(admin_user, case_id=body.payload["case"]["id"])
+
+        assert code == 200
+        assert records.payload["records"][0]["record_type"] == "pl_quality_test"
+
+        code, updated_profile = AdvisoryService.update_hatchery_profile(
+            admin_user,
+            profile.payload["hatchery"]["id"],
+            HatcheryProfileUpdateSchema(
+                case_id=body.payload["case"]["id"],
+                name="Lampung Nauplii Center Updated",
+                location="Lampung",
+                maturation_capacity=1500,
+                larval_capacity=50000000,
+                biosecurity_level="high",
+                water_source="filtered seawater",
+                client_visible=True,
+                change_note="Capacity review",
+            ),
+        )
+
+        assert code == 200
+        assert updated_profile.payload["hatchery"]["name"] == "Lampung Nauplii Center Updated"
+        assert updated_profile.payload["revision"]["revision_number"] == 1
+        assert updated_profile.payload["revision"]["previous_data"]["name"] == "Lampung Nauplii Center"
+
+        code, updated_record = AdvisoryService.update_hatchery_record(
+            admin_user,
+            record.payload["record"]["id"],
+            HatcheryOperationalRecordUpdateSchema(
+                hatchery_id=profile.payload["hatchery"]["id"],
+                record_type="pl_quality_test",
+                batch_code="PL-2026-06",
+                metrics={"pl_quality_score": 88, "pcr_status": "negative"},
+                notes="PCR cleared after follow-up.",
+                client_visible=True,
+                change_note="PCR result received",
+            ),
+        )
+
+        assert code == 200
+        assert updated_record.payload["record"]["metrics"]["pl_quality_score"] == 88
+        assert PhaseSixRecordRevision.objects(record_kind="hatchery_record").count() == 1
+
+        code, revisions = AdvisoryService.admin_list_phase_six_revisions(admin_user, case_id=body.payload["case"]["id"])
+
+        assert code == 200
+        assert {revision["record_kind"] for revision in revisions.payload["revisions"]} == {"hatchery_profile", "hatchery_record"}
+
+        code, brief = AdvisoryService.build_assistant_brief(admin_user, body.payload["case"]["id"])
+
+        assert code == 200
+        assert "Hatchery operational records: 1" in brief.payload["brief"]["draft_report"]["data_received"]
+        assert brief.payload["brief"]["hatchery_profiles"][0]["name"] == "Lampung Nauplii Center Updated"
+        assert "Linked hatchery records available: pl_quality_test." in brief.payload["brief"]["draft_report"]["key_findings"]
+
+        code, case_detail = AdvisoryService.get_case(body.payload["case"]["id"], "user-1")
+
+        assert code == 200
+        assert case_detail.payload["hatchery_profiles"][0]["name"] == "Lampung Nauplii Center Updated"
+        assert case_detail.payload["hatchery_records"][0]["metrics"]["pl_quality_score"] == 88
+
+    def test_admin_can_create_investor_due_diligence_score(self, admin_user):
+        _, body = AdvisoryService.create_case(
+            "user-1",
+            AdvisoryCaseCreateSchema(
+                case_type="investor_due_diligence",
+                title="Integrated farm feasibility",
+            ),
+        )
+
+        code, score = AdvisoryService.create_investor_due_diligence_score(
+            admin_user,
+            InvestorDueDiligenceScoreSchema(
+                case_id=body.payload["case"]["id"],
+                project_type="integrated",
+                location="Sulawesi",
+                planned_capacity="500 tons/year",
+                capex_estimate_idr=20000000000,
+                opex_estimate_idr=9000000000,
+                technical_score=70,
+                management_score=60,
+                biosecurity_score=50,
+                market_score=80,
+                financial_score=65,
+                red_flags=["No verified farm manager yet"],
+                recommendations=["Validate pond engineering assumptions before investment close"],
+                assumptions=["Capex is preliminary"],
+                client_visible=True,
+            ),
+        )
+
+        assert code == 200
+        assert score.payload["score"]["overall_score"] == 65
+        assert score.payload["score"]["risk_level"] == "moderate"
+
+        code, scores = AdvisoryService.admin_list_investor_due_diligence_scores(admin_user, case_id=body.payload["case"]["id"])
+
+        assert code == 200
+        assert scores.payload["scores"][0]["red_flags"] == ["No verified farm manager yet"]
+
+        code, updated_score = AdvisoryService.update_investor_due_diligence_score(
+            admin_user,
+            score.payload["score"]["id"],
+            InvestorDueDiligenceScoreUpdateSchema(
+                case_id=body.payload["case"]["id"],
+                project_type="integrated",
+                location="Sulawesi",
+                planned_capacity="500 tons/year",
+                capex_estimate_idr=20000000000,
+                opex_estimate_idr=9000000000,
+                technical_score=82,
+                management_score=80,
+                biosecurity_score=76,
+                market_score=84,
+                financial_score=78,
+                red_flags=["Engineering assumptions still require validation"],
+                recommendations=["Validate pond engineering assumptions before investment close"],
+                assumptions=["Capex is preliminary"],
+                client_visible=True,
+                change_note="Updated after management interview",
+            ),
+        )
+
+        assert code == 200
+        assert updated_score.payload["score"]["overall_score"] == 80
+        assert updated_score.payload["score"]["risk_level"] == "low"
+        assert updated_score.payload["revision"]["previous_data"]["risk_level"] == "moderate"
+
+        code, brief = AdvisoryService.build_assistant_brief(admin_user, body.payload["case"]["id"])
+
+        assert code == 200
+        assert "Investor due-diligence score: 80.0 (low)" in brief.payload["brief"]["draft_report"]["data_received"]
+        assert brief.payload["brief"]["investor_scores"][0]["risk_level"] == "low"
+
+        code, report = AdvisoryService.create_report_from_investor_score(
+            admin_user,
+            score.payload["score"]["id"],
+            InvestorDueDiligenceReportSchema(),
+        )
+
+        assert code == 200
+        assert report.payload["report"]["status"] == "expert_review_required"
+        assert "Overall score is 80.0 with low risk." in report.payload["report"]["executive_summary"]
+        assert report.payload["report"]["likely_causes"] == ["Engineering assumptions still require validation"]
+
+        code, case_detail = AdvisoryService.get_case(body.payload["case"]["id"], "user-1")
+
+        assert code == 200
+        assert case_detail.payload["investor_scores"][0]["overall_score"] == 80.0
+
+    def test_investor_score_requires_investor_case(self, admin_user):
+        _, body = AdvisoryService.create_case(
+            "user-1",
+            AdvisoryCaseCreateSchema(case_type="farm_diagnostic", title="Farm case"),
+        )
+
+        code, error = AdvisoryService.create_investor_due_diligence_score(
+            admin_user,
+            InvestorDueDiligenceScoreSchema(case_id=body.payload["case"]["id"], technical_score=80),
+        )
+
+        assert code == 400
+        assert error.message == "Case is not an investor due-diligence case"
+
+    def test_phase_six_benchmarks_use_only_cases_with_active_owner_consent(self, admin_user, member_user):
+        _, consented = AdvisoryService.create_case(
+            member_user.id,
+            AdvisoryCaseCreateSchema(case_type="hatchery_review", title="Consented hatchery case"),
+        )
+        code, consent = AdvisoryService.accept_benchmark_consent(
+            member_user,
+            consented.payload["case"]["id"],
+            BenchmarkConsentSchema(),
+        )
+        assert code == 200
+        assert consent.payload["benchmark_consent"]["active"] is True
+        assert BenchmarkConsentRecord.objects(case_id=consented.payload["case"]["id"], status="active").count() == 1
+        _, consented_investor = AdvisoryService.create_case(
+            member_user.id,
+            AdvisoryCaseCreateSchema(case_type="investor_due_diligence", title="Consented investor case"),
+        )
+        AdvisoryService.accept_benchmark_consent(
+            member_user,
+            consented_investor.payload["case"]["id"],
+            BenchmarkConsentSchema(),
+        )
+
+        _, unconsented = AdvisoryService.create_case(
+            "user-2",
+            AdvisoryCaseCreateSchema(case_type="hatchery_review", title="Unconsented hatchery case"),
+        )
+
+        _, hatchery = AdvisoryService.create_hatchery_profile(
+            admin_user,
+            HatcheryProfileSchema(case_id=consented.payload["case"]["id"], name="Consented Hatchery"),
+        )
+        AdvisoryService.create_hatchery_record(
+            admin_user,
+            HatcheryOperationalRecordSchema(
+                hatchery_id=hatchery.payload["hatchery"]["id"],
+                record_type="pl_quality_test",
+                metrics={"pl_quality_score": 90},
+            ),
+        )
+        AdvisoryService.create_investor_due_diligence_score(
+            admin_user,
+            InvestorDueDiligenceScoreSchema(
+                case_id=consented_investor.payload["case"]["id"],
+                project_type="integrated",
+                technical_score=60,
+                management_score=60,
+                biosecurity_score=60,
+                market_score=60,
+                financial_score=60,
+            ),
+        )
+        _, unconsented_hatchery = AdvisoryService.create_hatchery_profile(
+            admin_user,
+            HatcheryProfileSchema(case_id=unconsented.payload["case"]["id"], name="Unconsented Hatchery"),
+        )
+        AdvisoryService.create_hatchery_record(
+            admin_user,
+            HatcheryOperationalRecordSchema(
+                hatchery_id=unconsented_hatchery.payload["hatchery"]["id"],
+                record_type="pl_quality_test",
+                metrics={"pl_quality_score": 10},
+            ),
+        )
+
+        code, body = AdvisoryService.admin_phase_six_benchmarks(admin_user)
+
+        assert code == 200
+        assert body.payload["source_case_count"] == 2
+        assert body.payload["total_consented_case_count"] == 2
+        assert body.payload["hatchery"]["record_count"] == 1
+        assert body.payload["hatchery"]["average_pl_quality_score"] == 90
+        assert body.payload["investor"]["score_count"] == 1
+        assert body.payload["investor"]["risk_level_counts"] == {"moderate": 1}
+        assert body.payload["trend"][0]["hatchery_record_count"] == 1
+        assert body.payload["trend"][0]["investor_score_count"] == 1
+
+        code, filtered = AdvisoryService.admin_phase_six_benchmarks(
+            admin_user,
+            record_type="pl_quality_test",
+            risk_level="moderate",
+            project_type="integrated",
+        )
+
+        assert code == 200
+        assert filtered.payload["filters"]["project_type"] == "integrated"
+        assert filtered.payload["hatchery"]["record_count"] == 1
+        assert filtered.payload["investor"]["score_count"] == 1
+
+        code, invalid_month = AdvisoryService.admin_phase_six_benchmarks(admin_user, from_month="2026-99")
+
+        assert code == 400
+        assert invalid_month.message == "Benchmark month filters must use YYYY-MM format"
+
+        code, detail = AdvisoryService.get_case(consented.payload["case"]["id"], member_user.id)
+        assert code == 200
+        assert detail.payload["benchmark_consent"]["active"] is True
+
+        code, revoked = AdvisoryService.revoke_benchmark_consent(member_user, consented.payload["case"]["id"])
+        assert code == 200
+        assert revoked.payload["benchmark_consent"]["active"] is False
+
+        code, empty_benchmark = AdvisoryService.admin_phase_six_benchmarks(admin_user)
+        assert code == 200
+        assert empty_benchmark.payload["source_case_count"] == 1
+        assert empty_benchmark.payload["total_consented_case_count"] == 1
+        assert empty_benchmark.payload["hatchery"]["record_count"] == 0
+
     def test_admin_can_generate_internal_assistant_brief(self, admin_user):
         reference = ContentItem(
             title="Farm Failure Framework",
@@ -611,6 +954,11 @@ class TestAdvisoryWorkflow:
             source["source_ref"].startswith("content_item:")
             for source in brief.payload["brief"]["draft_report"]["source_citations"]
         )
+        content_citation = next(
+            source for source in brief.payload["brief"]["draft_report"]["source_citations"] if source["source_ref"].startswith("content_item:")
+        )
+        assert content_citation["document_id"] == content_citation["source_id"]
+        assert content_citation["source_snippet"] == content_citation["snippet"]
         assert AdvisorySourceEmbedding.objects(source_kind="content_item").count() == 1
         assert AdvisoryAssistantBriefLog.objects(case_id=body.payload["case"]["id"]).count() == 1
         brief_log = AdvisoryAssistantBriefLog.objects(id=brief.payload["brief"]["brief_log_id"]).first()
@@ -619,6 +967,10 @@ class TestAdvisoryWorkflow:
         assert brief.payload["brief"]["uploaded_file_checks"]["total_files"] == 1
         assert brief.payload["brief"]["uploaded_file_checks"]["needs_review"] == 0
         assert "Stocking Date" in brief.payload["brief"]["missing_data"]
+
+        code, logs = AdvisoryService.admin_list_assistant_brief_logs(admin_user, case_id=body.payload["case"]["id"])
+        assert code == 200
+        assert logs.payload["logs"][0]["id"] == brief.payload["brief"]["brief_log_id"]
 
     def test_assistant_brief_flags_unisolated_legacy_file_metadata(self, admin_user):
         _, body = AdvisoryService.create_case(
@@ -654,6 +1006,38 @@ class TestAdvisoryWorkflow:
         assert accepted.payload["brief_log"]["status"] == "accepted"
         assert accepted.payload["brief_log"]["accepted_by"] == "admin-user"
         assert accepted.payload["brief_log"]["accepted_report_id"] == "report-1"
+
+    def test_admin_can_generate_controlled_source_cited_assistant_answer(self, admin_user):
+        reference = ContentItem(
+            title="Farm Failure Framework",
+            slug="farm-failure-framework",
+            summary="Reconstruct mortality timelines, data gaps, and likely cause ranking.",
+            category="Farm",
+            tags=["diagnostic", "mortality"],
+            status="published",
+            published_at=datetime.now(),
+        )
+        reference.save()
+
+        code, body = AdvisoryService.answer_assistant_question(
+            admin_user,
+            AdvisoryAssistantAnswerSchema(question="How should I investigate mortality after DOC 45?"),
+        )
+
+        assert code == 200
+        assert body.payload["answer"]["status"] == "source_cited_internal_draft"
+        assert body.payload["answer"]["source_citations"]
+        assert body.payload["answer"]["source_citations"][0]["document_id"]
+        assert body.payload["answer"]["source_citations"][0]["source_snippet"]
+        assert body.payload["answer"]["safety_flags"] == ["Disease-related guidance requires lab data and expert review before client use."]
+        assert body.payload["answer"]["answer_log_id"]
+        assert AdvisoryAssistantAnswerLog.objects.count() == 1
+
+        code, logs = AdvisoryService.admin_list_assistant_answer_logs(admin_user)
+        assert code == 200
+        assert logs.payload["logs"][0]["id"] == body.payload["answer"]["answer_log_id"]
+        assert logs.payload["logs"][0]["question"] == "How should I investigate mortality after DOC 45?"
+        assert logs.payload["logs"][0]["source_citations"][0]["document_id"]
 
     def test_admin_can_create_internal_cited_draft_report_from_assistant_brief(self, admin_user):
         reference = ContentItem(
@@ -710,6 +1094,12 @@ class TestAdvisoryWorkflow:
         assert delivered.payload["report"]["reviewed_by"] == "admin-user"
         assert delivered.payload["case"]["status"] == "report_ready"
         assert AdvisorySourceEmbedding.objects(source_kind="advisory_report").count() == 1
+        assert AdvisoryReportWorkflowEvent.objects(report_id=draft.payload["report"]["id"]).count() == 2
+
+        code, events = AdvisoryService.admin_list_report_workflow_events(admin_user, report_id=draft.payload["report"]["id"])
+        assert code == 200
+        assert events.payload["events"][0]["previous_status"] == "expert_review_required"
+        assert events.payload["events"][0]["new_status"] == "delivered"
 
         code, case_detail = AdvisoryService.get_case(body.payload["case"]["id"], "user-1")
         assert code == 200
