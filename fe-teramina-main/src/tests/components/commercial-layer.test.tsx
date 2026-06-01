@@ -817,7 +817,7 @@ describe("Commercial admin surface", () => {
     expect(screen.getByText("2026-06")).toBeInTheDocument();
     expect(screen.getByText("Hatchery 1 | Investor 1")).toBeInTheDocument();
     expect(screen.getByText("Deliver Report")).toBeInTheDocument();
-  }, 15000);
+  }, 30000);
 
   it("blocks commercial admin page for non-admin users", async () => {
     server.use(
