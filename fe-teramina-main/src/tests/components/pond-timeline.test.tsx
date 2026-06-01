@@ -65,7 +65,8 @@ function renderComponent() {
 describe("PondTimeline", () => {
   beforeEach(() => {
     server.use(
-      http.get("*/agent/pond-timeline", () => HttpResponse.json(timelinePayload))
+      http.get("*/agent/pond-timeline", () => HttpResponse.json(timelinePayload)),
+      http.get("*/advisory/history", () => HttpResponse.json({ payload: { total_events: 0, events: [] } }))
     );
   });
 
@@ -119,6 +120,42 @@ describe("PondTimeline", () => {
 
     expect(screen.queryByText("DO measured at 6.2 mg/L, temp 28°C")).not.toBeInTheDocument();
     expect(screen.getByText("Added aeration for 2 hours, DO recovered")).toBeInTheDocument();
+  });
+
+  it("renders linked advisory history for the cycle", async () => {
+    server.use(
+      http.get("*/advisory/history", () =>
+        HttpResponse.json({
+          payload: {
+            total_events: 1,
+            events: [
+              {
+                id: "case-1",
+                type: "advisory_case",
+                case_id: "case-1",
+                case_type: "farm_diagnostic",
+                status: "in_review",
+                title: "DOC 45 mortality review",
+                description: "Farm Diagnostic: DOC 45 mortality review",
+                created_at: "2026-01-20T08:00:00",
+                url: "/dashboard/advisory/case-1",
+              },
+            ],
+          },
+        })
+      )
+    );
+    renderComponent();
+
+    expect(await screen.findByText("Farm Diagnostic: DOC 45 mortality review")).toBeInTheDocument();
+    expect(screen.getByText(/4 total events/i)).toBeInTheDocument();
+
+    const advisoryButton = screen.getByRole("button", { name: /^Advisory$/i });
+    await userEvent.click(advisoryButton);
+
+    expect(screen.queryByText("NH3 elevated: 0.05 mg/L")).not.toBeInTheDocument();
+    expect(screen.getByText("Farm Diagnostic: DOC 45 mortality review")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Open advisory case/i })).toBeInTheDocument();
   });
 
   it("shows empty state when filter matches no events", async () => {

@@ -23,6 +23,8 @@ steps:
       - '--build-arg'
       - 'VITE_SUMMARY_MODEL=${_VITE_SUMMARY_MODEL}'
       - '--build-arg'
+      - 'VITE_SENTRY_DSN=${_VITE_SENTRY_DSN}'
+      - '--build-arg'
       - 'VITE_GA_MEASUREMENT_ID=${_VITE_GA_MEASUREMENT_ID}'
       - '-t'
       - '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/${_SERVICE_NAME}:$SHORT_SHA'

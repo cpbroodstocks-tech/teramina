@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
+  Button,
   Card,
   CardContent,
   Chip,
@@ -22,8 +23,10 @@ import {
   MdOpacity,
   MdRefresh,
   MdScience,
+  MdSupportAgent,
 } from "react-icons/md";
 import { useGetPondTimeline } from "components/agent-chat/queries";
+import { useAdvisoryHistory } from "features/advisory/queries";
 
 const EVENT_CONFIG = {
   observation: {
@@ -62,6 +65,12 @@ const EVENT_CONFIG = {
     bg: "#e1f5fe",
     label: "Fact",
   },
+  advisory_case: {
+    icon: <MdSupportAgent size={16} />,
+    color: "#6d4c41",
+    bg: "#efebe9",
+    label: "Advisory",
+  },
 };
 
 const getEventConfig = (type) => {
@@ -80,9 +89,10 @@ const FILTER_OPTIONS = [
   { value: "observation", label: "Water" },
   { value: "alert", label: "Alerts" },
   { value: "advice", label: "Advice" },
+  { value: "advisory", label: "Advisory" },
 ];
 
-const TimelineEvent = ({ event }) => {
+const TimelineEvent = ({ event, onOpen }) => {
   const config = getEventConfig(event.type);
   const docOrDate = event.doc != null
     ? `DOC ${event.doc}`
@@ -112,7 +122,7 @@ const TimelineEvent = ({ event }) => {
       </Box>
 
       <Box flex={1} sx={{ pb: 1 }}>
-        <Stack direction="row" gap={1} alignItems="center" sx={{ mb: 0.5 }}>
+        <Stack direction="row" gap={1} sx={{ mb: 0.5, alignItems: "center" }}>
           <Chip
             label={config.label}
             size="small"
@@ -142,10 +152,24 @@ const TimelineEvent = ({ event }) => {
             ))}
           </Stack>
         )}
+        {event.url && (
+          <Button size="small" onClick={() => onOpen(event.url)} sx={{ mt: 0.5, px: 0, minWidth: 0 }}>
+            Open advisory case
+          </Button>
+        )}
       </Box>
     </Stack>
   );
 };
+
+const formatCaseType = (caseType) => (caseType || "advisory_case").replaceAll("_", " ");
+
+const toAdvisoryTimelineEvent = (event) => ({
+  ...event,
+  date: event.created_at,
+  description: event.description || `${formatCaseType(event.case_type)}: ${event.title}`,
+  tags: [event.status, formatCaseType(event.case_type)].filter(Boolean),
+});
 
 const PondTimeline = () => {
   const { cycle_id } = useParams();
@@ -153,19 +177,29 @@ const PondTimeline = () => {
   const [filter, setFilter] = useState("all");
 
   const { data, isLoading, isError, refetch } = useGetPondTimeline(cycle_id || null);
+  const {
+    data: advisoryHistory,
+    isLoading: isAdvisoryLoading,
+    isError: isAdvisoryError,
+    refetch: refetchAdvisoryHistory,
+  } = useAdvisoryHistory({ cycle_id });
 
   const events = data?.events || [];
-  const filtered = events.filter((e) => {
+  const advisoryEvents = (advisoryHistory?.events || []).map(toAdvisoryTimelineEvent);
+  const combinedEvents = [...events, ...advisoryEvents];
+  const filtered = combinedEvents.filter((e) => {
     if (filter === "all") return true;
     if (filter === "observation") return e.type === "observation";
     if (filter === "alert") return e.type === "alert";
     if (filter === "advice") return e.type === "memory_advice" || e.type?.startsWith("memory_");
+    if (filter === "advisory") return e.type === "advisory_case";
     return true;
   });
+  const totalEvents = (data?.total_events ?? events.length) + advisoryEvents.length;
 
   return (
     <Box>
-      <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 3 }}>
+      <Stack direction="row" gap={1} sx={{ mb: 3, alignItems: "center" }}>
         <IconButton size="small" onClick={() => navigate(-1)} title="Back">
           <MdArrowBack />
         </IconButton>
@@ -180,7 +214,13 @@ const PondTimeline = () => {
             </Typography>
           )}
         </Box>
-        <IconButton onClick={() => refetch()} title="Refresh">
+        <IconButton
+          onClick={() => {
+            refetch();
+            refetchAdvisoryHistory();
+          }}
+          title="Refresh"
+        >
           <MdRefresh />
         </IconButton>
       </Stack>
@@ -199,29 +239,30 @@ const PondTimeline = () => {
         ))}
       </ToggleButtonGroup>
 
-      {isLoading && (
-        <Stack direction="row" gap={1} alignItems="center">
+      {isLoading || isAdvisoryLoading ? (
+        <Stack direction="row" gap={1} sx={{ alignItems: "center" }}>
           <CircularProgress size={18} />
           <Typography variant="body2">Loading timeline…</Typography>
         </Stack>
-      )}
+      ) : null}
 
       {isError && <Alert severity="error">Failed to load pond timeline.</Alert>}
+      {isAdvisoryError && <Alert severity="warning" sx={{ mb: 2 }}>Timeline loaded, but advisory history could not be loaded.</Alert>}
 
-      {!isLoading && !isError && filtered.length === 0 && (
+      {!isLoading && !isAdvisoryLoading && !isError && filtered.length === 0 && (
         <Alert severity="info">No events found for this filter.</Alert>
       )}
 
-      {!isLoading && filtered.length > 0 && (
+      {!isLoading && !isAdvisoryLoading && filtered.length > 0 && (
         <Card variant="outlined">
           <CardContent sx={{ pb: "12px !important" }}>
             <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
-              {data?.total_events} total events — showing {filtered.length}
+              {totalEvents} total events — showing {filtered.length}
             </Typography>
             <Divider sx={{ mb: 1 }} />
             <Stack>
               {filtered.map((event, i) => (
-                <TimelineEvent key={i} event={event} />
+                <TimelineEvent key={`${event.type}-${event.id || event.description}-${i}`} event={event} onOpen={navigate} />
               ))}
             </Stack>
           </CardContent>

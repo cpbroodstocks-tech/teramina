@@ -73,7 +73,7 @@ export const useCreateSheetsTemplate = (cycle_id: string) => {
 export const useSyncSheets = (cycle_id: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (import_mode = "valid_rows_only") =>
+    mutationFn: (import_mode: string = "valid_rows_only") =>
       axios.post("/sheets/manual-sync", null, { params: { cycle_id, import_mode } }).then((r: any) => r.payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: sheetsKeys.status(cycle_id) }),
   });
@@ -107,7 +107,7 @@ export const useSyncLog = (cycle_id: string) =>
 
 export const usePreviewSync = (cycle_id: string) =>
   useMutation({
-    mutationFn: (import_mode = "valid_rows_only") =>
+    mutationFn: (import_mode: string = "valid_rows_only") =>
       axios
         .post("/sheets/preview-sync", null, { params: { cycle_id, import_mode } })
         .then((r: any) => r?.payload),

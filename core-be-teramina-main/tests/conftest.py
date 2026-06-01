@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+import mongomock
 
 # ---------------------------------------------------------------------------
 # Ensure the project root is importable and Django is configured BEFORE any
@@ -58,7 +59,18 @@ for _mod in [
 # Must patch mongoengine.connect BEFORE settings.py runs it
 import mongoengine
 _orig_connect = mongoengine.connect
-mongoengine.connect = lambda *a, **kw: _orig_connect("test_db", host="mongomock://localhost")
+
+
+def _connect_test_db(*_args, **_kwargs):
+    try:
+        return _orig_connect("test_db", host="mongodb://localhost", mongo_client_class=mongomock.MongoClient)
+    except Exception as exc:
+        if "mongo_client_class" not in str(exc):
+            raise
+        return _orig_connect("test_db", host="mongomock://localhost")
+
+
+mongoengine.connect = _connect_test_db
 
 # Patch google.oauth2 Credentials before they're used in settings.py
 _fake_creds = MagicMock()

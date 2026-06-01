@@ -4,6 +4,7 @@ import { routes } from "routes";
 import { Link } from "react-router-dom";
 import classNames from "classnames";
 import { useTranslation } from "react-i18next";
+import { useUserProfile } from "features/user/queries";
 
 const dashboardRoutes = routes.filter((r) => r.path === "/dashboard")[0].children;
 
@@ -61,10 +62,11 @@ const MenuList = ({ menus, activeLabelKey, styles }) => (
 const Sidebar = ({ open, setOpen, activePath }) => {
   const { t } = useTranslation();
   const { classes: styles } = useStyles();
+  const { data: profile } = useUserProfile();
   const activeLabelKey = getActiveLabelKey(activePath);
 
   const menus = dashboardRoutes
-    .filter((route) => route.category !== "children")
+    .filter((route) => route.category !== "children" && (!route.adminOnly || profile?.role_user === "admin"))
     .map((route) => ({
       path: route.path,
       icon: route.icon,

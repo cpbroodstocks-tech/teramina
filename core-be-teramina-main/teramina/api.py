@@ -39,6 +39,9 @@ from teramina.pl_report.controllers.farm_pl_controller import router as farm_pl_
 from teramina.pl_report.controllers.share_controller import router as share_router
 from teramina.pl_report.controllers.year_pl_controller import router as year_pl_router
 from teramina.pl_report.controllers.pl_report_alias_controller import router as pl_alias_router
+from teramina.content.controllers.content_controller import router as content_router
+from teramina.advisory.controllers.advisory_controller import router as advisory_router
+from teramina.billing.controllers.billing_controller import router as billing_router
 
 api = NinjaAPI(
     title="Teramina Backend API",
@@ -73,3 +76,6 @@ api.add_router("/cycles", pl_alias_router)
 api.add_router("/farm", farm_pl_router)
 api.add_router("/farm", year_pl_router)
 api.add_router("/report", share_router)
+api.add_router("/content", content_router)
+api.add_router("/advisory", advisory_router)
+api.add_router("/billing", billing_router)

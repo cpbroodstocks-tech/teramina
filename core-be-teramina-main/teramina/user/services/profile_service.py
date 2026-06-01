@@ -24,6 +24,7 @@ class ProfileService:
                 "picture": user.picture,
                 "address": user.address,
                 "is_there_data": user.is_there_data,
+                "role_user": user.role_user,
             }
         except DoesNotExist as exception:
             return 400, DataErrorSchema(code=400, message=str(exception))
