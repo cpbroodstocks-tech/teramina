@@ -31,6 +31,13 @@ git tag production-YYYYMMDD-N
 git push origin production-YYYYMMDD-N
 ```
 
+Before running a deployment, verify GitHub environment readiness:
+
+```bash
+./scripts/check_deploy_readiness.sh staging
+./scripts/check_deploy_readiness.sh production
+```
+
 ## Required Backend GitHub Secrets
 
 Set these secrets in GitHub Actions environments, at minimum for `staging` before staging deploys and `production` before production deploys:
