@@ -1,0 +1,215 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Deployment environment"
+        required: true
+        default: "staging"
+        type: choice
+        options:
+          - staging
+          - production
+      service:
+        description: "Service to deploy"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - backend
+          - frontend
+      run_commercial_seed:
+        description: "Run seed_commercial_layer after backend deploy"
+        required: false
+        default: false
+        type: boolean
+      reindex_advisory_sources:
+        description: "Run reindex_advisory_sources after backend deploy"
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - "production-*"
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend Deploy
+    if: ${{ github.event_name == 'push' || github.event.inputs.service == 'all' || github.event.inputs.service == 'backend' }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.target || 'production' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add server to known hosts
+        run: echo "${{ secrets.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+
+      - name: Write backend environment on server
+        run: |
+          ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          set -e
+          cd ~/teramina/core-be-teramina/
+          cat > .env << 'ENVEOF'
+          DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+          DJANGO_DEBUG=False
+          DJANGO_ALLOWED_HOSTS=${{ secrets.DJANGO_ALLOWED_HOSTS }}
+          CORS_ALLOWED_ORIGINS=${{ secrets.CORS_ALLOWED_ORIGINS }}
+          CSRF_TRUSTED_ORIGINS=${{ secrets.CSRF_TRUSTED_ORIGINS }}
+          JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
+          MONGODB_URI=${{ secrets.MONGODB_URI }}
+          FIREBASE_CREDENTIALS_JSON=${{ secrets.FIREBASE_CREDENTIALS_JSON }}
+          FIREBASE_CREDENTIALS_PATH=/secrets/firebase-sa.json
+          GOOGLE_APPLICATION_CREDENTIALS_JSON=${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+          GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcs-sa.json
+          ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          open_ai_key=${{ secrets.OPENAI_API_KEY }}
+          TERAMINA_LLM_API=${{ secrets.TERAMINA_LLM_API }}
+          TERAMINA_API_KEY=${{ secrets.TERAMINA_API_KEY }}
+          SUMMARY_MODEL=${{ secrets.SUMMARY_MODEL }}
+          PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }}
+          PINECONE_INDEX=${{ secrets.PINECONE_INDEX }}
+          GS_BUCKET_NAME=${{ secrets.GS_BUCKET_NAME }}
+          GS_PROJECT_ID=${{ secrets.GS_PROJECT_ID }}
+          GS_VDB_BUCKET_NAME=${{ secrets.GS_VDB_BUCKET_NAME }}
+          CELERY_BROKER_URL=${{ secrets.CELERY_BROKER_URL }}
+          CELERY_RESULT_BACKEND=${{ secrets.CELERY_RESULT_BACKEND }}
+          CACHE_REDIS_URL=${{ secrets.CACHE_REDIS_URL }}
+          SENTRY_DSN=${{ secrets.SENTRY_DSN }}
+          DATA_UPLOAD_MAX_MB=${{ secrets.DATA_UPLOAD_MAX_MB }}
+          FILE_UPLOAD_MAX_MB=${{ secrets.FILE_UPLOAD_MAX_MB }}
+          ENVEOF
+          EOF
+
+      - name: Deploy backend
+        run: |
+          ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          set -e
+          cd ~/teramina/core-be-teramina/
+          git rev-parse HEAD > /tmp/teramina_be_prev_sha
+          git checkout main
+          git pull --ff-only origin main
+          docker-compose down
+          docker-compose up -d --build
+          EOF
+
+      - name: Seed commercial layer
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_commercial_seed == 'true' }}
+        run: |
+          ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          set -e
+          cd ~/teramina/core-be-teramina/
+          docker-compose exec -T web python manage.py seed_commercial_layer
+          EOF
+
+      - name: Reindex advisory sources
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.reindex_advisory_sources == 'true' }}
+        run: |
+          ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          set -e
+          cd ~/teramina/core-be-teramina/
+          docker-compose exec -T web python manage.py reindex_advisory_sources
+          EOF
+
+      - name: Backend health check with rollback
+        run: |
+          sleep 20
+          if curl --fail --silent --show-error \
+                  --retry 6 --retry-delay 5 --retry-connrefused \
+                  http://${{ secrets.SSH_HOST }}:8000/health/; then
+            echo "Backend health check passed."
+          else
+            echo "Backend health check failed; rolling back."
+            ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'ROLLBACK'
+            set -e
+            cd ~/teramina/core-be-teramina/
+            git checkout main
+            git reset --hard $(cat /tmp/teramina_be_prev_sha)
+            docker-compose down
+            docker-compose up -d --build
+            ROLLBACK
+            exit 1
+          fi
+
+  frontend:
+    name: Frontend Deploy
+    if: ${{ github.event_name == 'push' || github.event.inputs.service == 'all' || github.event.inputs.service == 'frontend' }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.target || 'production' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add server to known hosts
+        run: echo "${{ secrets.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+
+      - name: Write frontend environment on server
+        run: |
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=120 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          set -e
+          cd ~/teramina/fe-teramina/
+          cat > .env << 'ENVEOF'
+          VITE_ENDPOINT=${{ secrets.VITE_ENDPOINT }}
+          VITE_FIREBASE_PROJECT_ID=${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_API_KEY=${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_STORAGE_BUCKET=${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_AUTH_DOMAIN=${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID=${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID=${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
+          VITE_FIREBASE_VAPID_KEY=${{ secrets.VITE_FIREBASE_VAPID_KEY }}
+          VITE_SUMMARY_MODEL=${{ secrets.VITE_SUMMARY_MODEL }}
+          VITE_SENTRY_DSN=${{ secrets.VITE_SENTRY_DSN }}
+          VITE_GA_MEASUREMENT_ID=${{ secrets.VITE_GA_MEASUREMENT_ID }}
+          ENVEOF
+          EOF
+
+      - name: Deploy frontend
+        run: |
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=120 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          set -e
+          cd ~/teramina/fe-teramina/
+          git rev-parse HEAD > /tmp/teramina_fe_prev_sha
+          git checkout main
+          git pull --ff-only origin main
+          docker-compose down
+          docker-compose up -d --build
+          EOF
+
+      - name: Frontend health check with rollback
+        run: |
+          sleep 15
+          if curl --fail --silent --show-error \
+                  --retry 5 --retry-delay 5 --retry-connrefused \
+                  http://${{ secrets.SSH_HOST }}/; then
+            echo "Frontend health check passed."
+          else
+            echo "Frontend health check failed; rolling back."
+            ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'ROLLBACK'
+            set -e
+            cd ~/teramina/fe-teramina/
+            git checkout main
+            git reset --hard $(cat /tmp/teramina_fe_prev_sha)
+            docker-compose down
+            docker-compose up -d --build
+            ROLLBACK
+            exit 1
+          fi

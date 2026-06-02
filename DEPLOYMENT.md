@@ -5,9 +5,35 @@ This repository deploys two services:
 - `core-be-teramina-main`: Django API, Celery worker, Celery beat, Redis
 - `fe-teramina-main`: Vite static frontend served by nginx
 
+## Active GitHub Workflows
+
+Active workflows must live under the repository root `.github/workflows/` directory.
+
+- `.github/workflows/ci.yml` - CI for pull requests and `main` pushes; also supports manual dispatch.
+- `.github/workflows/deploy.yml` - SSH/Docker deployment for backend, frontend, or both.
+
+The old sub-project workflow locations under `core-be-teramina-main/.github/` and `fe-teramina-main/.github/` are not active in GitHub Actions for this monorepo layout.
+
+## Deployment Modes
+
+Use `Deploy` from GitHub Actions for staging:
+
+1. Select `Run workflow`.
+2. Set `target` to `staging`.
+3. Set `service` to `all`, `backend`, or `frontend`.
+4. Use `run_commercial_seed` only after confirming the target MongoDB is the intended staging database.
+5. Use `reindex_advisory_sources` after content/report data exists on staging.
+
+Production deployment remains tag-driven:
+
+```bash
+git tag production-YYYYMMDD-N
+git push origin production-YYYYMMDD-N
+```
+
 ## Required Backend GitHub Secrets
 
-Set these secrets for `core-be-teramina-main/.github/workflows/cd.yml`:
+Set these secrets in GitHub Actions environments, at minimum for `staging` before staging deploys and `production` before production deploys:
 
 - `SSH_PRIVATE_KEY`
 - `SSH_KNOWN_HOSTS`
@@ -42,7 +68,7 @@ Set these secrets for `core-be-teramina-main/.github/workflows/cd.yml`:
 
 ## Required Frontend GitHub Secrets
 
-Set these secrets for `fe-teramina-main/.github/workflows/cd.yml`:
+Set these secrets in the same GitHub Actions environments:
 
 - `SSH_PRIVATE_KEY`
 - `SSH_KNOWN_HOSTS`
@@ -71,6 +97,15 @@ If JSON secrets are not provided, place service account files here:
 - `/secrets/teramina/firebase-sa.json`
 
 Prefer compact JSON GitHub secrets for hosted deployments. Use file mounts only when the server secret management process owns rotation and permissions.
+
+## Expected Server Checkout Paths
+
+The deploy workflow assumes the SSH server has these existing checkouts:
+
+- backend: `~/teramina/core-be-teramina/`
+- frontend: `~/teramina/fe-teramina/`
+
+Each checkout must track `origin/main` and contain the relevant `docker-compose.yml`.
 
 ## Pre-Deployment Checks
 
