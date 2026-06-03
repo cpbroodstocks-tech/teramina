@@ -68,6 +68,20 @@ const reasonColor = (reason) => {
   return "#616161";
 };
 
+const errorCategoryLabel = (category) => {
+  const labels = {
+    google_auth: "Google access",
+    google_quota: "Google quota",
+    google_transient: "Google transient",
+    validation: "Validation",
+    database_write: "Database write",
+    lock_contention: "Sync lock",
+    stale_preview: "Stale preview",
+    unknown: "Unknown",
+  };
+  return labels[category] || category;
+};
+
 const MAX_POLL_ATTEMPTS = 20;
 
 // ─── Issues Table ─────────────────────────────────────────────────────────────
@@ -174,12 +188,12 @@ const TabSummaryRow = ({ summary }) => (
     )}
     {summary.rejected > 0 && (
       <Typography variant="caption" color="error.main" sx={{ fontWeight: 700 }}>
-        ✕{summary.rejected} err
+        !{summary.rejected} issue
       </Typography>
     )}
     {summary.error && (
       <Typography variant="caption" color="error.main" sx={{ flexBasis: "100%", ml: { xs: 0, sm: 15 } }}>
-        {summary.error}
+        {summary.error_category ? `[${errorCategoryLabel(summary.error_category)}] ` : ""}{summary.error}
       </Typography>
     )}
   </Box>
@@ -277,7 +291,8 @@ const GoogleSheets = () => {
   const pollTimerRef = useRef(null);
 
   const { data: status, isLoading, isError, dataUpdatedAt, refetch: refetchStatus } = useGoogleSheetsStatus(cycle_id);
-  const { data: syncLog, refetch: refetchSyncLog } = useSyncLog(cycle_id);
+  const syncLogId = status?.active_sync_id || status?.last_sync_id || "";
+  const { data: syncLog, refetch: refetchSyncLog } = useSyncLog(cycle_id, syncLogId);
   const { mutate: connect, isPending: connecting } = useConnectSheets(cycle_id);
   const { mutate: createTemplate, isPending: creatingTemplate } = useCreateSheetsTemplate(cycle_id);
   const { mutate: sync, isPending: syncing } = useSyncSheets(cycle_id);
@@ -474,8 +489,13 @@ const GoogleSheets = () => {
   const rejectedRows = syncLog?.rejected_rows ?? [];
   const hasIssues = rejectedRows.length > 0;
   const totalValid = tabSummaries.reduce((s, t) => s + (t.inserted || 0) + (t.updated || 0), 0);
-  const totalRejected = tabSummaries.reduce((s, t) => s + (t.rejected || 0), 0);
+  const totalTabRejected = tabSummaries.reduce((s, t) => s + (t.rejected || 0), 0);
   const totalWarnings = rejectedRows.filter((r) => r.reason?.startsWith("warn:")).length;
+  const totalRejected = rejectedRows.length
+    ? rejectedRows.filter((r) => !r.reason?.startsWith("warn:")).length
+    : totalTabRejected;
+  const rowsPerSecond = syncLog?.rows_per_second ?? status?.rows_per_second;
+  const errorCategory = syncLog?.error_category ?? status?.error_category;
 
   return (
     <Box sx={{ py: 2 }}>
@@ -510,6 +530,21 @@ const GoogleSheets = () => {
           {(status.active_sync_id || status.last_sync_id) && (
             <Typography variant="caption" color="textSecondary" sx={{ mb: 1, display: "block", fontFamily: "monospace" }}>
               Sync ID: {status.active_sync_id || status.last_sync_id}
+            </Typography>
+          )}
+          {status.access_status === "error" && (
+            <Typography variant="caption" color="error" display="block" sx={{ mb: 1 }}>
+              Spreadsheet access check failed: {status.access_error || "share the sheet with the service account and retry."}
+            </Typography>
+          )}
+          {rowsPerSecond != null && (
+            <Typography variant="caption" color="textSecondary" sx={{ mb: 1, display: "block" }}>
+              Throughput: {rowsPerSecond} rows/sec
+            </Typography>
+          )}
+          {errorCategory && (
+            <Typography variant="caption" color="textSecondary" sx={{ mb: 1, display: "block" }}>
+              Error category: {errorCategoryLabel(errorCategory)}
             </Typography>
           )}
 

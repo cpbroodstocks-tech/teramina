@@ -35,7 +35,8 @@ export const useOptOutBenchmark = (cycle_id: string) => {
 
 export const sheetsKeys = {
   status: (cycle_id: string) => ["sheets-status", cycle_id] as const,
-  syncLog: (cycle_id: string) => ["sheets-sync-log", cycle_id] as const,
+  syncLog: (cycle_id: string, sync_id = "") => ["sheets-sync-log", cycle_id, sync_id] as const,
+  syncLogBase: (cycle_id: string) => ["sheets-sync-log", cycle_id] as const,
 };
 
 export const useGoogleSheetsStatus = (cycle_id: string) =>
@@ -75,7 +76,10 @@ export const useSyncSheets = (cycle_id: string) => {
   return useMutation({
     mutationFn: (import_mode: string = "valid_rows_only") =>
       axios.post("/sheets/manual-sync", null, { params: { cycle_id, import_mode } }).then((r: any) => r.payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: sheetsKeys.status(cycle_id) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: sheetsKeys.status(cycle_id) });
+      queryClient.invalidateQueries({ queryKey: sheetsKeys.syncLogBase(cycle_id) });
+    },
   });
 };
 
@@ -84,16 +88,19 @@ export const useDisconnectSheets = (cycle_id: string) => {
   return useMutation({
     mutationFn: () =>
       axios.delete(`/sheets/disconnect?cycle_id=${cycle_id}`).then((r: any) => r.payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: sheetsKeys.status(cycle_id) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: sheetsKeys.status(cycle_id) });
+      queryClient.invalidateQueries({ queryKey: sheetsKeys.syncLogBase(cycle_id) });
+    },
   });
 };
 
-export const useSyncLog = (cycle_id: string) =>
+export const useSyncLog = (cycle_id: string, sync_id = "") =>
   useQuery({
-    queryKey: sheetsKeys.syncLog(cycle_id),
+    queryKey: sheetsKeys.syncLog(cycle_id, sync_id),
     queryFn: () =>
       axios
-        .get("/sheets/sync-log", { params: { cycle_id } })
+        .get("/sheets/sync-log", { params: { cycle_id, ...(sync_id ? { sync_id } : {}) } })
         .then((r: any) => r?.payload ?? null)
         .catch((error: any) => {
           if (error?.response?.status === 404) return null;
@@ -122,7 +129,7 @@ export const useConfirmSync = (cycle_id: string) => {
         .then((r: any) => r?.payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: sheetsKeys.status(cycle_id) });
-      queryClient.invalidateQueries({ queryKey: sheetsKeys.syncLog(cycle_id) });
+      queryClient.invalidateQueries({ queryKey: sheetsKeys.syncLogBase(cycle_id) });
     },
   });
 };

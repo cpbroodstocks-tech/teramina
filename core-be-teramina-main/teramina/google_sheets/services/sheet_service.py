@@ -64,6 +64,14 @@ ROW_ID_COLUMNS = {
     TAB_HARVEST: ("K", 10),
 }
 TRANSIENT_GOOGLE_STATUSES = {429, 500, 502, 503, 504}
+ERROR_CATEGORY_GOOGLE_AUTH = "google_auth"
+ERROR_CATEGORY_GOOGLE_QUOTA = "google_quota"
+ERROR_CATEGORY_GOOGLE_TRANSIENT = "google_transient"
+ERROR_CATEGORY_VALIDATION = "validation"
+ERROR_CATEGORY_DATABASE_WRITE = "database_write"
+ERROR_CATEGORY_LOCK_CONTENTION = "lock_contention"
+ERROR_CATEGORY_STALE_PREVIEW = "stale_preview"
+ERROR_CATEGORY_UNKNOWN = "unknown"
 
 # DAILY_LOG column layout (0-indexed):
 # A=0  date          B=1  doc           C=2  do_morning     D=3  do_afternoon
@@ -307,6 +315,81 @@ def _safe_uuid_str(value) -> str | None:
     return str(value) if value else None
 
 
+def _error_category(error: str = "", exc: Exception | None = None) -> str:
+    status = getattr(getattr(exc, "resp", None), "status", None)
+    if status in (401, 403):
+        return ERROR_CATEGORY_GOOGLE_AUTH
+    if status == 429:
+        return ERROR_CATEGORY_GOOGLE_QUOTA
+    if status in TRANSIENT_GOOGLE_STATUSES:
+        return ERROR_CATEGORY_GOOGLE_TRANSIENT
+
+    text = f"{error or ''} {str(exc) if exc else ''}".lower()
+    if "sheet changed since preview" in text:
+        return ERROR_CATEGORY_STALE_PREVIEW
+    if "sync already in progress" in text:
+        return ERROR_CATEGORY_LOCK_CONTENTION
+    if "quota" in text:
+        return ERROR_CATEGORY_GOOGLE_QUOTA
+    if "permission" in text or "forbidden" in text or "unauthorized" in text or "cannot access" in text:
+        return ERROR_CATEGORY_GOOGLE_AUTH
+    if "hard_failure" in text or "invalid" in text or "strict import blocked" in text or "validation" in text:
+        return ERROR_CATEGORY_VALIDATION
+    if "database" in text or "mongo" in text or "save" in text:
+        return ERROR_CATEGORY_DATABASE_WRITE
+    if "google" in text or "sheets" in text:
+        return ERROR_CATEGORY_GOOGLE_TRANSIENT
+    return ERROR_CATEGORY_UNKNOWN
+
+
+def _sync_error_category(summary: dict, rejected_rows: list) -> str | None:
+    for tab_data in summary.values():
+        if "error" in tab_data:
+            return _error_category(tab_data.get("error") or "")
+    if rejected_rows:
+        return ERROR_CATEGORY_VALIDATION
+    return None
+
+
+def _persist_failed_sync_log(
+    cycle_id: str,
+    spreadsheet_id: str,
+    sync_uuid,
+    started_at: datetime,
+    message: str,
+    error_category: str,
+    source_fingerprint: str = None,
+):
+    try:
+        finished_at = datetime.utcnow()
+        sync_log_kwargs = {
+            "cycle_id": cycle_id,
+            "spreadsheet_id": spreadsheet_id,
+            "source_fingerprint": source_fingerprint,
+            "started_at": started_at,
+            "finished_at": finished_at,
+            "duration_seconds": (finished_at - started_at).total_seconds(),
+            "rows_per_second": 0,
+            "status": "error",
+            "error_category": error_category,
+            "tab_summaries": [
+                TabSummary(
+                    tab="SYNC",
+                    processed=0,
+                    error=message,
+                    error_category=error_category,
+                )
+            ],
+            "rejected_rows": [],
+        }
+        if sync_uuid:
+            sync_log_kwargs["sync_id"] = sync_uuid
+        return SheetSyncLog(**sync_log_kwargs).save().sync_id
+    except Exception as exc:
+        logger.warning("Failed to save failed SheetSyncLog: %s", exc)
+        return None
+
+
 def _delete_result_rows(cycle_data: CycleData | None, cycle_id: str, keys: set[str]) -> int:
     if not keys:
         return 0
@@ -502,9 +585,13 @@ class SheetService:
 
         # Embed latest sync log tab_summaries if available
         tab_summaries = []
+        rows_per_second = None
+        error_category = getattr(integration, "last_error_category", None)
         if integration.last_sync_log_id:
             log = SheetSyncLog.objects(sync_id=integration.last_sync_log_id).first()
             if log:
+                rows_per_second = getattr(log, "rows_per_second", None)
+                error_category = getattr(log, "error_category", None) or error_category
                 tab_summaries = [
                     {
                         "tab": ts.tab,
@@ -515,6 +602,7 @@ class SheetService:
                         "skipped": ts.skipped,
                         "rejected": ts.rejected,
                         "error": ts.error,
+                        "error_category": getattr(ts, "error_category", None),
                     }
                     for ts in log.tab_summaries
                 ]
@@ -540,6 +628,8 @@ class SheetService:
                 "last_sync_id": _safe_uuid_str(getattr(integration, "last_sync_log_id", None)),
                 "access_status": access_status,
                 "access_error": access_error,
+                "rows_per_second": rows_per_second,
+                "error_category": error_category or (_error_category(integration.last_error or "") if integration.last_error else None),
                 "tab_summaries": tab_summaries,
             },
         )
@@ -560,33 +650,46 @@ class SheetService:
         if not integration:
             return {"error": "No active integration found"}
 
+        started_at = datetime.utcnow()
+        sync_uuid = UUID(str(sync_id)) if sync_id else None
         cycle = Cycle.objects(id=cycle_id).first()
         if not cycle:
             if not dry_run:
                 integration.last_status = "error"
                 integration.last_error = "Cycle not found"
+                integration.last_error_category = ERROR_CATEGORY_UNKNOWN
                 integration.active_sync_id = None
                 integration.save()
-            return {"error": "Cycle not found"}
+            return {"error": "Cycle not found", "error_category": ERROR_CATEGORY_UNKNOWN}
 
         spreadsheet_id = integration.spreadsheet_id
         start_date = cycle.start_date
         summary = {}
         total_inserted = 0
         total_updated = 0
-        started_at = datetime.utcnow()
         rejected_rows_collector: list = []
-        sync_uuid = UUID(str(sync_id)) if sync_id else None
 
         try:
             service = _get_sheets_service()
         except Exception as exc:
+            category = _error_category(exc=exc)
             if not dry_run:
                 integration.last_status = "error"
                 integration.last_error = str(exc)
+                integration.last_error_category = category
                 integration.active_sync_id = None
+                log_id = _persist_failed_sync_log(
+                    cycle_id,
+                    spreadsheet_id,
+                    sync_uuid,
+                    started_at,
+                    str(exc),
+                    category,
+                )
+                if log_id:
+                    integration.last_sync_log_id = log_id
                 integration.save()
-            return {"error": str(exc)}
+            return {"error": str(exc), "error_category": category}
 
         row_ids_backfilled = _backfill_row_ids(service, spreadsheet_id)
 
@@ -602,12 +705,25 @@ class SheetService:
         source_fingerprint = _fingerprint_sheet_rows(rows_by_tab)
         if expected_fingerprint and expected_fingerprint != source_fingerprint:
             message = "Sheet changed since preview. Run preview-sync again."
+            category = ERROR_CATEGORY_STALE_PREVIEW
             if not dry_run:
                 integration.last_status = "error"
                 integration.last_error = message
+                integration.last_error_category = category
                 integration.active_sync_id = None
+                log_id = _persist_failed_sync_log(
+                    cycle_id,
+                    spreadsheet_id,
+                    sync_uuid,
+                    started_at,
+                    message,
+                    category,
+                    source_fingerprint=source_fingerprint,
+                )
+                if log_id:
+                    integration.last_sync_log_id = log_id
                 integration.save()
-            return {"error": message}
+            return {"error": message, "error_category": category}
 
         if not dry_run:
             integration.last_status = "syncing"
@@ -1191,11 +1307,14 @@ class SheetService:
             integration.last_error = "; ".join(
                 f"{k}: {v['error']}" for k, v in summary.items() if "error" in v
             ) or None
+            sync_error_category = _sync_error_category(summary, rejected_rows_collector)
+            integration.last_error_category = sync_error_category if status_str != "ok" else None
             integration.rows_synced = (integration.rows_synced or 0) + total_inserted + total_updated
 
             # Persist sync log
             try:
                 tab_summaries = []
+                total_processed = 0
                 for tab_name, tab_data in summary.items():
                     if "error" not in tab_data:
                         processed = (
@@ -1203,6 +1322,7 @@ class SheetService:
                             + tab_data.get("deleted", 0) + tab_data.get("skipped", 0)
                             + tab_data.get("rejected", 0)
                         )
+                        total_processed += processed
                         tab_summaries.append(TabSummary(
                             tab=tab_name,
                             processed=processed,
@@ -1217,6 +1337,7 @@ class SheetService:
                             tab=tab_name,
                             processed=0,
                             error=tab_data.get("error"),
+                            error_category=_error_category(tab_data.get("error") or ""),
                         ))
 
                 rejected_row_docs = [
@@ -1237,7 +1358,9 @@ class SheetService:
                     "started_at": started_at,
                     "finished_at": finished_at,
                     "duration_seconds": duration_seconds,
+                    "rows_per_second": round(total_processed / duration_seconds, 2) if duration_seconds > 0 else float(total_processed),
                     "status": status_str,
+                    "error_category": sync_error_category,
                     "tab_summaries": tab_summaries,
                     "rejected_rows": rejected_row_docs,
                 }
@@ -1264,7 +1387,19 @@ class SheetService:
             "started_at": started_at.isoformat(),
             "finished_at": finished_at.isoformat(),
             "duration_seconds": duration_seconds,
+            "rows_per_second": (
+                round(
+                    sum(
+                        data.get("inserted", 0) + data.get("updated", 0) + data.get("deleted", 0)
+                        + data.get("skipped", 0) + data.get("rejected", 0)
+                        for data in summary.values() if "error" not in data
+                    ) / duration_seconds,
+                    2,
+                )
+                if duration_seconds > 0 else 0
+            ),
             "status": status_str,
+            "error_category": _sync_error_category(summary, rejected_rows_collector),
         }
 
     @staticmethod

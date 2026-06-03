@@ -4,7 +4,12 @@ import logging
 from celery import shared_task
 from django.core.cache import cache
 from ..models.sheet_integration_model import SheetIntegration
-from ..services.sheet_service import SheetService, SYNC_LOCK_KEY_PREFIX
+from ..services.sheet_service import (
+    ERROR_CATEGORY_LOCK_CONTENTION,
+    ERROR_CATEGORY_VALIDATION,
+    SheetService,
+    SYNC_LOCK_KEY_PREFIX,
+)
 
 logger = logging.getLogger("teramina")
 
@@ -21,11 +26,30 @@ def _has_strict_errors(result: dict) -> bool:
     )
 
 
-def _mark_sync_error(cycle_id: str, message: str):
+def _tab_counts(summary: dict) -> dict:
+    return {
+        tab: {
+            "processed": (
+                data.get("inserted", 0) + data.get("updated", 0) + data.get("deleted", 0)
+                + data.get("skipped", 0) + data.get("rejected", 0)
+            ),
+            "inserted": data.get("inserted", 0),
+            "updated": data.get("updated", 0),
+            "deleted": data.get("deleted", 0),
+            "skipped": data.get("skipped", 0),
+            "rejected": data.get("rejected", 0),
+            "has_error": "error" in data,
+        }
+        for tab, data in summary.items()
+    }
+
+
+def _mark_sync_error(cycle_id: str, message: str, error_category: str):
     integration = SheetIntegration.objects(cycle_id=cycle_id, is_active=True).first()
     if integration:
         integration.last_status = "error"
         integration.last_error = message
+        integration.last_error_category = error_category
         integration.active_sync_id = None
         integration.save()
 
@@ -42,7 +66,8 @@ def _run_sync_with_lock(
     lock_key = f"{SYNC_LOCK_KEY_PREFIX}{cycle_id}"
     if not cache.add(lock_key, "1", timeout=900):
         logger.info("Sheet sync skipped: lock active cycle=%s sync_id=%s", cycle_id, sync_id)
-        return {"error": "Sync already in progress"}
+        _mark_sync_error(cycle_id, "Sync already in progress", ERROR_CATEGORY_LOCK_CONTENTION)
+        return {"error": "Sync already in progress", "error_category": ERROR_CATEGORY_LOCK_CONTENTION}
     try:
         logger.info(
             "Sheet sync started cycle=%s sync_id=%s import_mode=%s",
@@ -53,12 +78,12 @@ def _run_sync_with_lock(
         if import_mode == "strict":
             preview = SheetService.sync_cycle(cycle_id, dry_run=True)
             if "error" in preview:
-                _mark_sync_error(cycle_id, preview["error"])
+                _mark_sync_error(cycle_id, preview["error"], preview.get("error_category") or ERROR_CATEGORY_VALIDATION)
                 return preview
             if _has_strict_errors(preview):
                 message = "Strict import blocked because the sheet has errors."
-                _mark_sync_error(cycle_id, message)
-                return {"error": message, **preview}
+                _mark_sync_error(cycle_id, message, ERROR_CATEGORY_VALIDATION)
+                return {"error": message, "error_category": ERROR_CATEGORY_VALIDATION, **preview}
             expected_fingerprint = preview.get("source_fingerprint")
 
         result = SheetService.sync_cycle(
@@ -67,10 +92,14 @@ def _run_sync_with_lock(
             sync_id=sync_id,
         )
         logger.info(
-            "Sheet sync finished cycle=%s sync_id=%s status=%s",
+            "Sheet sync finished cycle=%s sync_id=%s status=%s duration_seconds=%s rows_per_second=%s error_category=%s tab_counts=%s",
             cycle_id,
             sync_id,
             result.get("status") or result.get("error"),
+            result.get("duration_seconds"),
+            result.get("rows_per_second"),
+            result.get("error_category"),
+            _tab_counts(result.get("summary", {})),
         )
         return result
     finally:

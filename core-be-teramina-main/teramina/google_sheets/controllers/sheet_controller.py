@@ -49,14 +49,21 @@ def sheet_status(request, cycle_id: str):
 
 
 @router.get("/sync-log", response=response_schema, auth=AuthBearer())
-def get_sync_log(request, cycle_id: str):
+def get_sync_log(request, cycle_id: str, sync_id: str = ""):
     user = get_signed_in_user(request)
     if not verify_cycle_owner(cycle_id, str(user.id)):
         return 401, DataErrorSchema(code=401, message="Unauthorized")
 
-    log = SheetSyncLog.objects(cycle_id=cycle_id).first()
+    filters = {"cycle_id": cycle_id}
+    if sync_id:
+        try:
+            filters["sync_id"] = uuid.UUID(sync_id)
+        except ValueError:
+            return 400, DataErrorSchema(code=400, message="Invalid sync_id")
+    log = SheetSyncLog.objects(**filters).first()
     if not log:
-        return 404, DataErrorSchema(code=404, message="No sync log found for this cycle")
+        message = "No sync log found for this sync" if sync_id else "No sync log found for this cycle"
+        return 404, DataErrorSchema(code=404, message=message)
 
     return 200, DataSuccessSchema(
         code=200,
@@ -69,7 +76,9 @@ def get_sync_log(request, cycle_id: str):
             started_at=log.started_at,
             finished_at=log.finished_at,
             duration_seconds=getattr(log, "duration_seconds", None),
+            rows_per_second=getattr(log, "rows_per_second", None),
             status=log.status,
+            error_category=getattr(log, "error_category", None),
             tab_summaries=[
                 {
                     "tab": ts.tab, "processed": ts.processed,
@@ -77,6 +86,7 @@ def get_sync_log(request, cycle_id: str):
                     "deleted": getattr(ts, "deleted", 0),
                     "skipped": ts.skipped, "rejected": ts.rejected,
                     "error": getattr(ts, "error", None),
+                    "error_category": getattr(ts, "error_category", None),
                 }
                 for ts in log.tab_summaries
             ],
@@ -147,11 +157,11 @@ def preview_sync(request, cycle_id: str, import_mode: str = "valid_rows_only"):
     rejected_rows = result.get("rejected_rows", [])
 
     # Count rows_valid, rows_warning, rows_error from summary + rejected_rows
-    rows_error = sum(
-        v.get("rejected", 0) for v in summary.values() if "error" not in v
-    )
     rows_warning = sum(
         1 for r in rejected_rows if r.get("reason", "").startswith("warn:")
+    )
+    rows_error = sum(
+        1 for r in rejected_rows if not r.get("reason", "").startswith("warn:")
     )
     rows_valid = sum(
         v.get("inserted", 0) + v.get("updated", 0)

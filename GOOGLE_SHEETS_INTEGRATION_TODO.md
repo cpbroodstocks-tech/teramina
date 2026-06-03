@@ -1,66 +1,112 @@
-# Google Sheets Integration TODO
+# Google Sheets Integration Finish TODO
 
-## 1. Sync Job Contract
+## Goal
 
-- Add a first-class sync job ID to manual sync and confirmed sync responses.
-- Store the active sync job ID on the integration while a job is running.
-- Return the active/latest sync job ID from status.
-- Keep status values explicit: `pending`, `queued`, `syncing`, `ok`, `partial`, `error`.
-- Make stale preview failures visible as a normal sync failure with a clear message.
+Finish the Google Sheets hardening track and keep this document accurate as the status artifact.
 
-## 2. Endpoint Test Coverage
+The original TODO was stale: several listed items are already implemented. This file now separates completed work, remaining work, and deferred decisions.
 
-- Test `/sheets/manual-sync` for unauthorized, missing integration, lock contention, and queued job payload.
-- Test `/sheets/preview-sync` for dry-run payload, preview fingerprint storage, and validation summary.
-- Test `/sheets/confirm-sync` for expired preview, unauthorized preview, stale fingerprint handoff, and lock contention.
-- Test `/sheets/sync-log` ordering and missing-log behavior.
+## Current Status
 
-## 3. Sync Log Quality
+### Done
 
-- Store per-tab errors in `SheetSyncLog`, not only summary counts.
-- Store source fingerprint and source spreadsheet ID on each sync log.
-- Store duration and rows-per-second metrics for operational debugging.
-- Preserve rejected-row warnings separately from hard errors.
+- [x] Manual and confirmed sync responses return a first-class `sync_id`.
+- [x] `SheetIntegration` stores `active_sync_id` while a sync is queued or running.
+- [x] Status returns `active_sync_id`, `last_sync_id`, explicit sync state, tab summaries, and access check fields.
+- [x] Status values now include `pending`, `queued`, `syncing`, `ok`, `partial`, and `error`.
+- [x] Stale preview fingerprint mismatch is surfaced as a normal sync error.
+- [x] Endpoint tests cover manual sync, preview sync, confirm sync, sync log behavior, stale fingerprints, ownership, lock contention, and queued payloads.
+- [x] `SheetSyncLog` stores per-tab summaries, per-tab errors, source spreadsheet ID, source fingerprint, duration, and rejected rows.
+- [x] Frontend shows queued/running state, sync IDs, sync log load errors, stale-preview recovery, tab summaries, warnings, and errors.
+- [x] Generated templates include import-managed row IDs, delete markers, and import status/message columns.
+- [x] Sync backfills missing row IDs for existing generated templates.
+- [x] Row IDs are used as idempotency keys before fallback natural keys.
+- [x] Delete markers work for supported tabs without requiring a destructive mirror mode.
+- [x] `valid_rows_only` remains the default import mode.
+- [x] `strict` mode blocks import when hard validation errors are present.
+- [x] Sheet-side validation feedback is written to import status/message columns.
+- [x] Manual sync is rate-limited per cycle/user.
+- [x] Transient Google API calls use bounded retries.
+- [x] Optional status access health check exists behind `SHEETS_STATUS_ACCESS_CHECK=true`.
+- [x] `SheetSyncLog`, `/sheets/sync-log`, status payloads, and frontend display include `rows_per_second`.
+- [x] Sync-level and tab-level errors include `error_category`.
+- [x] Error categories cover `google_auth`, `google_quota`, `google_transient`, `validation`, `database_write`, `lock_contention`, `stale_preview`, and `unknown`.
+- [x] Frontend sync-log queries are sync-ID aware while preserving latest-log fallback.
+- [x] Warning-only preview rows are no longer counted as hard errors.
 
-## 4. Frontend Status UX
+## Finish TODO
 
-- Show the active sync job ID/state when a sync is queued or running.
-- Poll the current job or latest sync log instead of only polling integration status.
-- Surface sync-log load errors explicitly.
-- Add a stale-preview recovery path that lets the user rerun preview in one click.
+### 1. Close Sync Log Observability Gaps
 
-## 5. Stable Row Identity
+- [x] Add `rows_per_second` to `SheetSyncLog`, `/sheets/sync-log`, status payloads, and frontend display.
+- [x] Add an `error_category` field for sync-level and tab-level errors.
+- [x] Classify at least these categories: `google_auth`, `google_quota`, `google_transient`, `validation`, `database_write`, `lock_contention`, `stale_preview`, and `unknown`.
+- [x] Add tests proving stale-preview failures and lock contention are categorized.
+- [x] Keep rejected-row warnings separate from hard errors in API payloads and frontend copy.
 
-- Add hidden/import-managed row IDs to generated templates.
-- Use row IDs as idempotency keys before falling back to natural keys.
-- Backfill row IDs when syncing older templates.
-- Preserve compatibility with manually created sheets that do not have row IDs.
+### 2. Make Polling Job-Aware
 
-## 6. Deletion And Import Modes
+- [x] Use `/sheets/sync-log?sync_id=...` so the existing endpoint remains backwards compatible.
+- [x] Query the active sync ID or latest sync log while retaining latest-log fallback.
+- [x] Keep integration-status polling as the compatibility fallback for older integrations.
+- [x] Add frontend tests for active-sync log lookup and existing terminal-state behavior.
 
-- Add import modes: `valid_rows_only`, `strict`, and later `mirror_sheet`.
-- Keep `valid_rows_only` as the default to avoid accidental destructive edits.
-- In `strict`, block the whole import if any row has hard errors.
-- In `mirror_sheet`, allow explicit delete markers or row-ID based deletions.
+### 3. Resolve Import Mode Scope
 
-## 7. Sheet-Side Feedback
+- [x] Defer `mirror_sheet` for beta.
+- [x] Document delete markers as the beta deletion path.
+- [ ] Add manual QA for row-ID update, row-ID delete, natural-key fallback, and strict-mode rejection.
 
-- Add status/error columns to template tabs.
-- Write validation feedback back to the relevant sheet row after sync.
-- Include tab, row, field, severity, and actionable reason.
-- Avoid overwriting farmer-entered data columns.
+### 4. Harden Sheet-Side Feedback
 
-## 8. Access And Reliability
+- [ ] Verify with a real Google Sheet that import status/message columns are updated for hard errors, warnings, and successful rows.
+- [ ] Confirm feedback writes do not overwrite farmer-entered data columns.
+- [x] Add regression coverage for warning-only preview behavior versus hard-error behavior.
+- [x] Update `GOOGLE_SHEETS_MANUAL_QA.md` with the final feedback verification steps.
 
-- Add an access health check to status so revoked access is visible before sync.
-- Add bounded retries for transient Google API failures.
-- Do not retry validation/data-shape failures.
-- Rate-limit manual sync per cycle/user.
-- Expose background sync enablement and frequency controls per cycle.
+### 5. Finish Access And Background Sync Controls
 
-## 9. Observability
+- [ ] Decide whether `SHEETS_STATUS_ACCESS_CHECK=true` should be enabled in staging and production.
+- [x] Add user-facing copy for revoked or inaccessible spreadsheet states.
+- [x] Keep global 30-minute sync as the beta decision; per-cycle controls are deferred.
 
-- Log sync job ID, cycle ID, spreadsheet ID, status, duration, and per-tab counts.
-- Track lock contention and stale-preview failures.
-- Add alertable error categories for Google auth, Google quota, validation, and database write failures.
-- Add metrics hooks around Google API calls and DB writes.
+### 6. Add Production Observability Hooks
+
+- [x] Persist sync ID, cycle ID, spreadsheet ID, status, duration, rows-per-second, per-tab counts, and error category in sync logs.
+- [x] Emit the same operational fields in worker logs without raw row contents.
+- [ ] Add metrics hooks around Google API reads/writes and database writes.
+- [ ] Add alert thresholds for repeated auth failures, quota failures, stale-preview failures, and database write failures.
+- [ ] Ensure logs never include raw sheet row contents beyond controlled rejected-row diagnostics.
+
+### 7. Final Verification
+
+- [x] Run backend focused tests:
+
+```bash
+cd core-be-teramina-main
+python -m pytest -q tests/test_google_sheets.py
+```
+
+- [x] Run frontend focused tests:
+
+```bash
+cd fe-teramina-main
+yarn test src/tests/components/google-sheets.test.tsx
+```
+
+- [x] Run full production-bound gates before merge:
+
+```bash
+cd fe-teramina-main && yarn lint && yarn typecheck && yarn test && yarn build
+cd ../core-be-teramina-main && python -m pytest -q && python manage.py check --deploy
+```
+
+- [ ] Complete `GOOGLE_SHEETS_MANUAL_QA.md` against a real spreadsheet with seeded cycle data.
+- [ ] Update this file after verification so no completed item remains listed as open.
+
+## Deferred Unless Product Scope Changes
+
+- [ ] `mirror_sheet` destructive import mode.
+- [ ] Per-row writeback for every successful imported row, if the current success/error column behavior is enough for beta.
+- [ ] User-configurable background sync frequency, if global scheduled sync is accepted for beta.
+- [ ] Backend tests for per-cycle background sync enablement/frequency, if that product decision changes.

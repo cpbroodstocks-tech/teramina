@@ -14,6 +14,7 @@ class TabSummary(EmbeddedDocument):
     skipped = fields.IntField(default=0)
     rejected = fields.IntField(default=0)
     error = fields.StringField()
+    error_category = fields.StringField()
 
 
 class RejectedRow(EmbeddedDocument):
@@ -32,7 +33,9 @@ class SheetSyncLog(Document):
     started_at = fields.DateTimeField()
     finished_at = fields.DateTimeField()
     duration_seconds = fields.FloatField()
+    rows_per_second = fields.FloatField()
     status = fields.StringField(default="pending")  # "ok" | "partial" | "error"
+    error_category = fields.StringField()
     tab_summaries = fields.EmbeddedDocumentListField(TabSummary)
     rejected_rows = fields.EmbeddedDocumentListField(RejectedRow)
 

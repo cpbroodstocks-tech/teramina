@@ -2,6 +2,7 @@
 import pytest
 from datetime import datetime
 from types import SimpleNamespace
+from uuid import UUID
 from unittest.mock import patch, MagicMock
 from googleapiclient.errors import HttpError
 
@@ -274,6 +275,48 @@ class TestGetStatus:
         assert body.payload["active_sync_id"] is None
         assert body.payload["last_sync_id"] is None
         assert body.payload["tab_summaries"] == []
+
+    @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
+    @patch("teramina.google_sheets.services.sheet_service.SheetIntegration")
+    def test_status_includes_latest_log_observability_fields(self, MockIntegration, MockSyncLog):
+        integration = SimpleNamespace(
+            spreadsheet_id=SPREADSHEET_ID,
+            spreadsheet_url=SPREADSHEET_URL,
+            is_active=True,
+            last_synced=None,
+            last_status="partial",
+            last_error="COST: forbidden",
+            last_error_category="google_auth",
+            rows_synced=0,
+            active_sync_id=None,
+            last_sync_log_id=UUID("12345678-1234-5678-1234-567812345678"),
+        )
+        log = SimpleNamespace(
+            rows_per_second=12.5,
+            error_category="google_auth",
+            tab_summaries=[
+                SimpleNamespace(
+                    tab="COST",
+                    processed=0,
+                    inserted=0,
+                    updated=0,
+                    deleted=0,
+                    skipped=0,
+                    rejected=0,
+                    error="forbidden",
+                    error_category="google_auth",
+                )
+            ],
+        )
+        MockIntegration.objects.return_value.first.return_value = integration
+        MockSyncLog.objects.return_value.first.return_value = log
+
+        code, body = SheetService.get_status(CYCLE_ID)
+
+        assert code == 200
+        assert body.payload["rows_per_second"] == 12.5
+        assert body.payload["error_category"] == "google_auth"
+        assert body.payload["tab_summaries"][0]["error_category"] == "google_auth"
 
 
 # ── SyncCycle tests ───────────────────────────────────────────────────────
@@ -728,17 +771,21 @@ class TestSyncCycle:
         assert sync_log_kwargs["spreadsheet_id"] == SPREADSHEET_ID
         assert sync_log_kwargs["source_fingerprint"] == result["source_fingerprint"]
         assert sync_log_kwargs["duration_seconds"] >= 0
+        assert sync_log_kwargs["rows_per_second"] >= 0
+        assert sync_log_kwargs["error_category"] == "google_auth"
         cost_summary = [
             ts for ts in sync_log_kwargs["tab_summaries"]
             if ts.tab == "COST"
         ][0]
         assert "forbidden" in cost_summary.error
+        assert cost_summary.error_category == "google_auth"
 
+    @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
     @patch("teramina.google_sheets.services.sheet_service.SheetIntegration")
     @patch("teramina.google_sheets.services.sheet_service.Cycle")
     @patch("teramina.google_sheets.services.sheet_service._get_sheets_service")
     def test_expected_fingerprint_mismatch_aborts_before_writes(
-        self, mock_get_svc, MockCycle, MockIntegration
+        self, mock_get_svc, MockCycle, MockIntegration, MockSyncLog
     ):
         mock_get_svc.return_value = _build_sheets_service({
             "DAILY_LOG": [["2024-01-01", "1", "5.0"]],
@@ -747,11 +794,18 @@ class TestSyncCycle:
         integration = self._make_integration()
         MockIntegration.objects.return_value.first.return_value = integration
         MockCycle.objects.return_value.first.return_value = self._make_cycle()
+        saved_log = MagicMock()
+        saved_log.sync_id = UUID("12345678-1234-5678-1234-567812345678")
+        MockSyncLog.return_value.save.return_value = saved_log
 
         result = SheetService.sync_cycle(CYCLE_ID, expected_fingerprint="stale")
 
         assert result["error"] == "Sheet changed since preview. Run preview-sync again."
+        assert result["error_category"] == "stale_preview"
         assert integration.last_status == "error"
+        assert integration.last_error_category == "stale_preview"
+        assert integration.last_sync_log_id
+        assert MockSyncLog.call_args.kwargs["error_category"] == "stale_preview"
 
     @patch("teramina.google_sheets.services.sheet_service.SheetSyncLog")
     @patch("teramina.google_sheets.services.sheet_service.FeedRealization")
@@ -1057,8 +1111,56 @@ class TestSheetController:
         assert body.payload["spreadsheet_id"] is None
         assert body.payload["source_fingerprint"] is None
         assert body.payload["duration_seconds"] is None
+        assert body.payload["rows_per_second"] is None
+        assert body.payload["error_category"] is None
         assert body.payload["tab_summaries"][0]["deleted"] == 0
         assert body.payload["tab_summaries"][0]["error"] is None
+        assert body.payload["tab_summaries"][0]["error_category"] is None
+
+    @patch("teramina.google_sheets.controllers.sheet_controller.SheetSyncLog")
+    @patch("teramina.google_sheets.controllers.sheet_controller.verify_cycle_owner")
+    @patch("teramina.google_sheets.controllers.sheet_controller.get_signed_in_user")
+    def test_sync_log_can_filter_by_sync_id(self, mock_user, mock_owner, MockSyncLog):
+        from teramina.google_sheets.controllers.sheet_controller import get_sync_log
+
+        sync_id = "12345678-1234-5678-1234-567812345678"
+        mock_user.return_value = SimpleNamespace(id=USER_ID)
+        mock_owner.return_value = True
+        log = SimpleNamespace(
+            sync_id=sync_id,
+            cycle_id=CYCLE_ID,
+            spreadsheet_id=SPREADSHEET_ID,
+            source_fingerprint="fingerprint-1",
+            started_at=datetime(2024, 1, 1),
+            finished_at=datetime(2024, 1, 1),
+            duration_seconds=2.0,
+            rows_per_second=4.5,
+            status="error",
+            error_category="google_auth",
+            tab_summaries=[
+                SimpleNamespace(
+                    tab="COST",
+                    processed=0,
+                    inserted=0,
+                    updated=0,
+                    deleted=0,
+                    skipped=0,
+                    rejected=0,
+                    error="forbidden",
+                    error_category="google_auth",
+                )
+            ],
+            rejected_rows=[],
+        )
+        MockSyncLog.objects.return_value.first.return_value = log
+
+        code, body = get_sync_log(MagicMock(), CYCLE_ID, sync_id)
+
+        assert code == 200
+        MockSyncLog.objects.assert_called_once_with(cycle_id=CYCLE_ID, sync_id=UUID(sync_id))
+        assert body.payload["sync_id"] == sync_id
+        assert body.payload["rows_per_second"] == 4.5
+        assert body.payload["error_category"] == "google_auth"
 
     @patch("teramina.google_sheets.controllers.sheet_controller.sync_single_cycle")
     @patch("teramina.google_sheets.controllers.sheet_controller.cache")
@@ -1166,6 +1268,41 @@ class TestSheetController:
         assert body.message == "Strict import blocked because the sheet has errors."
         mock_cache.set.assert_not_called()
 
+    @patch("teramina.google_sheets.controllers.sheet_controller.cache")
+    @patch("teramina.google_sheets.controllers.sheet_controller.SheetIntegration")
+    @patch("teramina.google_sheets.controllers.sheet_controller.SheetService")
+    @patch("teramina.google_sheets.controllers.sheet_controller.verify_cycle_owner")
+    @patch("teramina.google_sheets.controllers.sheet_controller.get_signed_in_user")
+    def test_preview_sync_strict_allows_warning_only_rows(
+        self, mock_user, mock_owner, MockService, MockIntegration, mock_cache
+    ):
+        from teramina.google_sheets.controllers.sheet_controller import preview_sync
+
+        mock_user.return_value = SimpleNamespace(id=USER_ID)
+        mock_owner.return_value = True
+        MockIntegration.objects.return_value.first.return_value = MagicMock()
+        MockService.sync_cycle.return_value = {
+            "summary": {"DAILY_LOG": {"inserted": 1, "updated": 0, "skipped": 0, "rejected": 1}},
+            "rejected_rows": [
+                {
+                    "tab": "DAILY_LOG",
+                    "row_number": 3,
+                    "field": "do_morning",
+                    "raw_value": "3.9",
+                    "reason": "warn:low_do",
+                }
+            ],
+            "source_fingerprint": "fingerprint-1",
+            "status": "partial",
+        }
+
+        code, body = preview_sync(MagicMock(), CYCLE_ID, import_mode="strict")
+
+        assert code == 200
+        assert body.payload["rows_warning"] == 1
+        assert body.payload["rows_error"] == 0
+        mock_cache.set.assert_called_once()
+
     @patch("teramina.google_sheets.controllers.sheet_controller.sync_single_cycle")
     @patch("teramina.google_sheets.controllers.sheet_controller.cache")
     @patch("teramina.google_sheets.controllers.sheet_controller.SheetIntegration")
@@ -1256,7 +1393,25 @@ class TestSyncTasks:
         result = sync_single_cycle(CYCLE_ID, import_mode="strict")
 
         assert result["error"] == "Strict import blocked because the sheet has errors."
+        assert result["error_category"] == "validation"
         assert MockService.sync_cycle.call_count == 1
         assert MockService.sync_cycle.call_args.kwargs["dry_run"] is True
         assert integration.last_status == "error"
+        assert integration.last_error_category == "validation"
         mock_cache.delete.assert_called_once()
+
+    @patch("teramina.google_sheets.tasks.sync_tasks.cache")
+    @patch("teramina.google_sheets.tasks.sync_tasks.SheetIntegration")
+    def test_lock_contention_marks_error_category(self, MockIntegration, mock_cache):
+        mock_cache.add.return_value = False
+        integration = MagicMock()
+        MockIntegration.objects.return_value.first.return_value = integration
+
+        from teramina.google_sheets.tasks.sync_tasks import sync_single_cycle
+        result = sync_single_cycle(CYCLE_ID, sync_id="12345678-1234-5678-1234-567812345678")
+
+        assert result["error"] == "Sync already in progress"
+        assert result["error_category"] == "lock_contention"
+        assert integration.last_status == "error"
+        assert integration.last_error_category == "lock_contention"
+        mock_cache.delete.assert_not_called()

@@ -181,6 +181,44 @@ describe("GoogleSheets", () => {
       expect(screen.getByText("Sync ID: sync-123")).toBeInTheDocument();
     });
 
+    it("loads sync log for the active sync id", async () => {
+      let requestedSyncId = "";
+      server.use(
+        http.get("*/sheets/status", () =>
+          HttpResponse.json(connectedPayload({
+            last_status: "queued",
+            active_sync_id: "sync-123",
+          }))
+        ),
+        http.get("*/sheets/sync-log", ({ request }) => {
+          requestedSyncId = new URL(request.url).searchParams.get("sync_id") || "";
+          return HttpResponse.json({ message: "No sync log found for this sync" }, { status: 404 });
+        })
+      );
+
+      renderComponent();
+      await screen.findByText("Queued");
+      await waitFor(() => expect(requestedSyncId).toBe("sync-123"));
+    });
+
+    it("shows access check failures and sync observability fields", async () => {
+      server.use(
+        http.get("*/sheets/status", () =>
+          HttpResponse.json(connectedPayload({
+            access_status: "error",
+            access_error: "Spreadsheet permission denied",
+            rows_per_second: 8.25,
+            error_category: "google_auth",
+          }))
+        )
+      );
+
+      renderComponent();
+      expect(await screen.findByText(/Spreadsheet access check failed/i)).toBeInTheDocument();
+      expect(screen.getByText("Throughput: 8.25 rows/sec")).toBeInTheDocument();
+      expect(screen.getByText("Error category: Google access")).toBeInTheDocument();
+    });
+
     it("shows Error chip and inline error text for error status", async () => {
       server.use(
         http.get("*/sheets/status", () =>

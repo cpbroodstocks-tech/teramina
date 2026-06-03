@@ -21,6 +21,10 @@ class SheetStatusSchema(BaseModel):
     rows_synced: int
     active_sync_id: Optional[str] = None
     last_sync_id: Optional[str] = None
+    access_status: Optional[str] = None
+    access_error: Optional[str] = None
+    rows_per_second: Optional[float] = None
+    error_category: Optional[str] = None
 
 
 class TabSummarySchema(BaseModel):
@@ -32,6 +36,7 @@ class TabSummarySchema(BaseModel):
     skipped: int
     rejected: int
     error: Optional[str] = None
+    error_category: Optional[str] = None
 
 
 class RejectedRowSchema(BaseModel):
@@ -50,7 +55,9 @@ class SheetSyncLogSchema(BaseModel):
     started_at: Optional[datetime]
     finished_at: Optional[datetime]
     duration_seconds: Optional[float] = None
+    rows_per_second: Optional[float] = None
     status: str
+    error_category: Optional[str] = None
     tab_summaries: list[TabSummarySchema]
     rejected_rows: list[RejectedRowSchema]
 

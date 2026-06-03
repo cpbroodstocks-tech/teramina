@@ -27,6 +27,7 @@ Use this checklist against a real Google Sheet after backend, frontend, MongoDB,
   - physiological warning values that are not hard failures
 - Run `Review & Sync` with `Import valid rows`.
 - Confirm preview shows valid, warning, and error counts correctly.
+- Confirm warning-only rows increase the warning count but do not increase the error count.
 - Confirm invalid rows are not imported and valid rows are queued.
 - Confirm `Import Status` and `Import Message` are written beside rejected/warning rows.
 
@@ -35,9 +36,23 @@ Use this checklist against a real Google Sheet after backend, frontend, MongoDB,
 - Set import mode to `Strict import`.
 - Run `Review & Sync` while errors exist.
 - Confirm preview is blocked and no sync is queued.
+- Leave only warning rows in the sheet.
+- Confirm strict preview allows import when no hard errors remain.
 - Fix the invalid rows.
 - Run `Review & Sync` in strict mode again.
 - Confirm import queues and completes.
+
+## Status, Polling, And Observability
+
+- Start an import from `Review & Sync`.
+- Confirm the UI shows `Queued` or `Syncing...` and a `Sync ID`.
+- Confirm the sync log shown in the UI belongs to the active/latest sync ID, not an older import.
+- Confirm completed imports show throughput as `rows/sec` when the backend returns it.
+- Confirm tab summaries show inserted, updated, deleted, skipped, and issue counts.
+- Create or simulate a stale preview.
+- Confirm the UI shows error category `Stale preview`.
+- Create or simulate a Google access failure.
+- Confirm the UI shows error category `Google access`.
 
 ## Stale Preview
 
@@ -46,6 +61,7 @@ Use this checklist against a real Google Sheet after backend, frontend, MongoDB,
 - Confirm the preview.
 - Confirm sync fails with `Sheet changed since preview. Run preview-sync again.`
 - Confirm the UI shows `Review Again`.
+- Confirm the sync log/status payload classifies the failure as `stale_preview`.
 
 ## Manual Sync
 
@@ -53,6 +69,16 @@ Use this checklist against a real Google Sheet after backend, frontend, MongoDB,
 - Confirm status transitions through `queued`/`syncing` and ends in `Synced` or `Partial`.
 - Confirm duplicate clicks within 60 seconds are rate-limited.
 - Confirm concurrent sync attempts return `Sync already in progress`.
+- Confirm lock-contention failures are classified as `lock_contention`.
+
+## Access Health
+
+- Enable `SHEETS_STATUS_ACCESS_CHECK=true` in a non-production environment.
+- Confirm connected sheets show no access warning when the service account can read the sheet.
+- Remove service-account access from the sheet.
+- Refresh the app.
+- Confirm the UI shows the spreadsheet access warning and the backend status payload includes `access_status=error`.
+- Restore sheet access before continuing.
 
 ## Delete Marker
 
