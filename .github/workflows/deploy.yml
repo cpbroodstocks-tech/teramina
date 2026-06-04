@@ -70,9 +70,9 @@ jobs:
           JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
           MONGODB_URI=${{ secrets.MONGODB_URI }}
           FIREBASE_CREDENTIALS_JSON=${{ secrets.FIREBASE_CREDENTIALS_JSON }}
-          FIREBASE_CREDENTIALS_PATH=/secrets/firebase-sa.json
+          FIREBASE_CREDENTIALS_PATH=
           GOOGLE_APPLICATION_CREDENTIALS_JSON=${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
-          GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcs-sa.json
+          GOOGLE_APPLICATION_CREDENTIALS=
           ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
           open_ai_key=${{ secrets.OPENAI_API_KEY }}
