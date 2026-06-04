@@ -169,6 +169,7 @@ jobs:
           VITE_SUMMARY_MODEL: ${{ secrets.VITE_SUMMARY_MODEL }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
           VITE_GA_MEASUREMENT_ID: ${{ secrets.VITE_GA_MEASUREMENT_ID }}
+          HUSKY: 0
         run: |
           corepack enable
           corepack prepare yarn@1.22.22 --activate
