@@ -48,6 +48,35 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: fe-teramina-main/yarn.lock
+
+      - name: Build frontend artifact
+        working-directory: fe-teramina-main
+        env:
+          VITE_ENDPOINT: ${{ secrets.VITE_ENDPOINT }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
+          VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
+          VITE_SUMMARY_MODEL: ${{ secrets.VITE_SUMMARY_MODEL }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_GA_MEASUREMENT_ID: ${{ secrets.VITE_GA_MEASUREMENT_ID }}
+        run: |
+          corepack enable
+          corepack prepare yarn@1.22.22 --activate
+          yarn install --frozen-lockfile
+          yarn build
+          tar -czf ../frontend-dist.tgz dist
+
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -155,6 +184,9 @@ jobs:
       - name: Add server to known hosts
         run: echo "${{ secrets.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
 
+      - name: Upload frontend artifact
+        run: scp -o ServerAliveInterval=30 -o ServerAliveCountMax=120 frontend-dist.tgz ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/tmp/teramina-frontend-dist.tgz
+
       - name: Write frontend environment on server
         run: |
           ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=120 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
@@ -185,8 +217,12 @@ jobs:
           git checkout main
           git pull --ff-only origin main
           cd fe-teramina-main/
+          if [ -d dist ]; then tar -czf /tmp/teramina_fe_prev_dist.tgz dist; else rm -f /tmp/teramina_fe_prev_dist.tgz; fi
+          rm -rf dist
+          tar -xzf /tmp/teramina-frontend-dist.tgz
           docker-compose down
-          docker-compose up -d --build
+          docker-compose up -d
+          rm -f /tmp/teramina-frontend-dist.tgz
           EOF
 
       - name: Frontend health check with rollback
@@ -198,6 +234,6 @@ jobs:
             echo "Frontend health check passed."
           else
             echo "Frontend health check failed; rolling back."
-            ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "set -e; cd ~/teramina/; git checkout main; git reset --hard \$(cat /tmp/teramina_fe_prev_sha); cd fe-teramina-main/; docker-compose down; docker-compose up -d --build"
+            ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "set -e; cd ~/teramina/; git checkout main; git reset --hard \$(cat /tmp/teramina_fe_prev_sha); cd fe-teramina-main/; rm -rf dist; if [ -f /tmp/teramina_fe_prev_dist.tgz ]; then tar -xzf /tmp/teramina_fe_prev_dist.tgz; fi; docker-compose down; docker-compose up -d"
             exit 1
           fi
