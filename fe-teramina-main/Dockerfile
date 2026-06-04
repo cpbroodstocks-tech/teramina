@@ -1,5 +1,5 @@
 # Build stage
-FROM node:18 AS build
+FROM node:20 AS build
 
 ARG VITE_ENDPOINT
 ARG VITE_FIREBASE_PROJECT_ID
