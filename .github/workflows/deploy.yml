@@ -60,7 +60,7 @@ jobs:
         run: |
           ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
           set -e
-          cd ~/teramina/core-be-teramina/
+          cd ~/teramina/core-be-teramina-main/
           cat > .env << 'ENVEOF'
           DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
           DJANGO_DEBUG=False
@@ -97,10 +97,11 @@ jobs:
         run: |
           ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
           set -e
-          cd ~/teramina/core-be-teramina/
+          cd ~/teramina/
           git rev-parse HEAD > /tmp/teramina_be_prev_sha
           git checkout main
           git pull --ff-only origin main
+          cd core-be-teramina-main/
           docker-compose down
           docker-compose up -d --build
           EOF
@@ -110,7 +111,7 @@ jobs:
         run: |
           ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
           set -e
-          cd ~/teramina/core-be-teramina/
+          cd ~/teramina/core-be-teramina-main/
           docker-compose exec -T web python manage.py seed_commercial_layer
           EOF
 
@@ -119,7 +120,7 @@ jobs:
         run: |
           ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
           set -e
-          cd ~/teramina/core-be-teramina/
+          cd ~/teramina/core-be-teramina-main/
           docker-compose exec -T web python manage.py reindex_advisory_sources
           EOF
 
@@ -134,9 +135,10 @@ jobs:
             echo "Backend health check failed; rolling back."
             ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'ROLLBACK'
             set -e
-            cd ~/teramina/core-be-teramina/
+            cd ~/teramina/
             git checkout main
             git reset --hard $(cat /tmp/teramina_be_prev_sha)
+            cd core-be-teramina-main/
             docker-compose down
             docker-compose up -d --build
             ROLLBACK
@@ -165,7 +167,7 @@ jobs:
         run: |
           ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=120 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
           set -e
-          cd ~/teramina/fe-teramina/
+          cd ~/teramina/fe-teramina-main/
           cat > .env << 'ENVEOF'
           VITE_ENDPOINT=${{ secrets.VITE_ENDPOINT }}
           VITE_FIREBASE_PROJECT_ID=${{ secrets.VITE_FIREBASE_PROJECT_ID }}
@@ -186,10 +188,11 @@ jobs:
         run: |
           ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=120 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
           set -e
-          cd ~/teramina/fe-teramina/
+          cd ~/teramina/
           git rev-parse HEAD > /tmp/teramina_fe_prev_sha
           git checkout main
           git pull --ff-only origin main
+          cd fe-teramina-main/
           docker-compose down
           docker-compose up -d --build
           EOF
@@ -205,9 +208,10 @@ jobs:
             echo "Frontend health check failed; rolling back."
             ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'ROLLBACK'
             set -e
-            cd ~/teramina/fe-teramina/
+            cd ~/teramina/
             git checkout main
             git reset --hard $(cat /tmp/teramina_fe_prev_sha)
+            cd fe-teramina-main/
             docker-compose down
             docker-compose up -d --build
             ROLLBACK

@@ -19,4 +19,4 @@ services:
         - VITE_SENTRY_DSN
         - VITE_GA_MEASUREMENT_ID
     ports:
-      - "5173:8080"
+      - "80:8080"

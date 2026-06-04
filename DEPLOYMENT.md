@@ -107,12 +107,22 @@ Prefer compact JSON GitHub secrets for hosted deployments. Use file mounts only 
 
 ## Expected Server Checkout Paths
 
-The deploy workflow assumes the SSH server has these existing checkouts:
+The deploy workflow assumes the SSH server has one existing monorepo checkout:
 
-- backend: `~/teramina/core-be-teramina/`
-- frontend: `~/teramina/fe-teramina/`
+- repo root: `~/teramina/`
+- backend: `~/teramina/core-be-teramina-main/`
+- frontend: `~/teramina/fe-teramina-main/`
 
-Each checkout must track `origin/main` and contain the relevant `docker-compose.yml`.
+The root checkout must track `origin/main`. The workflow runs `git pull --ff-only origin main` from `~/teramina/`, then runs Docker Compose inside the relevant service directory.
+
+## Exposed Ports
+
+The deployment health checks expect these public HTTP endpoints on the SSH host:
+
+- backend health check: `http://<SSH_HOST>:8000/health/`
+- frontend health check: `http://<SSH_HOST>/`
+
+The frontend Docker Compose file maps host port `80` to nginx port `8080`, so the frontend health check works without a separate reverse proxy. If you later add nginx, Caddy, Cloudflare Tunnel, or another TLS-terminating proxy on the server, update either the frontend port mapping or the workflow health check so they keep matching.
 
 ## Pre-Deployment Checks
 
