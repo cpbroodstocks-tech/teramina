@@ -133,15 +133,7 @@ jobs:
             echo "Backend health check passed."
           else
             echo "Backend health check failed; rolling back."
-            ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'ROLLBACK'
-            set -e
-            cd ~/teramina/
-            git checkout main
-            git reset --hard $(cat /tmp/teramina_be_prev_sha)
-            cd core-be-teramina-main/
-            docker-compose down
-            docker-compose up -d --build
-            ROLLBACK
+            ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "set -e; cd ~/teramina/; git checkout main; git reset --hard \$(cat /tmp/teramina_be_prev_sha); cd core-be-teramina-main/; docker-compose down; docker-compose up -d --build"
             exit 1
           fi
 
@@ -206,14 +198,6 @@ jobs:
             echo "Frontend health check passed."
           else
             echo "Frontend health check failed; rolling back."
-            ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'ROLLBACK'
-            set -e
-            cd ~/teramina/
-            git checkout main
-            git reset --hard $(cat /tmp/teramina_fe_prev_sha)
-            cd fe-teramina-main/
-            docker-compose down
-            docker-compose up -d --build
-            ROLLBACK
+            ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "set -e; cd ~/teramina/; git checkout main; git reset --hard \$(cat /tmp/teramina_fe_prev_sha); cd fe-teramina-main/; docker-compose down; docker-compose up -d --build"
             exit 1
           fi
