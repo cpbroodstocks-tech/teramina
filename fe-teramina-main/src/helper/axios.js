@@ -3,9 +3,26 @@ import { getAuth, signOut } from "firebase/auth";
 import { useLocalStorage } from "hooks/useLocalStorage";
 import { useToastStore } from "store/toast.store";
 
+const getEndpoint = () => {
+  const endpoint = import.meta.env.VITE_ENDPOINT;
+  if (typeof window === "undefined" || !endpoint) return endpoint;
+
+  try {
+    const url = new URL(endpoint);
+    if (url.hostname === window.location.hostname && url.port === "8000" && window.location.protocol === "http:") {
+      url.protocol = "http:";
+      return url.toString().replace(/\/$/, "");
+    }
+  } catch {
+    return endpoint;
+  }
+
+  return endpoint;
+};
+
 const AXIOS = axios.create({
   withCredentials: true,
-  baseURL: import.meta.env.VITE_ENDPOINT,
+  baseURL: getEndpoint(),
   headers: {
     "Content-Type": "application/json",
   }
