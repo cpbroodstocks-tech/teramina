@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 import { useToastStore } from "store/toast.store";
 import { useLoadCachedInsight } from "features/cycle-detail/queries";
+import { getEndpoint } from "helper/axios";
 
 const TYPES = ["performance", "water_quality", "feeding", "harvest", "economics", "weekly"];
 
@@ -66,7 +67,7 @@ const AiInsights = () => {
     setCached(false);
     setStreamStatus("Analyzing…");
 
-    const baseUrl = import.meta.env.VITE_ENDPOINT || "";
+    const baseUrl = getEndpoint() || "";
     const token = localStorage.getItem("authentication") || "";
     const url = `${baseUrl}/summarize/insight/stream?cycle_id=${cycle_id}&type=${type}`;
 

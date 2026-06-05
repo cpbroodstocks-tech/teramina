@@ -29,6 +29,7 @@ import {
   useCreateAgentMemory,
 } from "components/agent-chat/queries";
 import { buildAgentContext } from "components/agent-chat/context";
+import { getEndpoint } from "helper/axios";
 
 const SESSION_KEY = "agent_session_id";
 
@@ -102,7 +103,7 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
       pathname: location.pathname,
     });
     const token = localStorage.getItem("authentication") || "";
-    const baseURL = import.meta.env.VITE_ENDPOINT || "";
+    const baseURL = getEndpoint() || "";
     const memoryCandidate = extractMemoryCandidate(userMessage);
 
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);

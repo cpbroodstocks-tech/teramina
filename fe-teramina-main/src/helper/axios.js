@@ -92,4 +92,4 @@ AXIOS.interceptors.response.use(
 );
 
 
-export { AXIOS as axios }
+export { AXIOS as axios, getEndpoint }
