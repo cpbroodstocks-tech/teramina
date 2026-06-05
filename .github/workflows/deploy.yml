@@ -62,15 +62,15 @@ jobs:
           set -e
           cd ~/teramina/core-be-teramina-main/
           mkdir -p secrets
-          chmod 700 secrets
+          chmod 755 secrets
           cat > secrets/firebase-admin-sdk.json << 'FIREBASEEOF'
           ${{ secrets.FIREBASE_CREDENTIALS_JSON }}
           FIREBASEEOF
           cat > secrets/google-application-credentials.json << 'GOOGLEEOF'
           ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
           GOOGLEEOF
-          chmod 600 secrets/firebase-admin-sdk.json
-          chmod 600 secrets/google-application-credentials.json
+          chmod 644 secrets/firebase-admin-sdk.json
+          chmod 644 secrets/google-application-credentials.json
           cat > .env << 'ENVEOF'
           DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
           DJANGO_DEBUG=False
