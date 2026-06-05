@@ -37,6 +37,13 @@ def env_list(name, default=""):
     return [value.strip() for value in os.getenv(name, default).split(",") if value.strip()]
 
 
+def env_bool(name, default=False):
+    value = os.getenv(name)
+    if value is None or value == "":
+        return default
+    return value.lower() in {"1", "true", "yes", "on"}
+
+
 def require_env(name):
     value = os.getenv(name)
     if not value:
@@ -178,7 +185,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Production security settings (disabled in DEBUG mode so local dev still works)
 if not DEBUG:
     require_env("JWT_SECRET_KEY")
-    SECURE_SSL_REDIRECT = True
+    SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", True)
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
