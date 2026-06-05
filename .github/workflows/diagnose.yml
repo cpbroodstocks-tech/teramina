@@ -1,0 +1,74 @@
+name: Diagnose
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Deployment environment"
+        required: true
+        default: "staging"
+        type: choice
+        options:
+          - staging
+          - production
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend Diagnostics
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
+
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add server to known hosts
+        run: echo "${{ secrets.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+
+      - name: Inspect backend
+        run: |
+          ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          set -e
+          cd ~/teramina/core-be-teramina-main/
+
+          echo "== docker-compose ps =="
+          docker-compose ps
+
+          echo "== backend env/file checks =="
+          docker-compose exec -T web python - << 'PY'
+          import os
+
+          firebase_path = os.getenv("FIREBASE_CREDENTIALS_PATH")
+          google_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+          checks = {
+              "JWT_SECRET_KEY_set": bool(os.getenv("JWT_SECRET_KEY")),
+              "MONGODB_URI_set": bool(os.getenv("MONGODB_URI")),
+              "FIREBASE_CREDENTIALS_JSON_set": bool(os.getenv("FIREBASE_CREDENTIALS_JSON")),
+              "FIREBASE_CREDENTIALS_PATH": firebase_path,
+              "GOOGLE_APPLICATION_CREDENTIALS_set": bool(google_path),
+              "SEEDER_FARM_set": bool(os.getenv("SEEDER_FARM")),
+              "SEEDER_POND_set": bool(os.getenv("SEEDER_POND")),
+              "SEEDER_CYCLE_set": bool(os.getenv("SEEDER_CYCLE")),
+          }
+          for key, value in checks.items():
+              print(f"{key}={value}")
+
+          for label, path in [("firebase", firebase_path), ("google", google_path)]:
+              if not path:
+                  continue
+              try:
+                  with open(path, "rb") as handle:
+                      handle.read(1)
+                  print(f"{label}_credentials_readable=True")
+              except Exception as exc:  # pylint: disable=broad-except
+                  print(f"{label}_credentials_readable=False error={type(exc).__name__}: {exc}")
+          PY
+
+          echo "== recent web logs =="
+          docker-compose logs --tail=300 web
+          EOF
