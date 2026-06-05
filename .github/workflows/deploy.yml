@@ -61,6 +61,16 @@ jobs:
           ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
           set -e
           cd ~/teramina/core-be-teramina-main/
+          mkdir -p secrets
+          chmod 700 secrets
+          cat > secrets/firebase-admin-sdk.json << 'FIREBASEEOF'
+          ${{ secrets.FIREBASE_CREDENTIALS_JSON }}
+          FIREBASEEOF
+          cat > secrets/google-application-credentials.json << 'GOOGLEEOF'
+          ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+          GOOGLEEOF
+          chmod 600 secrets/firebase-admin-sdk.json
+          chmod 600 secrets/google-application-credentials.json
           cat > .env << 'ENVEOF'
           DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
           DJANGO_DEBUG=False
@@ -70,10 +80,10 @@ jobs:
           CSRF_TRUSTED_ORIGINS=${{ secrets.CSRF_TRUSTED_ORIGINS }}
           JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
           MONGODB_URI=${{ secrets.MONGODB_URI }}
-          FIREBASE_CREDENTIALS_JSON=${{ secrets.FIREBASE_CREDENTIALS_JSON }}
-          FIREBASE_CREDENTIALS_PATH=
-          GOOGLE_APPLICATION_CREDENTIALS_JSON=${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
-          GOOGLE_APPLICATION_CREDENTIALS=
+          FIREBASE_CREDENTIALS_JSON=
+          FIREBASE_CREDENTIALS_PATH=/run/secrets/teramina/firebase-admin-sdk.json
+          GOOGLE_APPLICATION_CREDENTIALS_JSON=
+          GOOGLE_APPLICATION_CREDENTIALS=${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON != '' && '/run/secrets/teramina/google-application-credentials.json' || '' }}
           ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
           open_ai_key=${{ secrets.OPENAI_API_KEY }}
