@@ -13,6 +13,7 @@ const SERVICE_WORKER = VitePWA({
   workbox: {
     clientsClaim: true,
     skipWaiting: true,
+    cleanupOutdatedCaches: true,
     globPatterns: ["**/*.{html,js,css,ico,png,gif,woff2,svg}"],
     globIgnores: ["**/laptop.svg"],
   },
