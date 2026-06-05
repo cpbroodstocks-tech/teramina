@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 import re
@@ -14,6 +15,8 @@ from ...user.models.user_model import User
 from ...schemas.general_schema import DataErrorSchema, DataSuccessSchema
 
 from ...helpers.default_data_updater import DataSeeder
+
+logger = logging.getLogger("teramina")
 
 WHITE_LIST = [
     "anggoro.pras11@gmail.com",
@@ -78,8 +81,8 @@ def decode_token(token):
         decoded_token = auth.verify_id_token(token)
         return {
             "email": decoded_token["email"],
-            "photoURL": decoded_token["picture"],
-            "displayName": decoded_token["name"],
+            "photoURL": decoded_token.get("picture", ""),
+            "displayName": decoded_token.get("name") or decoded_token["email"].split("@")[0],
         }
     except InvalidIdTokenError as exc:
         raise ValueError("Could not verify token signature") from exc
@@ -113,13 +116,20 @@ def signed_token_using_firebase(token):
                 picture=decoded_token["photoURL"],
             )
             user.save()
-            data_seeder = DataSeeder(
-                farm_id=os.getenv("SEEDER_FARM"),
-                pond_id=os.getenv("SEEDER_POND"),
-                cycle_id=os.getenv("SEEDER_CYCLE"),
-                user_id=str(user.id),
-            )
-            data_seeder.set_data()
+            seeder_farm = os.getenv("SEEDER_FARM")
+            seeder_pond = os.getenv("SEEDER_POND")
+            seeder_cycle = os.getenv("SEEDER_CYCLE")
+            if seeder_farm and seeder_pond and seeder_cycle:
+                try:
+                    data_seeder = DataSeeder(
+                        farm_id=seeder_farm,
+                        pond_id=seeder_pond,
+                        cycle_id=seeder_cycle,
+                        user_id=str(user.id),
+                    )
+                    data_seeder.set_data()
+                except Exception as exc:  # pylint: disable=broad-except
+                    logger.warning("Default data seeding skipped for user %s: %s", user.email, exc)
 
         jwt_payload = {
             "exp": datetime.now(timezone.utc) + timedelta(minutes=120),
