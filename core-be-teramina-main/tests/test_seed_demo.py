@@ -258,6 +258,18 @@ def test_existing_user_without_dashboard_ready_data_gets_seed_once(monkeypatch):
     assert status == 400
     assert response.message == f"Dashboard data with cycle {invalid_cycle.id} doesn't exist"
 
+    status, response = FilterData(str(user.id)).wq_filter(str(invalid_farm.id), str(invalid_pond.id))
+    assert status == 200
+    assert response.payload == []
+
+    status, response = FilterData(str(user.id)).wq_filter(
+        str(invalid_farm.id),
+        str(invalid_pond.id),
+        str(invalid_cycle.id),
+    )
+    assert status == 400
+    assert response.message == f"Dashboard data with cycle {invalid_cycle.id} doesn't exist"
+
     assert ensure_default_data_for_user(str(user.id)) is False
     assert Farm.objects(user_id=str(user.id)).count() == farm_count
 

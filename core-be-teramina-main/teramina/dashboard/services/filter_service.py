@@ -186,38 +186,30 @@ class FilterData:
     def get_start_date(self, cycles: list):
         """get start date"""
 
-        start_date = 0
+        start_date = None
         for cycle_id in cycles:
-            if start_date == 0:
-                start_date = (
-                    Cycle.objects(id=cycle_id).only("start_date").first().start_date
-                )
-            else:
-                new_start_date = (
-                    Cycle.objects(id=cycle_id).only("start_date").first().start_date
-                )
-                if (start_date - new_start_date).days > 0:
-                    start_date = new_start_date
+            cycle = Cycle.objects(id=cycle_id).only("start_date").first()
+            if not cycle or not cycle.start_date:
+                raise ValueError(f"Cycle {cycle_id} has no start date")
+            if start_date is None or cycle.start_date < start_date:
+                start_date = cycle.start_date
 
         return start_date
 
     def get_end_date(self, cycles: list):
         """get end date"""
 
-        end_date = 0
+        end_date = None
         for cycle_id in cycles:
             cycle_data = (
                 CycleData.objects(cycle_id=cycle_id).only("result_data").first()
             )
-            if not cycle_data:
-                break
+            if not cycle_data or not cycle_data.result_data:
+                raise ValueError(f"Data with cycle {cycle_id} doesn't exist")
 
-            if end_date == 0:
-                end_date = _as_datetime(cycle_data["result_data"][-1]["date"])
-            else:
-                new_end_date = _as_datetime(cycle_data["result_data"][-1]["date"])
-                if (new_end_date - end_date).days > 0:
-                    end_date = new_end_date
+            new_end_date = _as_datetime(cycle_data["result_data"][-1]["date"])
+            if end_date is None or new_end_date > end_date:
+                end_date = new_end_date
 
         return end_date
 
@@ -255,10 +247,12 @@ class FilterData:
         """water quality data"""
         try:
             if not cycle_id:
-                data = self.get_list_data_main(farm_id, pond_id)
+                data = self.get_list_data_main(farm_id, pond_id, dashboard_ready=True)
                 result_data = [{"id": str(i.id), "name": i.name} for i in data]
             else:
                 cycles = cycle_id.split(",")
+                for selected_cycle_id in cycles:
+                    self.get_list_data(farm_id, pond_id, selected_cycle_id)
                 start_date = datetime.strftime(self.get_start_date(cycles), "%Y-%m-%d")
                 end_date = datetime.strftime(self.get_end_date(cycles), "%Y-%m-%d")
                 variables = self.get_current_variable(cycles)
