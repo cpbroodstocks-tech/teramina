@@ -24,7 +24,6 @@ const useFilter = () => {
     farm_id: "",
     pond_id: "",
     cycle_id: [],
-    variables: [],
   });
 
   const [filterList, setFilter] = useState(() => ({
@@ -67,17 +66,18 @@ const useFilter = () => {
         filter: {
           farms: previousValue.filter.farms,
           ponds: undefined,
-          cycles: undefined,
+          cycles: [],
           daterange: {
             start_date: dayjs(new Date()).format("MM/DD/YYYY"),
             end_date: dayjs(N_DOC_AFTER).format("MM/DD/YYYY"),
           },
+          variables: [],
         },
       }));
       filterQueryParams.current = {
         farm_id: "",
         pond_id: "",
-        cycle_id: [""],
+        cycle_id: [],
       };
     },
     dirty: formState.isDirty,
@@ -97,13 +97,13 @@ const useFilter = () => {
 
     const indexToExclude = fields.indexOf(key);
 
-    if (key !== "start_date" || key !== "end_date")
+    if (["farm_id", "pond_id", "cycle_id"].includes(key))
       filterQueryParams.current[key] = value;
     setValue(key, value, { shouldDirty: true });
 
     for (const field of fields.slice(indexToExclude + 1)) {
-      if (field !== "start_date" || field !== "end_date")
-        filterQueryParams.current[field] = "";
+      if (["farm_id", "pond_id", "cycle_id"].includes(field))
+        filterQueryParams.current[field] = field === "cycle_id" ? [] : "";
       if (field === "start_date" || field === "end_date")
         setValue(field, "");
       if (field === "cycle_id" || field === "variables")
@@ -113,7 +113,7 @@ const useFilter = () => {
       }
     }
 
-    if (value === "") {
+    if (value === "" || (Array.isArray(value) && value.length === 0)) {
       let fieldToReset = [];
       switch (key) {
       case "farm_id":
@@ -140,10 +140,10 @@ const useFilter = () => {
           setValue("start_date", "");
           setValue("end_date", "");
         } else if (field === "cycles") {
-          resetFilterField[field] = [""];
+          resetFilterField[field] = [];
           setValue("cycle_id", []);
         } else if (field === "variables") {
-          resetFilterField[field] = [""];
+          resetFilterField[field] = [];
           setValue("variables", []);
         } else {
           resetFilterField[field] = "";
@@ -164,24 +164,33 @@ const useFilter = () => {
     let url = "/dashboard/wq-filter";
     url = `${url}?${formatToQueryParams(filterQueryParams.current)}`;
 
-    const response = await fetchFilterUrl(url);
-    if (!response) throw response;
+    let response;
+    try {
+      response = await fetchFilterUrl(url);
+    } catch {
+      return;
+    }
+
+    const payload = Array.isArray(response?.payload) ? response.payload : [];
 
     const updateListItem = {};
     switch (key) {
     case "farm_id":
-      updateListItem["ponds"] = response.payload;
+      updateListItem["ponds"] = payload;
       break;
     case "pond_id":
-      updateListItem["cycles"] = response.payload;
+      updateListItem["cycles"] = payload;
       break;
-    case "cycle_id":
+    case "cycle_id": {
+      const cycleMetadata = payload[0]?.data;
+      if (!cycleMetadata) return;
       updateListItem["daterange"] = {
-        start_date: response.payload[0].data.start_date,
-        end_date: response.payload[0].data.end_date,
+        start_date: cycleMetadata.start_date,
+        end_date: cycleMetadata.end_date,
       };
-      updateListItem["variables"] = response.payload[0].data.variables;
+      updateListItem["variables"] = Array.isArray(cycleMetadata.variables) ? cycleMetadata.variables : [];
       break;
+    }
     }
 
     setFilter((previousValue) => ({

@@ -81,6 +81,7 @@ jobs:
           from teramina.dashboard.services.historical.feed import DashboardFeed
           from teramina.dashboard.services.readiness import is_dashboard_ready_cycle
           from teramina.helpers.default_data_updater import user_has_dashboard_data
+          from teramina.water_quality_dashboard.services.water_quality_service import WaterQuality
 
           for user in User.objects.only('id', 'email', 'is_there_data'):
               user_id = str(user.id)
@@ -97,7 +98,10 @@ jobs:
                           end_date = date_range.get('end_date') if isinstance(date_range, dict) else None
                           economics_status = DashboardEconomic(str(farm.id), str(pond.id), cycle_id, end_date).economic()[0] if end_date else None
                           feeding_status = DashboardFeed(str(farm.id), str(pond.id), cycle_id, end_date).feed()[0] if end_date else None
-                          print({'farm_id': str(farm.id), 'pond_id': str(pond.id), 'cycle_id': cycle_id, 'cycle': cycle.name, 'cycle_rows': len(cycle_data.result_data) if cycle_data else 0, 'result_rows': len(result_data.result_data) if result_data else 0, 'ready': ready, 'filter_status': filter_status, 'economics_status': economics_status, 'feeding_status': feeding_status, 'daterange': date_range})
+                          wq_filter_status, wq_filter_response = FilterData(user_id).wq_filter(str(farm.id), str(pond.id), cycle_id)
+                          wq_data = wq_filter_response.payload[0].get('data') if wq_filter_status == 200 and wq_filter_response.payload else {}
+                          wq_status = WaterQuality().get_water_quality_data(cycle_id, wq_data.get('start_date'), wq_data.get('end_date'), 'wqi_1')[0] if wq_data else None
+                          print({'farm_id': str(farm.id), 'pond_id': str(pond.id), 'cycle_id': cycle_id, 'cycle': cycle.name, 'cycle_rows': len(cycle_data.result_data) if cycle_data else 0, 'result_rows': len(result_data.result_data) if result_data else 0, 'ready': ready, 'filter_status': filter_status, 'economics_status': economics_status, 'feeding_status': feeding_status, 'wq_filter_status': wq_filter_status, 'wq_status': wq_status, 'wq_variables': wq_data.get('variables', []), 'daterange': date_range})
           "
 
           echo "== recent web logs =="

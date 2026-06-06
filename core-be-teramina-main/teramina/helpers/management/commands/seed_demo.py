@@ -22,6 +22,7 @@ from teramina.farm.models.farm_model import Farm
 from teramina.feeding.models.feed_realization_model import FeedRealization
 from teramina.harvest.models.harvest_record_model import HarvestRecord
 from teramina.pond.models.pond_model import Pond
+from teramina.water_quality_dashboard.services.variable_management import VariableManagement
 
 
 POND_SIZE_M2 = 3000
@@ -401,6 +402,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write(f"Loading onboarding seed from {_sample_data_dir()}...")
+        VariableManagement().ensure_default_variables()
         seed = load_sample_seed_data()
         now = datetime.utcnow()
 

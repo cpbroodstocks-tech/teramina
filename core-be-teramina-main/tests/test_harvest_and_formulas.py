@@ -19,6 +19,12 @@ import pytest
 
 from teramina.formulas.feed.fr_main_formula import FrByDPI, FrByBlindFeed
 from teramina.formulas.sgr.growth_rate import Sgr
+from teramina.helpers.utils import normal_trapezoidal
+
+
+def test_normal_trapezoidal_supports_optimal_values_at_bounds():
+    assert normal_trapezoidal(0.1, 0, 2.09, 0, 0.25) == 1
+    assert normal_trapezoidal(50, 0, 100, 0, 100) == 1
 
 
 # ─── FrByDPI ──────────────────────────────────────────────────────────────────

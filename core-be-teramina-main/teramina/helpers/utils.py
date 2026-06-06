@@ -17,11 +17,21 @@ def normal_trapezoidal(m, suitable_min, suitable_max, optimal_min, optimal_max):
     elif (m < suitable_min) or (m > suitable_max):
         ret = 0
     else:
+        lower_score = (
+            1
+            if optimal_min == suitable_min
+            else (m - suitable_min) / (optimal_min - suitable_min)
+        )
+        upper_score = (
+            1
+            if suitable_max == optimal_max
+            else (suitable_max - m) / (suitable_max - optimal_max)
+        )
         ret = min(
             (
-                (m - suitable_min) / (optimal_min - suitable_min),
+                lower_score,
                 1,
-                (suitable_max - m) / (suitable_max - optimal_max),
+                upper_score,
             )
         )
 

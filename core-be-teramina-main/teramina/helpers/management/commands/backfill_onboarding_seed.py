@@ -4,6 +4,7 @@ from django.core.management.base import BaseCommand
 
 from teramina.helpers.default_data_updater import ensure_default_data_for_user
 from teramina.user.models.user_model import User
+from teramina.water_quality_dashboard.services.variable_management import VariableManagement
 
 
 class Command(BaseCommand):
@@ -11,6 +12,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         seeded = skipped = failed = 0
+        VariableManagement().ensure_default_variables()
 
         for user in User.objects.only("id", "email"):
             try:

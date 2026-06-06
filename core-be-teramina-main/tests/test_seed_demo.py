@@ -19,6 +19,8 @@ from teramina.helpers.management.commands.seed_demo import load_sample_seed_data
 from teramina.pond.models.pond_model import Pond
 from teramina.user.models.user_model import User
 from teramina.user.services.profile_service import ProfileService
+from teramina.water_quality_dashboard.models.variable_model import WQVariable
+from teramina.water_quality_dashboard.services.water_quality_service import WaterQuality
 
 
 SAMPLE_DATA_DIR = Path(__file__).resolve().parents[2] / "sample_data"
@@ -111,6 +113,48 @@ def test_seed_demo_supports_string_date_filter_and_economics_dashboard():
     ).economic()
     assert status == 200
     assert response.payload["profit_n_lost"]["data"][0]["value"] == 120.0
+
+
+def test_seed_demo_supports_csv_water_quality_parameters_and_wqi():
+    call_command("seed_demo", verbosity=0)
+
+    farm = Farm.objects(user_id="__seed__").order_by("-created_at").first()
+    pond = Pond.objects(farm_id=str(farm.id)).first()
+    cycle = Cycle.objects(pond_id=str(pond.id)).first()
+    cycle_id = str(cycle.id)
+
+    assert WQVariable.objects.count() == 7
+    cycle_data = CycleData.objects(cycle_id=cycle_id).first()
+    cycle_data.result_data[-1].pop("turbidity")
+    cycle_data.save()
+
+    status, response = FilterData("__seed__").wq_filter(str(farm.id), str(pond.id), cycle_id)
+    assert status == 200, response.message
+    assert set(response.payload[0]["data"]["variables"]) == {
+        "do_morning",
+        "do_afternoon",
+        "do_avg",
+        "temp_morning",
+        "temp_afternoon",
+        "temp_avg",
+        "ph_morning",
+        "ph_afternoon",
+        "salinity",
+        "nh3",
+        "turbidity",
+        "wqi_1",
+        "wqi_2",
+    }
+
+    status, response = WaterQuality().get_water_quality_data(
+        cycle_id,
+        "2024-05-01",
+        "2024-06-28",
+        "wqi_1",
+    )
+    assert status == 200, response.message
+    assert len(response.payload["data"]) == 59
+    assert response.payload["data"][0]["wqi_1"] is not None
 
 
 @pytest.mark.parametrize("date", ["03/31/2024", "06/01/2024"])

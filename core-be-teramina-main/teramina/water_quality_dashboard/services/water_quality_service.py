@@ -6,7 +6,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from .variable_management import VariableManagement
+from .variable_management import VariableManagement, canonical_wq_variable_name
 from ...schemas.general_schema import DataSuccessSchema, DataErrorSchema
 from ...cycle_data.models.cycle_data_model import CycleData
 from ...cycle.models.cycle_model import Cycle
@@ -34,6 +34,7 @@ class WaterQuality:
             )
             if result_data:
                 ndf = pd.DataFrame(result_data.result_data)
+                ndf["date"] = pd.to_datetime(ndf["date"], errors="raise")
                 ndf = self.generate_water_quality_index(ndf)
                 ndf["cycle"] = cycle.name
                 data.append(ndf)
@@ -55,17 +56,15 @@ class WaterQuality:
 
     def get_first_wqi(self, df):
         """generate first wqi"""
-        columns = [i for i in df.columns if "weight" in i]
+        columns = [i for i in df.columns if i.endswith("_score_weight")]
         data = df[columns].values
         return data.sum(axis=1)
 
     def get_second_wqi(self, df):
         """generate second wqi"""
-        columns = [i for i in df.columns if "weight" in i]
-        weight_columns = [i for i in df.columns if "scale" in i]
-        score_columns = [
-            i for i in df.columns if ("weight" not in i) and ("score" in i)
-        ]
+        columns = [i for i in df.columns if i.endswith("_score_weight")]
+        weight_columns = [i for i in df.columns if i.endswith("_scale")]
+        score_columns = [i for i in df.columns if i.endswith("_score")]
 
         values = (df[columns].sum(axis=1) / df[weight_columns].sum(axis=1)).values
         has_negative = np.any(df[score_columns].values < 0)
@@ -91,7 +90,7 @@ class WaterQuality:
         """add wqi into df"""
         wq_variables = df.columns
         for i in wq_variables:
-            var = i.split("_")[0]
+            var = canonical_wq_variable_name(i)
             if var in VariableManagement().get_variable_names():
                 try:
                     (
@@ -287,7 +286,7 @@ class WaterQuality:
             data = self.get_table(cycles, start_date, end_date, variables)
             line_plot = self.get_plot(data, variables, plot_type="line")
             scatter_plot = self.get_plot(data, variables, plot_type="scatter")
-        except TypeError as e:
+        except (KeyError, TypeError, ValueError) as e:
             return 400, DataErrorSchema(code=400, message=str(e))
 
         return 200, DataSuccessSchema(

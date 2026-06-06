@@ -10,6 +10,7 @@ from teramina.harvest.models.harvest_recommendation_model import HarvestRecommen
 from teramina.harvest.models.harvest_record_model import HarvestRecord
 from teramina.water_quality_dashboard.services.variable_management import (
     VariableManagement,
+    canonical_wq_variable_name,
 )
 from teramina.dashboard.services.readiness import is_dashboard_ready_cycle
 
@@ -223,21 +224,26 @@ class FilterData:
     def get_current_variable(self, cycles: list):
         """get current variable"""
         var_list = []
+        seen = set()
         for cycle_id in cycles:
             cycle_data = (
                 CycleData.objects(cycle_id=cycle_id).only("result_data").first()
             )
 
             if not cycle_data:
-                break
-            var_list = list(set(var_list).union(cycle_data["result_data"][-1].keys()))
+                continue
+            for row in cycle_data["result_data"]:
+                for variable in row:
+                    if variable not in seen:
+                        seen.add(variable)
+                        var_list.append(variable)
 
         return var_list
 
     def mapping_wq_variables(self, data: list):
         """mapping wq variables"""
-        wq_vars = VariableManagement().get_variable_names()
-        var_list = [i for i in data if i in wq_vars] + ["wqi_1", "wqi_2"]
+        wq_vars = VariableManagement().get_display_variable_names()
+        var_list = [i for i in data if canonical_wq_variable_name(i) in wq_vars] + ["wqi_1", "wqi_2"]
         return var_list
 
     def wq_filter(

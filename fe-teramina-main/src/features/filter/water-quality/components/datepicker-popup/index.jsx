@@ -18,7 +18,15 @@ const StartDatePickerPopUp = ({ form, daterange }) => {
   };
 
   const handleClose = () => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     setAnchorEl(null);
+  };
+
+  const handleKeyDown = (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      setAnchorEl(event.currentTarget);
+    }
   };
 
   const handleChangePicker = (newDate) => {
@@ -32,11 +40,12 @@ const StartDatePickerPopUp = ({ form, daterange }) => {
 
   return (
     <Fragment>
-      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/interactive-supports-focus */}
       <div
         aria-describedby={id}
         role="button"
+        tabIndex={0}
         onClick={handleClick}
+        onKeyDown={handleKeyDown}
         className={styles.button}
       >
         <Typography variant="h6">
@@ -90,7 +99,15 @@ const EndDatePickerPopUp = ({ form, daterange }) => {
   };
 
   const handleClose = () => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     setAnchorEl(null);
+  };
+
+  const handleKeyDown = (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      setAnchorEl(event.currentTarget);
+    }
   };
 
   const handleChangePicker = (newDate) => {
@@ -104,11 +121,12 @@ const EndDatePickerPopUp = ({ form, daterange }) => {
 
   return (
     <Fragment>
-      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/interactive-supports-focus */}
       <div
         aria-describedby={id}
         role="button"
+        tabIndex={0}
         onClick={handleClick}
+        onKeyDown={handleKeyDown}
         className={styles.button}
       >
         <Typography variant="h6">
