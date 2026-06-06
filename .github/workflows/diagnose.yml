@@ -69,6 +69,34 @@ jobs:
                   print(f"{label}_credentials_readable=False error={type(exc).__name__}: {exc}")
           PY
 
+          echo "== dashboard readiness =="
+          docker-compose exec -T web python manage.py shell -c "
+          from teramina.user.models.user_model import User
+          from teramina.farm.models.farm_model import Farm
+          from teramina.pond.models.pond_model import Pond
+          from teramina.cycle.models.cycle_model import Cycle
+          from teramina.cycle_data.models.cycle_data_model import CycleData, ResultData
+          from teramina.dashboard.services.filter_service import FilterData
+          from teramina.dashboard.services.historical.economic import DashboardEconomic
+          from teramina.helpers.default_data_updater import DASHBOARD_REQUIRED_FIELDS, user_has_dashboard_data
+
+          for user in User.objects.only('id', 'email', 'is_there_data'):
+              user_id = str(user.id)
+              print({'user': user.email, 'cached_status': user.is_there_data, 'dashboard_ready': user_has_dashboard_data(user_id)})
+              for farm in Farm.objects(user_id=user_id).only('id', 'name'):
+                  for pond in Pond.objects(farm_id=str(farm.id)).only('id', 'name'):
+                      for cycle in Cycle.objects(pond_id=str(pond.id)).only('id', 'name'):
+                          cycle_id = str(cycle.id)
+                          cycle_data = CycleData.objects(cycle_id=cycle_id).only('result_data').first()
+                          result_data = ResultData.objects(cycle_id=cycle_id).only('result_data').first()
+                          ready = bool(result_data and result_data.result_data and DASHBOARD_REQUIRED_FIELDS.issubset(result_data.result_data[-1].keys()))
+                          filter_status, filter_response = FilterData(user_id).filter(str(farm.id), str(pond.id), cycle_id, 'historical')
+                          date_range = filter_response.payload[0].get('daterange') if filter_status == 200 else filter_response.message
+                          end_date = date_range.get('end_date') if isinstance(date_range, dict) else None
+                          economics_status = DashboardEconomic(str(farm.id), str(pond.id), cycle_id, end_date).economic()[0] if end_date else None
+                          print({'farm_id': str(farm.id), 'pond_id': str(pond.id), 'cycle_id': cycle_id, 'cycle': cycle.name, 'cycle_rows': len(cycle_data.result_data) if cycle_data else 0, 'result_rows': len(result_data.result_data) if result_data else 0, 'ready': ready, 'filter_status': filter_status, 'economics_status': economics_status, 'daterange': date_range})
+          "
+
           echo "== recent web logs =="
           docker-compose logs --tail=300 web
           EOF
