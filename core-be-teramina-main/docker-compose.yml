@@ -19,6 +19,7 @@ services:
     volumes:
       - ./secrets:/run/secrets/teramina:ro
       - gcs-credentials:/secrets:ro
+      - ../sample_data:/app/sample_data:ro
     depends_on:
       redis:
         condition: service_healthy

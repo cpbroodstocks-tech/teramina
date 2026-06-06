@@ -25,6 +25,11 @@ on:
         required: false
         default: false
         type: boolean
+      run_demo_seed:
+        description: "Create the default onboarding sample seed after backend deploy"
+        required: false
+        default: false
+        type: boolean
       reindex_advisory_sources:
         description: "Run reindex_advisory_sources after backend deploy"
         required: false
@@ -80,6 +85,9 @@ jobs:
           CSRF_TRUSTED_ORIGINS=${{ secrets.CSRF_TRUSTED_ORIGINS }}
           JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
           MONGODB_URI=${{ secrets.MONGODB_URI }}
+          SEEDER_FARM=${{ secrets.SEEDER_FARM }}
+          SEEDER_POND=${{ secrets.SEEDER_POND }}
+          SEEDER_CYCLE=${{ secrets.SEEDER_CYCLE }}
           FIREBASE_CREDENTIALS_JSON=
           FIREBASE_CREDENTIALS_PATH=/run/secrets/teramina/firebase-admin-sdk.json
           GOOGLE_APPLICATION_CREDENTIALS_JSON=
@@ -124,6 +132,15 @@ jobs:
           set -e
           cd ~/teramina/core-be-teramina-main/
           docker-compose exec -T web python manage.py seed_commercial_layer
+          EOF
+
+      - name: Create onboarding demo seed
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_demo_seed == 'true' }}
+        run: |
+          ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          set -e
+          cd ~/teramina/core-be-teramina-main/
+          docker-compose exec -T web python manage.py seed_demo
           EOF
 
       - name: Reindex advisory sources

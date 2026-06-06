@@ -1,326 +1,455 @@
 """
-Management command: seed_demo
------------------------------
-Creates the template farm/pond/cycle that every new user gets cloned on
-first login. Run this once on the server where MongoDB Atlas is reachable.
+Create the template farm, pond, and cycle cloned for new-user onboarding.
 
-Usage:
-    python manage.py seed_demo
-
-After running, copy the three printed env vars into your .env file:
-    SEEDER_FARM=<id>
-    SEEDER_POND=<id>
-    SEEDER_CYCLE=<id>
-
-Then restart Django so the env vars are picked up.
+The seed is loaded from the Google Sheets-style CSV tabs in ``sample_data/``.
+Run this once on the deployed backend, then set the printed ``SEEDER_*`` values
+in the backend environment and restart Django.
 """
 
+import csv
 import math
-import random
-from datetime import datetime, timedelta
+from datetime import datetime
+from pathlib import Path
 
-from django.core.management.base import BaseCommand
+import pandas as pd
+from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError
 
-from teramina.farm.models.farm_model import Farm
-from teramina.pond.models.pond_model import Pond
-from teramina.cycle.models.cycle_model import Cycle
-from teramina.cycle_data.models.cycle_data_model import CycleData, ResultData, ForecastData
-from teramina.harvest.models.harvest_record_model import HarvestRecord
-from teramina.feeding.models.feed_realization_model import FeedRealization
 from teramina.cost_data.models.cost_data_model import CostData
+from teramina.cycle.models.cycle_model import Cycle
+from teramina.cycle_data.models.cycle_data_model import CycleData, ForecastData, ResultData
+from teramina.farm.models.farm_model import Farm
+from teramina.feeding.models.feed_realization_model import FeedRealization
+from teramina.harvest.models.harvest_record_model import HarvestRecord
+from teramina.pond.models.pond_model import Pond
 
 
-POND_SIZE_M2     = 3000
-INITIAL_STOCKING = 360_000
-START_DATE       = datetime(2024, 3, 1)
-TOTAL_DAYS       = 120
-PARTIAL_DOC      = 95
-PARTIAL_FRACTION = 0.30
+POND_SIZE_M2 = 3000
+DEFAULT_INITIAL_STOCKING = 360_000
+ENERGY_DIVISOR = 820 * 24
+SOURCE = "seed_sample"
 
-ABW_CHECKPOINTS = {
-    0: 0.001, 7: 0.8, 14: 1.5, 21: 2.8, 28: 4.5,
-    35: 6.8, 42: 9.5, 50: 12.5, 60: 15.8, 70: 18.9,
-    80: 21.7, 90: 24.2, 95: 25.6, 100: 26.8, 110: 28.9, 120: 30.5,
+DAILY_FIELDS = {
+    "DO Morning": "do_morning",
+    "DO Afternoon": "do_afternoon",
+    "DO Average": "do_avg",
+    "Temp Morning": "temp_morning",
+    "Temp Afternoon": "temp_afternoon",
+    "Temp Average": "temp_avg",
+    "pH Morning": "ph_morning",
+    "pH Afternoon": "ph_afternoon",
+    "Salinity": "salinity",
+    "NH3": "nh3",
+    "Turbidity": "turbidity",
+    "Feed Given": "feed_given_kg",
+    "Feed Leftover": "feed_leftover",
+    "Protein %": "protein_content",
+    "Feeding Freq": "feeding_frequency",
 }
 
-FEED_SCHEDULE = [
-    (1,  14, "Tipe 00", 38, 18_000),
-    (15, 30, "Tipe 0",  36, 17_000),
-    (31, 60, "Tipe 1",  35, 15_500),
-    (61, 90, "Tipe 2",  34, 14_000),
-    (91, 120, "Tipe 3", 32, 13_000),
-]
+COST_FIELDS = {
+    "Benur": "seed_cost",
+    "Pakan": "feeding_cost",
+    "Probiotik": "probiotic_cost",
+    "Tenaga Kerja": "labor_cost",
+    "Panen": "harvest_cost",
+    "Kimia": "other_cost",
+    "Vitamin": "other_cost",
+    "Lain-lain": "other_cost",
+}
 
 
-def shrimp_price(abw_g):
-    if abw_g < 10:  return 42_000
-    if abw_g < 15:  return 50_000
-    if abw_g < 20:  return 55_000
-    if abw_g < 25:  return 62_000
-    if abw_g < 30:  return 70_000
-    return 78_000
+def _sample_data_dir() -> Path:
+    candidates = [
+        Path(settings.BASE_DIR) / "sample_data",
+        Path(settings.BASE_DIR).parent / "sample_data",
+    ]
+    for candidate in candidates:
+        if candidate.is_dir():
+            return candidate
+    return candidates[0]
 
 
-def interp_abw(doc):
-    keys = sorted(ABW_CHECKPOINTS)
-    if doc <= keys[0]:  return ABW_CHECKPOINTS[keys[0]]
-    if doc >= keys[-1]: return ABW_CHECKPOINTS[keys[-1]]
-    for i in range(len(keys) - 1):
-        d0, d1 = keys[i], keys[i + 1]
-        if d0 <= doc <= d1:
-            t = (doc - d0) / (d1 - d0)
-            return ABW_CHECKPOINTS[d0] + t * (ABW_CHECKPOINTS[d1] - ABW_CHECKPOINTS[d0])
-    return ABW_CHECKPOINTS[keys[-1]]
+def _read_tab(sample_dir: Path, filename: str) -> list[dict]:
+    path = sample_dir / filename
+    if not path.is_file():
+        raise CommandError(f"Missing onboarding sample tab: {path}")
+
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    return [row for row in rows if row.get("Date") and row["Date"] != "YYYY-MM-DD"]
 
 
-def feed_info(doc):
-    for d0, d1, name, prot, cost in FEED_SCHEDULE:
-        if d0 <= doc <= d1:
-            return name, prot, cost
-    return "Tipe 3", 32, 13_000
+def _float(value, default=0.0) -> float:
+    if value in (None, "", "-", "N/A"):
+        return default
+    return float(value)
 
 
-def jitter(val, pct=0.03):
-    return val * (1 + random.uniform(-pct, pct))
+def _int(value, default=0) -> int:
+    if value in (None, "", "-", "N/A"):
+        return default
+    return int(float(value))
 
 
-def cum_mortality(doc):
-    if doc <= 14:  return 0.04 * (doc / 14)
-    if doc <= 60:  return 0.04 + 0.14 * ((doc - 14) / 46)
-    if doc <= 95:  return 0.18 + 0.05 * ((doc - 60) / 35)
-    return 0.23 + 0.04 * ((doc - 95) / 25)
+def _load_daily_rows(sample_dir: Path) -> list[dict]:
+    rows = []
+    for source_row in _read_tab(sample_dir, "DAILY_LOG.csv"):
+        row = {
+            "date": source_row["Date"],
+            "doc": _int(source_row["DOC"]),
+            "feed_type": source_row["Feed Type"],
+            "notes": source_row["Notes"],
+            "source": SOURCE,
+        }
+        for source_key, target_key in DAILY_FIELDS.items():
+            value = _int(source_row[source_key]) if target_key == "feeding_frequency" else _float(source_row[source_key])
+            row[target_key] = value
+        rows.append(row)
+
+    return rows
 
 
-def generate_daily_data():
-    random.seed(42)
+def _merge_sampling_tabs(sample_dir: Path, daily_rows: list[dict]) -> None:
+    rows_by_doc = {row["doc"]: row for row in daily_rows}
 
-    result_rows = []
-    feed_rows = []
-    cost_rows = []
-    harvest_events = []  # list of {doc, biomass_kg, price, is_partial}
-
-    for doc in range(1, TOTAL_DAYS + 1):
-        date = START_DATE + timedelta(days=doc - 1)
-        date_str = date.strftime("%Y-%m-%d")
-
-        abw = interp_abw(doc)
-        sr_total = 1.0 - cum_mortality(doc)
-        population = round(INITIAL_STOCKING * sr_total)
-        biomass_kg = population * abw / 1000.0
-
-        do_m  = jitter(6.8);  do_a  = jitter(5.9);  do_avg  = (do_m + do_a) / 2
-        tmp_m = jitter(28.5); tmp_a = jitter(30.2);  tmp_avg = (tmp_m + tmp_a) / 2
-        ph_m  = jitter(7.9, 0.01); ph_a = jitter(8.1, 0.01)
-        sal   = jitter(28.0, 0.02)
-        nh3   = max(0.001, jitter(0.02, 0.4))
-        turb  = max(15, jitter(35.0, 0.2))
-
-        feed_pct = max(2.5, 8.0 - 0.045 * doc)
-        feed_kg = round(biomass_kg * feed_pct / 100, 2)
-        feed_leftover = round(jitter(feed_kg * 0.04, 0.5), 2)
-        freq = 4 if doc <= 30 else (5 if doc <= 70 else 6)
-        fname, fprot, fcost_idr = feed_info(doc)
-
-        feed_cost_day = feed_kg * fcost_idr
-        labor_cost_day = 500_000 / 30
-        energy_cost_day = 800_000 / 30
-        probiotic_day = 200_000 / 30 if doc % 3 == 0 else 0
-        other_day = 50_000 / 30
-
-        is_partial_harvest = (doc == PARTIAL_DOC)
-        is_final_harvest = (doc == TOTAL_DAYS)
-
-        if is_partial_harvest:
-            harvest_pop = round(population * PARTIAL_FRACTION)
-            harvest_kg = round(harvest_pop * abw / 1000, 2)
-            price = shrimp_price(abw)
-            harvest_events.append({"doc": doc, "biomass_kg": harvest_kg, "price": price, "is_partial": True})
-
-        if is_final_harvest:
-            remaining_pop = round(population * (1 - PARTIAL_FRACTION))
-            harvest_kg = round(remaining_pop * abw / 1000, 2)
-            price = shrimp_price(abw)
-            harvest_events.append({"doc": doc, "biomass_kg": harvest_kg, "price": price, "is_partial": False})
-
-        abw_entry = {}
-        if doc >= 14 and (doc - 14) % 7 == 0:
-            sample_n = 100
-            abw_entry = {
-                "abw": round(abw, 2), "abw_sample_count": sample_n,
-                "abw_total_weight_g": round(abw * sample_n, 1),
-                "abw_min_g": round(abw * 0.75, 2), "abw_max_g": round(abw * 1.28, 2),
-                "abw_cv_pct": round(random.uniform(15, 25), 1),
-                "sampled_by": "Teknisi", "abw_notes": "",
+    for row in _read_tab(sample_dir, "ABW_SAMPLING.csv"):
+        target = rows_by_doc[_int(row["DOC"])]
+        target.update(
+            {
+                "abw_sample_count": _int(row["Sample Count"]),
+                "abw_total_weight_g": _float(row["Total Weight (g)"]),
+                "abw": _float(row["ABW (g)"]),
+                "abw_min_g": _float(row["Min Weight"]),
+                "abw_max_g": _float(row["Max Weight"]),
+                "abw_cv_pct": _float(row["CV%"]),
+                "sampled_by": row["Sampled By"],
+                "abw_notes": row["Notes"],
             }
+        )
 
-        prev_sr = 1.0 - cum_mortality(doc - 1) if doc > 1 else 1.0
-        prev_pop = round(INITIAL_STOCKING * prev_sr)
-        daily_dead = max(0, prev_pop - population)
+    for row in _read_tab(sample_dir, "MORTALITY.csv"):
+        rows_by_doc[_int(row["DOC"])].update(
+            {
+                "mortality_count": _int(row["Dead Count"]),
+                "mortality_notes": row["Notes"],
+            }
+        )
 
-        result_rows.append({
-            "date": date_str, "doc": doc,
-            "do_morning": round(do_m, 2), "do_afternoon": round(do_a, 2), "do_avg": round(do_avg, 2),
-            "temp_morning": round(tmp_m, 2), "temp_afternoon": round(tmp_a, 2), "temp_avg": round(tmp_avg, 2),
-            "ph_morning": round(ph_m, 2), "ph_afternoon": round(ph_a, 2),
-            "salinity": round(sal, 1), "nh3": round(nh3, 4), "turbidity": round(turb, 1),
-            "feed_given_kg": feed_kg, "feed_leftover": feed_leftover,
-            "feed_type": fname, "protein_content": float(fprot), "feeding_frequency": freq,
-            "mortality_count": daily_dead, "mortality_notes": "", "notes": "", "source": "seed",
-            **abw_entry,
-        })
 
-        feed_rows.append({
-            "doc": doc, "ration_number": 0,
-            "feed_ration": feed_kg, "feed_given": feed_kg, "feed_leftover": feed_leftover,
-        })
+def _load_cost_rows(sample_dir: Path) -> list[dict]:
+    return [
+        {
+            "date": row["Date"],
+            "category": row["Category"],
+            "description": row["Description"],
+            "quantity": _float(row["Quantity"]),
+            "unit": row["Unit"],
+            "unit_price": _float(row["Unit Price (IDR)"]),
+            "total": _float(row["Total (IDR)"]),
+            "vendor": row["Vendor"],
+            "notes": row["Notes"],
+            "source": SOURCE,
+        }
+        for row in _read_tab(sample_dir, "COST.csv")
+    ]
 
-        if doc % 30 == 1:
-            month_label = f"Bulan {(doc // 30) + 1}"
-            cost_rows.extend([
-                {"date": date_str, "category": "Feed", "description": f"Pakan {fname}", "quantity": feed_kg * 30, "unit": "kg", "unit_price": fcost_idr, "total": feed_kg * 30 * fcost_idr, "vendor": "CV Pakan Maju", "notes": month_label, "source": "seed"},
-                {"date": date_str, "category": "Labor", "description": "Upah tenaga kerja", "quantity": 1, "unit": "bulan", "unit_price": 500_000, "total": 500_000, "vendor": "", "notes": month_label, "source": "seed"},
-                {"date": date_str, "category": "Electricity", "description": "Listrik aerasi", "quantity": 1, "unit": "bulan", "unit_price": 800_000, "total": 800_000, "vendor": "PLN", "notes": month_label, "source": "seed"},
-                {"date": date_str, "category": "Chemical", "description": "Probiotik & suplemen", "quantity": 10, "unit": "L", "unit_price": 20_000, "total": 200_000, "vendor": "Toko Tambak Jaya", "notes": month_label, "source": "seed"},
-            ])
 
-    result_computed = []
-    cum_feed = 0.0
-    cum_cost = 0.0
-    cum_rev = 0.0
-    for row in result_rows:
-        doc = row["doc"]
-        abw = row.get("abw", interp_abw(doc))
-        sr_total = 1.0 - cum_mortality(doc)
-        pop = round(INITIAL_STOCKING * sr_total)
-        biomass = pop * abw / 1000.0
-        feed = row["feed_given_kg"]
-        fname, fprot, fcost_idr = feed_info(doc)
-        feed_cost_d = feed * fcost_idr
-        # Daily cost values — units must match what cost_formula.py expects:
-        # energy_cost: rate multiplied by AERATOR_WATTS(820) × HOURS_PER_DAY(24) → IDR/day
-        #   12 × 820 × 24 = 235,520 IDR/day (realistic for a 3000m² aerated pond)
-        # feeding_cost, labor_cost, probiotic_cost, other_cost: direct IDR/day values
-        energy_rate = 12.0
-        labor_day = round(500_000 / 30, 0)
-        probiotic_day = round(200_000 / 30, 0) if doc % 3 == 0 else 0.0
-        other_day = round(50_000 / 30, 0)
-        energy_day = energy_rate * 820 * 24
-        total_cost_d = feed_cost_d + labor_day + energy_day + probiotic_day + other_day
-        rev = sum(hr["harvest_biomass_kg"] * hr["price_per_kg_idr"] for hr in harvest_records if hr["doc"] == doc)
-        cum_feed += feed
-        cum_cost += total_cost_d
-        cum_rev += rev
-        result_computed.append({
-            "date": row["date"], "doc": doc,
-            "temperature": row["temp_avg"], "do": row["do_avg"], "nh3": row["nh3"],
-            "abw": round(abw, 2),
-            "fr": round(feed / biomass * 100, 2) if biomass > 0 else 0,
-            "sr": round(sr_total * 100, 2),
-            "w0": 0.001, "initial_stocking": INITIAL_STOCKING,
-            "total_biomass": round(biomass, 2),
-            "feed_given": feed, "total_cost": round(total_cost_d, 0),
-            "realized_revenue": round(rev, 0),
-            "cum_feed": round(cum_feed, 2),
-            "fcr": round(cum_feed / biomass, 3) if biomass > 0 else 0,
-            "cum_total_cost": round(cum_cost, 0),
-            "cost_per_kg": round(cum_cost / biomass, 0) if biomass > 0 else 0,
-            "cum_realized_revenue": round(cum_rev, 0),
-            "profit": round(cum_rev - cum_cost, 0),
-            "labor_cost": labor_day, "bonus_cost": 0.0, "energy_cost": energy_rate,
-            "probiotic_cost": probiotic_day, "other_cost": other_day, "harvest_cost": 0.0,
-            "feeding_cost": round(feed_cost_d, 0),
-            "protein_content": float(fprot),
-            "chb": round(biomass * shrimp_price(abw), 0),
-            "source": "seed",
-        })
-
-    # Build canonical HarvestRecord structure expected by harvest_service / forecast_service:
-    # {"final": {doc, biomass, revenue}, "partial1": {...}, "partial2": {...}, "partial3": {...}}
-    partials = [e for e in harvest_events if e["is_partial"]]
-    final_ev = next((e for e in harvest_events if not e["is_partial"]), None)
-
+def _load_harvest_data(sample_dir: Path) -> tuple[dict, dict[int, dict]]:
     harvest_data = {
         "partial1": {"doc": "", "biomass": "", "revenue": ""},
         "partial2": {"doc": "", "biomass": "", "revenue": ""},
         "partial3": {"doc": "", "biomass": "", "revenue": ""},
-        "final":    {"doc": "", "biomass": "", "revenue": ""},
+        "final": {"doc": "", "biomass": "", "revenue": ""},
     }
-    for i, ev in enumerate(partials[:3], start=1):
-        harvest_data[f"partial{i}"] = {
-            "doc": ev["doc"],
-            "biomass": ev["biomass_kg"],
-            "revenue": round(ev["biomass_kg"] * ev["price"], 0),
-        }
-    if final_ev:
-        harvest_data["final"] = {
-            "doc": final_ev["doc"],
-            "biomass": final_ev["biomass_kg"],
-            "revenue": round(final_ev["biomass_kg"] * final_ev["price"], 0),
-        }
+    events = {}
+    partial_number = 1
 
-    return result_rows, result_computed, feed_rows, cost_rows, harvest_data
+    for row in _read_tab(sample_dir, "HARVEST.csv"):
+        doc = _int(row["DOC"])
+        biomass = _float(row["Biomass (kg)"])
+        price = _float(row["Price/kg (IDR)"])
+        is_partial = row["Is Partial?"].strip().upper() in {"Y", "YES", "TRUE", "1"}
+        key = f"partial{partial_number}" if is_partial else "final"
+        if is_partial:
+            partial_number += 1
+
+        event = {
+            "date": row["Date"],
+            "doc": doc,
+            "biomass": biomass,
+            "revenue": biomass * price,
+            "is_partial": is_partial,
+            "abw_g": _float(row["ABW at Harvest (g)"]),
+            "sr_pct": _float(row["SR at Harvest (%)"]),
+            "bags": _int(row["Bags"]),
+            "buyer": row["Buyer"],
+            "price_per_kg_idr": price,
+            "notes": row["Notes"],
+            "source": SOURCE,
+        }
+        harvest_data[key] = event
+        events[doc] = event
+
+    return harvest_data, events
+
+
+def _build_costs_by_doc(daily_rows: list[dict], cost_rows: list[dict]) -> tuple[dict[int, dict], int]:
+    date_to_doc = {row["date"]: row["doc"] for row in daily_rows}
+    costs_by_doc = {
+        row["doc"]: {
+            "seed_cost": 0.0,
+            "feeding_cost": 0.0,
+            "probiotic_cost": 0.0,
+            "labor_cost": 0.0,
+            "bonus_cost": 0.0,
+            "energy_cost": 0.0,
+            "harvest_cost": 0.0,
+            "other_cost": 0.0,
+        }
+        for row in daily_rows
+    }
+    initial_stocking = DEFAULT_INITIAL_STOCKING
+
+    for row in cost_rows:
+        doc = date_to_doc[row["date"]]
+        category = row["category"]
+        total = row["total"]
+        if category == "Benur":
+            initial_stocking = _int(row["quantity"], DEFAULT_INITIAL_STOCKING)
+        if category == "Utilitas":
+            costs_by_doc[doc]["energy_cost"] += total / ENERGY_DIVISOR
+        elif category in COST_FIELDS:
+            costs_by_doc[doc][COST_FIELDS[category]] += total
+
+    return costs_by_doc, initial_stocking
+
+
+def _build_interpolated_series(daily_rows: list[dict], harvest_events: dict[int, dict]) -> tuple[pd.Series, pd.Series]:
+    max_doc = daily_rows[-1]["doc"]
+
+    abw = pd.Series(index=range(1, max_doc + 1), dtype=float)
+    abw.loc[1] = 0.02
+    for row in daily_rows:
+        if "abw" in row:
+            abw.loc[row["doc"]] = row["abw"]
+    for doc, event in harvest_events.items():
+        abw.loc[doc] = event["abw_g"]
+    abw = abw.interpolate().ffill().bfill()
+
+    sr = pd.Series(index=range(0, max_doc + 1), dtype=float)
+    sr.loc[0] = 1.0
+    for doc, event in harvest_events.items():
+        sr.loc[doc] = event["sr_pct"] / 100
+    sr = sr.interpolate().ffill().bfill().loc[1:]
+
+    return abw, sr
+
+
+def _build_result_rows(
+    daily_rows: list[dict],
+    cost_rows: list[dict],
+    harvest_events: dict[int, dict],
+) -> list[dict]:
+    costs_by_doc, initial_stocking = _build_costs_by_doc(daily_rows, cost_rows)
+    abw_by_doc, sr_by_doc = _build_interpolated_series(daily_rows, harvest_events)
+
+    result_rows = []
+    cumulative_feed = 0.0
+    cumulative_cost = 0.0
+    cumulative_revenue = 0.0
+    cumulative_harvest = 0.0
+    harvested_population = 0.0
+    previous_abw = None
+
+    for raw in daily_rows:
+        doc = raw["doc"]
+        abw = float(abw_by_doc.loc[doc])
+        sr = float(sr_by_doc.loc[doc])
+        event = harvest_events.get(doc)
+        harvest_biomass = event["biomass"] if event else 0.0
+        harvest_population = harvest_biomass * 1000 / abw if harvest_biomass else 0.0
+        harvested_population += harvest_population
+
+        population = max(initial_stocking * sr - harvested_population, 0.0)
+        biomass = population * abw / 1000
+        cumulative_harvest += harvest_biomass
+        total_biomass = biomass + cumulative_harvest
+
+        feed_given = raw["feed_given_kg"]
+        cumulative_feed += feed_given
+        fr = feed_given / biomass * 100 if biomass else 0.0
+        fcr = cumulative_feed / total_biomass if total_biomass else 0.0
+
+        costs = costs_by_doc[doc]
+        cost_energy = costs["energy_cost"] * ENERGY_DIVISOR
+        total_cost = sum(value for key, value in costs.items() if key != "energy_cost") + cost_energy
+        cumulative_cost += total_cost
+
+        realized_revenue = event["revenue"] if event else 0.0
+        cumulative_revenue += realized_revenue
+        price = event["price_per_kg_idr"] if event else 58_000.0
+        potential_revenue = biomass * price
+        profit = cumulative_revenue - cumulative_cost
+        adg = abw - previous_abw if previous_abw is not None else 0.0
+        sgr = math.log(abw / previous_abw) * 100 if previous_abw else 0.0
+        previous_abw = abw
+
+        result_rows.append(
+            {
+                "date": datetime.strptime(raw["date"], "%Y-%m-%d"),
+                "doc": doc,
+                "temperature": raw["temp_avg"],
+                "do": raw["do_avg"],
+                "nh3": raw["nh3"],
+                "ph_morning": raw["ph_morning"],
+                "ph_afternoon": raw["ph_afternoon"],
+                "salinity": raw["salinity"],
+                "turbidity": raw["turbidity"],
+                "abw": abw,
+                "adj_abw": abw,
+                "adg": adg,
+                "sgr": sgr,
+                "fr": fr,
+                "adj_fr": fr / 100,
+                "sr": sr,
+                "w0": 0.02,
+                "initial_stocking": initial_stocking,
+                "population": population,
+                "harvest_population": harvest_population,
+                "biomass_kg": biomass,
+                "origin_biomass": biomass,
+                "harvest_biomass_kg": harvest_biomass,
+                "total_biomass": total_biomass,
+                "feed_given": feed_given,
+                "cum_feed": cumulative_feed,
+                "fcr": fcr,
+                "realized_fcr": fcr,
+                "protein_content": raw["protein_content"],
+                "seed_cost": costs["seed_cost"],
+                "feeding_cost": costs["feeding_cost"],
+                "probiotic_cost": costs["probiotic_cost"],
+                "labor_cost": costs["labor_cost"],
+                "bonus_cost": costs["bonus_cost"],
+                "energy_cost": costs["energy_cost"],
+                "harvest_cost": costs["harvest_cost"],
+                "other_cost": costs["other_cost"],
+                "cost_seed": costs["seed_cost"],
+                "cost_feed": costs["feeding_cost"],
+                "cost_probiotics": costs["probiotic_cost"],
+                "cost_labor": costs["labor_cost"],
+                "cost_bonuss": costs["bonus_cost"],
+                "cost_energy": cost_energy,
+                "cost_harvest": costs["harvest_cost"],
+                "cost_other": costs["other_cost"],
+                "total_cost": total_cost,
+                "cum_total_cost": cumulative_cost,
+                "cost_per_kg": cumulative_cost / total_biomass if total_biomass else 0.0,
+                "realized_revenue": realized_revenue,
+                "cum_realized_revenue": cumulative_revenue,
+                "potential_revenue": potential_revenue,
+                "profit": profit,
+                "potential_profit": profit + potential_revenue,
+                "chb": potential_revenue,
+                "category": "historical",
+                "source": SOURCE,
+            }
+        )
+
+    return result_rows
+
+
+def load_sample_seed_data(sample_dir: Path | None = None) -> dict:
+    sample_dir = sample_dir or _sample_data_dir()
+    daily_rows = _load_daily_rows(sample_dir)
+    if len(daily_rows) != 120:
+        raise CommandError(f"Expected 120 DAILY_LOG rows, found {len(daily_rows)}")
+
+    _merge_sampling_tabs(sample_dir, daily_rows)
+    cost_rows = _load_cost_rows(sample_dir)
+    harvest_data, harvest_events = _load_harvest_data(sample_dir)
+    result_rows = _build_result_rows(daily_rows, cost_rows, harvest_events)
+    feed_rows = [
+        {
+            "doc": row["doc"],
+            "ration_number": 0,
+            "feed_ration": row["feed_given_kg"],
+            "feed_given": row["feed_given_kg"],
+            "feed_leftover": row["feed_leftover"],
+        }
+        for row in daily_rows
+    ]
+
+    return {
+        "daily_rows": daily_rows,
+        "result_rows": result_rows,
+        "feed_rows": feed_rows,
+        "cost_rows": cost_rows,
+        "harvest_data": harvest_data,
+        "start_date": datetime.strptime(daily_rows[0]["date"], "%Y-%m-%d"),
+    }
 
 
 class Command(BaseCommand):
-    help = "Seed demo farm/pond/cycle template for new-user onboarding"
+    help = "Seed the Google Sheets-style demo cycle cloned during new-user onboarding"
 
     def handle(self, *args, **options):
-        self.stdout.write("Generating 120-day demo data...")
-        result_rows, result_computed, feed_rows, cost_rows, harvest_data = generate_daily_data()
-
-        self.stdout.write(f"  Daily rows:     {len(result_rows)}")
-        self.stdout.write(f"  Feed rows:      {len(feed_rows)}")
-        self.stdout.write(f"  Cost entries:   {len(cost_rows)}")
-
+        self.stdout.write(f"Loading onboarding seed from {_sample_data_dir()}...")
+        seed = load_sample_seed_data()
         now = datetime.utcnow()
 
         farm = Farm(name="Demo Farm", location="Jawa Timur", user_id="__seed__")
         farm.save()
         farm_id = str(farm.id)
-        self.stdout.write(f"Farm created:  {farm_id}")
 
         pond = Pond(
-            name="Kolam Demo 1", size=float(POND_SIZE_M2), depth=1.5,
-            pond_construction="Tambak tanah", pond_shape="Persegi", farm_id=farm_id,
+            name="Kolam Demo 1",
+            size=float(POND_SIZE_M2),
+            depth=1.5,
+            pond_construction="Tambak tanah",
+            pond_shape="Persegi",
+            farm_id=farm_id,
         )
         pond.save()
         pond_id = str(pond.id)
-        self.stdout.write(f"Pond created:  {pond_id}")
 
         cycle = Cycle(
-            name="Siklus Demo 120 Hari", start_date=START_DATE,
-            pond_id=pond_id, last_updated=now, is_active=False,
+            name="Siklus Demo 120 Hari",
+            start_date=seed["start_date"],
+            pond_id=pond_id,
+            last_updated=now,
+            is_active=False,
         )
         cycle.save()
         cycle_id = str(cycle.id)
-        self.stdout.write(f"Cycle created: {cycle_id}")
 
         pond.active_cycle_id = cycle_id
         pond.save()
 
-        CycleData(cycle_id=cycle_id, result_data=result_rows, last_updated=now).save()
-        ResultData(cycle_id=cycle_id, result_data=result_computed, last_updated=now).save()
-        ForecastData(cycle_id=cycle_id, result_data=[], last_updated=now).save()
+        CycleData(cycle_id=cycle_id, result_data=seed["daily_rows"], last_updated=now).save()
+        ResultData(cycle_id=cycle_id, result_data=seed["result_rows"], last_updated=now).save()
+        ForecastData(cycle_id=cycle_id, result_data=seed["result_rows"], last_updated=now).save()
 
-        for fr in feed_rows:
-            FeedRealization(
-                cycle_id=cycle_id, doc=fr["doc"], ration_number=fr["ration_number"],
-                feed_ration=fr["feed_ration"], feed_given=fr["feed_given"],
-                feed_leftover=fr["feed_leftover"], last_updated=now,
-            ).save()
-        self.stdout.write(f"FeedRealization: {len(feed_rows)} records saved")
+        for row in seed["feed_rows"]:
+            FeedRealization(cycle_id=cycle_id, last_updated=now, **row).save()
 
-        HarvestRecord(cycle_id=cycle_id, harvest_data=harvest_data, last_updated=now).save()
-        self.stdout.write("HarvestRecord:   1 record saved")
+        HarvestRecord(cycle_id=cycle_id, harvest_data=seed["harvest_data"], last_updated=now).save()
+        CostData(
+            farm_id=cycle_id,
+            start_date=seed["daily_rows"][0]["date"],
+            end_date=seed["daily_rows"][-1]["date"],
+            data=seed["cost_rows"],
+            last_updated=now,
+        ).save()
 
-        CostData(farm_id=cycle_id, data=cost_rows, last_updated=now).save()
-        self.stdout.write(f"CostData:        {len(cost_rows)} entries saved")
-
-        self.stdout.write("\n" + "=" * 60)
-        self.stdout.write("Add these to your .env file:")
-        self.stdout.write("=" * 60)
+        self.stdout.write(f"Farm created:  {farm_id}")
+        self.stdout.write(f"Pond created:  {pond_id}")
+        self.stdout.write(f"Cycle created: {cycle_id}")
+        self.stdout.write(f"Daily/derived rows: {len(seed['daily_rows'])}/{len(seed['result_rows'])}")
+        self.stdout.write(f"Feed/cost rows:     {len(seed['feed_rows'])}/{len(seed['cost_rows'])}")
+        self.stdout.write("\nAdd these to the deployed backend environment:")
         self.stdout.write(f"SEEDER_FARM={farm_id}")
         self.stdout.write(f"SEEDER_POND={pond_id}")
         self.stdout.write(f"SEEDER_CYCLE={cycle_id}")
-        self.stdout.write("=" * 60)
-        self.stdout.write("Done. Every new user who signs in will get this data cloned.")
+        self.stdout.write("Done. New users will receive this sample cycle on first login.")
