@@ -71,10 +71,20 @@ class FeedRecommendationService:
 
         fr = df.loc[doc - 1, "adj_fr"]
         feed_given = fr * biomass
-        periodic_fr = df.loc[
-            doc - 1,
-            ["feed_ration_1", "feed_ration_2", "feed_ration_3", "feed_ration_4"],
-        ].values
+        row = df.loc[doc - 1]
+        periodic_fr = np.array(
+            [
+                row.get(column, fr / 4)
+                for column in [
+                    "feed_ration_1",
+                    "feed_ration_2",
+                    "feed_ration_3",
+                    "feed_ration_4",
+                ]
+            ],
+            dtype=float,
+        )
+        periodic_fr = np.nan_to_num(periodic_fr, nan=fr / 4)
         periodic_feed_given = periodic_fr * biomass
         result_feed_given = np.append(feed_given, periodic_feed_given)
 

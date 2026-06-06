@@ -10,6 +10,7 @@ from teramina.cycle.models.cycle_model import Cycle
 from teramina.cycle_data.models.cycle_data_model import CycleData, ForecastData, ResultData
 from teramina.dashboard.services.filter_service import FilterData
 from teramina.dashboard.services.historical.economic import DashboardEconomic
+from teramina.dashboard.services.historical.feed import DashboardFeed
 from teramina.farm.models.farm_model import Farm
 from teramina.feeding.models.feed_realization_model import FeedRealization
 from teramina.harvest.models.harvest_record_model import HarvestRecord
@@ -44,11 +45,14 @@ def test_sample_seed_loads_all_google_sheets_tabs():
 
 
 def test_sample_seed_builds_healthy_dashboard_rows():
-    result_rows = load_sample_seed_data(SAMPLE_DATA_DIR)["result_rows"]
+    seed = load_sample_seed_data(SAMPLE_DATA_DIR)
+    result_rows = seed["result_rows"]
 
     assert all(row["abw"] > 0 for row in result_rows)
     assert all(0 < row["sr"] <= 1 for row in result_rows)
     assert all(row["do"] > 0 for row in result_rows)
+    assert all(row["ration_number"] == 1 for row in seed["feed_rows"])
+    assert all("feed_ration_1" in row for row in result_rows)
     assert result_rows[-1]["sr"] == pytest.approx(0.865)
     assert result_rows[-1]["harvest_biomass_kg"] == pytest.approx(6801.0)
     assert result_rows[-1]["cum_realized_revenue"] > 0
@@ -107,6 +111,62 @@ def test_seed_demo_supports_string_date_filter_and_economics_dashboard():
     ).economic()
     assert status == 200
     assert response.payload["profit_n_lost"]["data"][0]["value"] == 120.0
+
+
+@pytest.mark.parametrize("date", ["03/31/2024", "06/01/2024"])
+def test_seed_demo_supports_feeding_dashboard(date):
+    call_command("seed_demo", verbosity=0)
+
+    farm = Farm.objects(user_id="__seed__").order_by("-created_at").first()
+    pond = Pond.objects(farm_id=str(farm.id)).first()
+    cycle = Cycle.objects(pond_id=str(pond.id)).first()
+
+    status, response = DashboardFeed(
+        str(farm.id),
+        str(pond.id),
+        str(cycle.id),
+        date,
+    ).feed()
+
+    assert status == 200, response.message
+    realization = next(
+        item["data"]
+        for item in response.payload["daily_feed_adjustment"]["data"]
+        if item["title"] == "Realization"
+    )
+    assert len(realization["ration"]) == 4
+    assert realization["ration"][0]["ration_number"] == "1"
+
+
+def test_feeding_dashboard_supports_legacy_seed_rows():
+    call_command("seed_demo", verbosity=0)
+
+    farm = Farm.objects(user_id="__seed__").order_by("-created_at").first()
+    pond = Pond.objects(farm_id=str(farm.id)).first()
+    cycle = Cycle.objects(pond_id=str(pond.id)).first()
+    cycle_id = str(cycle.id)
+
+    result_data = ResultData.objects(cycle_id=cycle_id).first()
+    for row in result_data.result_data:
+        for ration_number in range(1, 5):
+            row.pop(f"feed_ration_{ration_number}", None)
+    result_data.save()
+    FeedRealization.objects(cycle_id=cycle_id).update(set__ration_number=0)
+
+    status, response = DashboardFeed(
+        str(farm.id),
+        str(pond.id),
+        cycle_id,
+        "03/31/2024",
+    ).feed()
+
+    assert status == 200, response.message
+    realization = next(
+        item["data"]
+        for item in response.payload["daily_feed_adjustment"]["data"]
+        if item["title"] == "Realization"
+    )
+    assert realization["ration"][0]["ration_number"] == "1"
 
 
 def test_existing_user_without_dashboard_ready_data_gets_seed_once(monkeypatch):

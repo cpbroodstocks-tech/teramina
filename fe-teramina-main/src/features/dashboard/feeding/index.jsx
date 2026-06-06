@@ -34,6 +34,11 @@ const Feeding = () => {
   const loading = filterLoading || dataLoading;
   const { classes: styles } = useStyles();
   const { generateOptionsDefault } = useLineEchartsGenerateOptions();
+  const hasData = Boolean(data?.feed_status && data?.feed_adjustment && data?.daily_feed_adjustment);
+  const dailyAdjustment = data?.daily_feed_adjustment?.data ?? [];
+  const recommendation = dailyAdjustment.find((item) => item.title === "Recommendation")?.data ?? [];
+  const realization = dailyAdjustment.find((item) => item.title === "Realization")?.data ?? {};
+  const rations = Array.isArray(realization.ration) ? realization.ration : [];
 
   return (
     <Fragment>
@@ -41,8 +46,8 @@ const Feeding = () => {
       <Filter data={data} filter={filter} form={form} onFilterChange={onFilterChange} />
       {loading && <Loader />}
       {error && <Error />}
-      {!loading && !error && (!data || !Object.keys(data).length) && <Empty />}
-      {!loading && !error && data && Object.keys(data).length > 0 && (
+      {!loading && !error && !hasData && <Empty />}
+      {!loading && !error && hasData && (
         <Fragment>
           <section className={styles.sectionContainer}>
             <Typography variant="h2" className={styles.sectionTitle}>
@@ -188,9 +193,8 @@ const Feeding = () => {
               Recomendation
             </Typography>
             <div className={styles.dailyFeedingAdjustment}>
-              {data.daily_feed_adjustment.data
-                .filter((filtered) => filtered.title === "Recommendation")[0]
-                .data.filter((data) => data.title === "Feed Ration")
+              {recommendation
+                .filter((data) => data.title === "Feed Ration")
                 .map((daily_adjustment, key) => (
                   <Card
                     className={classNames(styles.card, styles.cardToolTip)}
@@ -221,9 +225,8 @@ const Feeding = () => {
                     </CardContent>
                   </Card>
                 ))}
-              {data.daily_feed_adjustment.data
-                .filter((filtered) => filtered.title === "Recommendation")[0]
-                .data.filter((data) => data.title !== "Feed Ration")
+              {recommendation
+                .filter((data) => data.title !== "Feed Ration")
                 .map((daily_adjustment, key) => (
                   <Card className={styles.card} key={key}>
                     <CardContent className={styles.cardContent}>
@@ -252,11 +255,7 @@ const Feeding = () => {
                 <TableHead>
                   <TableRow>
                     <TableCell rowSpan="2">Feed Given</TableCell>
-                    {Object.keys(
-                      data.daily_feed_adjustment.data.filter(
-                        (feeds) => feeds.title === "Realization"
-                      )[0].data.ration
-                    ).map((ration, key) => {
+                    {rations.map((ration, key) => {
                       return (
                         <TableCell
                           colSpan="2"
@@ -266,11 +265,7 @@ const Feeding = () => {
                           <div className={styles.tableCellSpaceBetween}>
                             <Typography>Ration {key + 1}</Typography>
                             <ModalAddFeeding
-                              data={
-                                data.daily_feed_adjustment.data.filter(
-                                  (feeds) => feeds.title === "Realization"
-                                )[0].data.ration[ration]
-                              }
+                              data={ration}
                               onSubmit={refetch}
                               selectedFilter={selectedFilter}
                               index={key}
@@ -281,11 +276,7 @@ const Feeding = () => {
                     })}
                   </TableRow>
                   <TableRow>
-                    {Object.keys(
-                      data.daily_feed_adjustment.data.filter(
-                        (feeds) => feeds.title === "Realization"
-                      )[0].data.ration
-                    ).map((_, key) => {
+                    {rations.map((_, key) => {
                       return (
                         <Fragment key={key}>
                           <TableCell className={styles.tableCellBorderAll}>
@@ -302,32 +293,16 @@ const Feeding = () => {
                 <TableBody>
                   <TableRow>
                     <TableCell className={styles.tableCellBorderAll}>
-                      {
-                        data.daily_feed_adjustment.data.filter(
-                          (data) => data.title === "Realization"
-                        )[0].data.feed_given
-                      }
+                      {realization.feed_given}
                     </TableCell>
-                    {Object.keys(
-                      data.daily_feed_adjustment.data.filter(
-                        (feeds) => feeds.title === "Realization"
-                      )[0].data.ration
-                    ).map((ration, key) => {
+                    {rations.map((ration, key) => {
                       return (
                         <Fragment key={key}>
                           <TableCell className={styles.tableCellBorderAll}>
-                            {
-                              data.daily_feed_adjustment.data.filter(
-                                (feeds) => feeds.title === "Realization"
-                              )[0].data.ration[ration].value[0].value
-                            }
+                            {ration.value?.[0]?.value}
                           </TableCell>
                           <TableCell className={styles.tableCellBorderAll}>
-                            {
-                              data.daily_feed_adjustment.data.filter(
-                                (feeds) => feeds.title === "Realization"
-                              )[0].data.ration[ration].value[1].value
-                            }
+                            {ration.value?.[1]?.value}
                           </TableCell>
                         </Fragment>
                       );

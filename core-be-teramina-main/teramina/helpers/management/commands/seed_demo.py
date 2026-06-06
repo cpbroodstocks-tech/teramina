@@ -313,6 +313,10 @@ def _build_result_rows(
                 "sgr": sgr,
                 "fr": fr,
                 "adj_fr": fr / 100,
+                "feed_ration_1": fr / 400,
+                "feed_ration_2": fr / 400,
+                "feed_ration_3": fr / 400,
+                "feed_ration_4": fr / 400,
                 "sr": sr,
                 "w0": 0.02,
                 "initial_stocking": initial_stocking,
@@ -370,11 +374,12 @@ def load_sample_seed_data(sample_dir: Path | None = None) -> dict:
     cost_rows = _load_cost_rows(sample_dir)
     harvest_data, harvest_events = _load_harvest_data(sample_dir)
     result_rows = _build_result_rows(daily_rows, cost_rows, harvest_events)
+    result_by_doc = {row["doc"]: row for row in result_rows}
     feed_rows = [
         {
             "doc": row["doc"],
-            "ration_number": 0,
-            "feed_ration": row["feed_given_kg"],
+            "ration_number": 1,
+            "feed_ration": result_by_doc[row["doc"]]["fr"],
             "feed_given": row["feed_given_kg"],
             "feed_leftover": row["feed_leftover"],
         }

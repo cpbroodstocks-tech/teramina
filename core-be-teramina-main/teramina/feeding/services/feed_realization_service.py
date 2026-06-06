@@ -120,8 +120,15 @@ class FeedRealizationService:
         """
         ration = self.__generata_ration_for_empty_feed_data(max_ration_number)
         for j in current_data:
-            index = int(j["ration_number"]) - 1
-            ration[index] = j
+            ration_number = max(int(j["ration_number"]), 1)
+            if ration_number > max_ration_number:
+                continue
+            index = ration_number - 1
+            ration[index] = {
+                **j,
+                "title": f"Ration {ration_number}",
+                "ration_number": str(ration_number),
+            }
 
         return ration
 
