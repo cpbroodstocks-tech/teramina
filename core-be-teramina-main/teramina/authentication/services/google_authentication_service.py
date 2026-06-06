@@ -14,7 +14,7 @@ from ..auth_bearer import AuthBearer
 from ...user.models.user_model import User
 from ...schemas.general_schema import DataErrorSchema, DataSuccessSchema
 
-from ...helpers.default_data_updater import DataSeeder
+from ...helpers.default_data_updater import ensure_default_data_for_user
 
 logger = logging.getLogger("teramina")
 
@@ -116,20 +116,11 @@ def signed_token_using_firebase(token):
                 picture=decoded_token["photoURL"],
             )
             user.save()
-            seeder_farm = os.getenv("SEEDER_FARM")
-            seeder_pond = os.getenv("SEEDER_POND")
-            seeder_cycle = os.getenv("SEEDER_CYCLE")
-            if seeder_farm and seeder_pond and seeder_cycle:
-                try:
-                    data_seeder = DataSeeder(
-                        farm_id=seeder_farm,
-                        pond_id=seeder_pond,
-                        cycle_id=seeder_cycle,
-                        user_id=str(user.id),
-                    )
-                    data_seeder.set_data()
-                except Exception as exc:  # pylint: disable=broad-except
-                    logger.warning("Default data seeding skipped for user %s: %s", user.email, exc)
+
+        try:
+            ensure_default_data_for_user(str(user.id))
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning("Default data seeding skipped for user %s: %s", user.email, exc)
 
         jwt_payload = {
             "exp": datetime.now(timezone.utc) + timedelta(minutes=120),

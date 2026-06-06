@@ -1,5 +1,5 @@
 # pylint: disable=E0401
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from mongoengine.errors import InvalidQueryError, ValidationError, DoesNotExist
 
 from teramina.farm.models.farm_model import Farm
@@ -13,6 +13,25 @@ from teramina.water_quality_dashboard.services.variable_management import (
 )
 
 from teramina.schemas.general_schema import DataErrorSchema, GetListSuccessSchema
+
+
+def _as_datetime(value):
+    """Normalize MongoDB and Google Sheets date values for dashboard filters."""
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, date):
+        return datetime.combine(value, datetime.min.time())
+
+    text = str(value).strip()
+    for parser in (
+        lambda: datetime.fromisoformat(text.replace("Z", "+00:00")),
+        lambda: datetime.strptime(text, "%m/%d/%Y"),
+    ):
+        try:
+            return parser().replace(tzinfo=None)
+        except ValueError:
+            continue
+    raise ValueError(f"Invalid cycle data date: {value}")
 
 
 class FilterData:
@@ -93,8 +112,8 @@ class FilterData:
                     raise ValueError(f"Data with cycle {cycle_id} doesn't exist")
 
                 if filter_type == "historical":
-                    end_date = cycle_data["result_data"][-1]["date"]
-                    end_date = datetime.strftime(end_date, "%m/%d/%Y")
+                    end_date = _as_datetime(cycle_data["result_data"][-1]["date"])
+                    end_date = end_date.strftime("%m/%d/%Y")
                 else:
                     harvest_recommendation = (
                         HarvestRecommendation.objects(cycle_id=cycle_id)
@@ -109,7 +128,7 @@ class FilterData:
                         if harvest_recommendation
                         else []
                     )
-                    start_date = cycle_data["result_data"][-1]["date"] + timedelta(
+                    start_date = _as_datetime(cycle_data["result_data"][-1]["date"]) + timedelta(
                         days=1
                     )
                     if referenced_doc:
@@ -121,8 +140,8 @@ class FilterData:
                             days=120 - (cycle_data["result_data"][-1]["doc"] + 1)
                         )
 
-                    start_date = datetime.strftime(start_date, "%m/%d/%Y")
-                    end_date = datetime.strftime(end_date, "%m/%d/%Y")
+                    start_date = start_date.strftime("%m/%d/%Y")
+                    end_date = end_date.strftime("%m/%d/%Y")
 
                 result_data[0]["daterange"] = {
                     "start_date": start_date,
@@ -171,9 +190,9 @@ class FilterData:
                 break
 
             if end_date == 0:
-                end_date = cycle_data["result_data"][-1]["date"]
+                end_date = _as_datetime(cycle_data["result_data"][-1]["date"])
             else:
-                new_end_date = cycle_data["result_data"][-1]["date"]
+                new_end_date = _as_datetime(cycle_data["result_data"][-1]["date"])
                 if (new_end_date - end_date).days > 0:
                     end_date = new_end_date
 

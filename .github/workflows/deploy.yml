@@ -30,6 +30,11 @@ on:
         required: false
         default: false
         type: boolean
+      run_onboarding_backfill:
+        description: "Give the default sample cycle to users without dashboard-ready data"
+        required: false
+        default: false
+        type: boolean
       reindex_advisory_sources:
         description: "Run reindex_advisory_sources after backend deploy"
         required: false
@@ -141,6 +146,15 @@ jobs:
           set -e
           cd ~/teramina/core-be-teramina-main/
           docker-compose exec -T web python manage.py seed_demo
+          EOF
+
+      - name: Backfill onboarding demo seed
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_onboarding_backfill == 'true' }}
+        run: |
+          ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          set -e
+          cd ~/teramina/core-be-teramina-main/
+          docker-compose exec -T web python manage.py backfill_onboarding_seed
           EOF
 
       - name: Reindex advisory sources

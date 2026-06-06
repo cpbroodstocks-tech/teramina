@@ -23,3 +23,25 @@ def test_firebase_login_without_seed_env_succeeds(monkeypatch):
     assert response.payload["token"]
     assert response.payload["refresh_token"]
     assert User.objects(email="new-user@teramina.io").first() is not None
+
+
+def test_existing_firebase_user_is_checked_for_default_data():
+    user = User(name="Existing Auth User", email="existing-auth-user@teramina.io").save()
+
+    with (
+        patch(
+            "teramina.authentication.services.google_authentication_service.decode_token",
+            return_value={
+                "email": user.email,
+                "displayName": user.name,
+                "photoURL": "",
+            },
+        ),
+        patch(
+            "teramina.authentication.services.google_authentication_service.ensure_default_data_for_user"
+        ) as ensure_default,
+    ):
+        status, _ = signed_token_using_firebase("firebase-token")
+
+    assert status == 200
+    ensure_default.assert_called_once_with(str(user.id))

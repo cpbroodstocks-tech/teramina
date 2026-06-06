@@ -7,11 +7,15 @@ from django.core.management.base import CommandError
 from teramina.cost_data.models.cost_data_model import CostData
 from teramina.cycle.models.cycle_model import Cycle
 from teramina.cycle_data.models.cycle_data_model import CycleData, ForecastData, ResultData
+from teramina.dashboard.services.filter_service import FilterData
+from teramina.dashboard.services.historical.economic import DashboardEconomic
 from teramina.farm.models.farm_model import Farm
 from teramina.feeding.models.feed_realization_model import FeedRealization
 from teramina.harvest.models.harvest_record_model import HarvestRecord
+from teramina.helpers.default_data_updater import ensure_default_data_for_user, user_has_dashboard_data
 from teramina.helpers.management.commands.seed_demo import load_sample_seed_data
 from teramina.pond.models.pond_model import Pond
+from teramina.user.models.user_model import User
 
 
 SAMPLE_DATA_DIR = Path(__file__).resolve().parents[2] / "sample_data"
@@ -75,3 +79,78 @@ def test_seed_demo_command_persists_complete_onboarding_template():
     assert FeedRealization.objects(cycle_id=cycle_id).count() == 120
     assert HarvestRecord.objects(cycle_id=cycle_id).count() == 1
     assert len(CostData.objects(farm_id=cycle_id).first().data) == 40
+
+
+def test_seed_demo_supports_string_date_filter_and_economics_dashboard():
+    call_command("seed_demo", verbosity=0)
+
+    farm = Farm.objects(user_id="__seed__").order_by("-created_at").first()
+    pond = Pond.objects(farm_id=str(farm.id)).first()
+    cycle = Cycle.objects(pond_id=str(pond.id)).first()
+
+    status, response = FilterData("__seed__").filter(
+        str(farm.id), str(pond.id), str(cycle.id), "historical"
+    )
+    assert status == 200
+    assert response.payload[0]["daterange"] == {
+        "start_date": "03/01/2024",
+        "end_date": "06/28/2024",
+    }
+
+    status, response = DashboardEconomic(
+        str(farm.id),
+        str(pond.id),
+        str(cycle.id),
+        "06/28/2024",
+    ).economic()
+    assert status == 200
+    assert response.payload["profit_n_lost"]["data"][0]["value"] == 120.0
+
+
+def test_existing_user_without_dashboard_ready_data_gets_seed_once(monkeypatch):
+    call_command("seed_demo", verbosity=0)
+    source_farm = Farm.objects(user_id="__seed__").order_by("-created_at").first()
+    source_pond = Pond.objects(farm_id=str(source_farm.id)).first()
+    source_cycle = Cycle.objects(pond_id=str(source_pond.id)).first()
+
+    monkeypatch.setenv("SEEDER_FARM", str(source_farm.id))
+    monkeypatch.setenv("SEEDER_POND", str(source_pond.id))
+    monkeypatch.setenv("SEEDER_CYCLE", str(source_cycle.id))
+
+    user = User(name="Existing User", email="existing-seed-test@teramina.io").save()
+    invalid_farm = Farm(name="Incomplete Farm", location="Test", user_id=str(user.id)).save()
+    invalid_pond = Pond(name="Incomplete Pond", farm_id=str(invalid_farm.id)).save()
+    invalid_cycle = Cycle(name="Incomplete Cycle", pond_id=str(invalid_pond.id)).save()
+    CycleData(cycle_id=str(invalid_cycle.id), result_data=[{"date": "2024-01-01", "doc": 1}]).save()
+    ResultData(cycle_id=str(invalid_cycle.id), result_data=[{"date": "2024-01-01", "doc": 1}]).save()
+
+    assert ensure_default_data_for_user(str(user.id)) is True
+    assert user_has_dashboard_data(str(user.id)) is True
+    farm_count = Farm.objects(user_id=str(user.id)).count()
+
+    assert ensure_default_data_for_user(str(user.id)) is False
+    assert Farm.objects(user_id=str(user.id)).count() == farm_count
+
+
+def test_existing_matching_demo_cycle_is_repaired_in_place(monkeypatch):
+    call_command("seed_demo", verbosity=0)
+    source_farm = Farm.objects(user_id="__seed__").order_by("-created_at").first()
+    source_pond = Pond.objects(farm_id=str(source_farm.id)).first()
+    source_cycle = Cycle.objects(pond_id=str(source_pond.id)).first()
+
+    monkeypatch.setenv("SEEDER_FARM", str(source_farm.id))
+    monkeypatch.setenv("SEEDER_POND", str(source_pond.id))
+    monkeypatch.setenv("SEEDER_CYCLE", str(source_cycle.id))
+
+    user = User(name="Old Demo User", email="old-demo-test@teramina.io").save()
+    farm = Farm(name=source_farm.name, location=source_farm.location, user_id=str(user.id)).save()
+    pond = Pond(name=source_pond.name, farm_id=str(farm.id)).save()
+    cycle = Cycle(name=source_cycle.name, pond_id=str(pond.id)).save()
+    CycleData(cycle_id=str(cycle.id), result_data=[{"date": "2024-01-01", "doc": 1}]).save()
+    ResultData(cycle_id=str(cycle.id), result_data=[{"date": "2024-01-01", "doc": 1}]).save()
+
+    assert ensure_default_data_for_user(str(user.id)) is True
+    assert Farm.objects(user_id=str(user.id)).count() == 1
+    assert Cycle.objects(pond_id=str(pond.id)).count() == 1
+    assert len(ResultData.objects(cycle_id=str(cycle.id)).first().result_data) == 120
+    assert user_has_dashboard_data(str(user.id)) is True
