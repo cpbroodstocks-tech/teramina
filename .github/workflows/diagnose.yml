@@ -78,7 +78,8 @@ jobs:
           from teramina.cycle_data.models.cycle_data_model import CycleData, ResultData
           from teramina.dashboard.services.filter_service import FilterData
           from teramina.dashboard.services.historical.economic import DashboardEconomic
-          from teramina.helpers.default_data_updater import DASHBOARD_REQUIRED_FIELDS, user_has_dashboard_data
+          from teramina.dashboard.services.readiness import is_dashboard_ready_cycle
+          from teramina.helpers.default_data_updater import user_has_dashboard_data
 
           for user in User.objects.only('id', 'email', 'is_there_data'):
               user_id = str(user.id)
@@ -89,7 +90,7 @@ jobs:
                           cycle_id = str(cycle.id)
                           cycle_data = CycleData.objects(cycle_id=cycle_id).only('result_data').first()
                           result_data = ResultData.objects(cycle_id=cycle_id).only('result_data').first()
-                          ready = bool(result_data and result_data.result_data and DASHBOARD_REQUIRED_FIELDS.issubset(result_data.result_data[-1].keys()))
+                          ready = is_dashboard_ready_cycle(cycle_id)
                           filter_status, filter_response = FilterData(user_id).filter(str(farm.id), str(pond.id), cycle_id, 'historical')
                           date_range = filter_response.payload[0].get('daterange') if filter_status == 200 else filter_response.message
                           end_date = date_range.get('end_date') if isinstance(date_range, dict) else None

@@ -14,34 +14,12 @@ from ..harvest.models.harvest_record_model import HarvestRecord
 from ..feeding.models.feed_realization_model import FeedRealization
 from ..cost_data.models.cost_data_model import CostData
 from ..user.models.user_model import User
+from ..dashboard.services.readiness import is_dashboard_ready_cycle
 
 from ..helpers.pinecone_data_indexing import PineconeIndexing
 
 
 logger = logging.getLogger("teramina")
-
-DASHBOARD_REQUIRED_FIELDS = {
-    "date",
-    "doc",
-    "category",
-    "adj_abw",
-    "sr",
-    "initial_stocking",
-    "harvest_biomass_kg",
-    "biomass_kg",
-    "total_biomass",
-    "potential_revenue",
-    "cum_total_cost",
-    "cost_per_kg",
-    "cost_harvest",
-    "cost_energy",
-    "cost_probiotics",
-    "cost_other",
-    "cost_labor",
-    "cost_bonuss",
-    "cost_feed",
-}
-
 
 def user_has_dashboard_data(user_id):
     """Return whether a user owns at least one cycle usable by the dashboard."""
@@ -54,16 +32,7 @@ def user_has_dashboard_data(user_id):
         return False
 
     cycle_ids = [str(cycle.id) for cycle in Cycle.objects(pond_id__in=pond_ids).only("id")]
-    for cycle_id in cycle_ids:
-        cycle_data = CycleData.objects(cycle_id=cycle_id).only("result_data").first()
-        result_data = ResultData.objects(cycle_id=cycle_id).only("result_data").first()
-        if not cycle_data or not cycle_data.result_data or not result_data or not result_data.result_data:
-            continue
-        last_result = result_data.result_data[-1]
-        if isinstance(last_result, dict) and DASHBOARD_REQUIRED_FIELDS.issubset(last_result.keys()):
-            return True
-
-    return False
+    return any(is_dashboard_ready_cycle(cycle_id) for cycle_id in cycle_ids)
 
 
 def sync_user_data_status(user_id):

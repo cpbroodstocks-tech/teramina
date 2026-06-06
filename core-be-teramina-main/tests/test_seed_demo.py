@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from django.core.management import call_command
@@ -16,6 +17,7 @@ from teramina.helpers.default_data_updater import ensure_default_data_for_user, 
 from teramina.helpers.management.commands.seed_demo import load_sample_seed_data
 from teramina.pond.models.pond_model import Pond
 from teramina.user.models.user_model import User
+from teramina.user.services.profile_service import ProfileService
 
 
 SAMPLE_DATA_DIR = Path(__file__).resolve().parents[2] / "sample_data"
@@ -128,6 +130,30 @@ def test_existing_user_without_dashboard_ready_data_gets_seed_once(monkeypatch):
     assert user_has_dashboard_data(str(user.id)) is True
     farm_count = Farm.objects(user_id=str(user.id)).count()
 
+    status, response = FilterData(str(user.id)).filter()
+    assert status == 200
+    assert str(invalid_farm.id) not in {farm["id"] for farm in response.payload}
+    assert len(response.payload) == 1
+
+    ready_farm_id = response.payload[0]["id"]
+    status, response = FilterData(str(user.id)).filter(farm_id=ready_farm_id)
+    assert status == 200
+    assert len(response.payload) == 1
+
+    ready_pond_id = response.payload[0]["id"]
+    status, response = FilterData(str(user.id)).filter(farm_id=ready_farm_id, pond_id=ready_pond_id)
+    assert status == 200
+    assert len(response.payload) == 1
+
+    status, response = FilterData(str(user.id)).filter(
+        str(invalid_farm.id),
+        str(invalid_pond.id),
+        str(invalid_cycle.id),
+        "historical",
+    )
+    assert status == 400
+    assert response.message == f"Dashboard data with cycle {invalid_cycle.id} doesn't exist"
+
     assert ensure_default_data_for_user(str(user.id)) is False
     assert Farm.objects(user_id=str(user.id)).count() == farm_count
 
@@ -154,3 +180,17 @@ def test_existing_matching_demo_cycle_is_repaired_in_place(monkeypatch):
     assert Cycle.objects(pond_id=str(pond.id)).count() == 1
     assert len(ResultData.objects(cycle_id=str(cycle.id)).first().result_data) == 120
     assert user_has_dashboard_data(str(user.id)) is True
+
+
+def test_user_data_status_retries_default_seed_provisioning():
+    user = User(name="Status User", email="status-seed-test@teramina.io").save()
+
+    with (
+        patch("teramina.user.services.profile_service.ensure_default_data_for_user") as ensure_default,
+        patch("teramina.user.services.profile_service.sync_user_data_status", return_value=True),
+    ):
+        status, response = ProfileService().is_there_data_status(str(user.id))
+
+    assert status == 200
+    assert response.payload["is_there_data"] is True
+    ensure_default.assert_called_once_with(str(user.id))

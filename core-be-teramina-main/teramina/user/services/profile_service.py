@@ -8,7 +8,7 @@ from mongoengine.errors import DoesNotExist, InvalidQueryError, FieldDoesNotExis
 from ..schemas.profile_schema import UpdateProfileSchema
 from ...schemas.general_schema import DataErrorSchema, DataSuccessSchema
 from ..models.user_model import User
-from ...helpers.default_data_updater import sync_user_data_status
+from ...helpers.default_data_updater import ensure_default_data_for_user, sync_user_data_status
 
 
 class ProfileService:
@@ -79,6 +79,7 @@ class ProfileService:
     def is_there_data_status(self, user_id):
         """generate status existing data"""
         try:
+            ensure_default_data_for_user(user_id)
             data = {"is_there_data": sync_user_data_status(user_id)}
         except DoesNotExist as exception:
             return 400, DataErrorSchema(code=400, message=str(exception))
