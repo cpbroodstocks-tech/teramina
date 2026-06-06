@@ -25,6 +25,10 @@ const WaterQuality = () => {
   const { data, isLoading: dataLoading, isError: error } = useWaterQualityDashboard(submittedParams);
   const loading = filterLoading || dataLoading;
   const [value, setValue] = useState(0);
+  const linePlots = Array.isArray(data?.line_plot) ? data.line_plot : [];
+  const scatterPlots = Array.isArray(data?.scatter_plot) ? data.scatter_plot : [];
+  const tableRows = Array.isArray(data?.data) ? data.data : [];
+  const tableColumns = Object.keys(tableRows[0] || {});
 
   const handleChange = (_event, newValue) => {
     setValue(newValue);
@@ -50,14 +54,14 @@ const WaterQuality = () => {
           </Box>
           {value === 0 && (
             <Box>
-              {data.line_plot.map((plot) => (
+              {linePlots.map((plot) => (
                 <LineEcharts option={plot} key={plot.title} />
               ))}
             </Box>
           )}
           {value === 1 && (
             <Box>
-              {data.scatter_plot.map((plot) => (
+              {scatterPlots.map((plot) => (
                 <ScatterCharts option={plot} key={plot.title} />
               ))}
             </Box>
@@ -68,7 +72,7 @@ const WaterQuality = () => {
                 <Table aria-label="simple table">
                   <TableHead>
                     <TableRow>
-                      {Object.keys(data.data[0]).map((key) => (
+                      {tableColumns.map((key) => (
                         <TableCell align="center" key={key}>
                           {key.toUpperCase()}
                         </TableCell>
@@ -76,12 +80,12 @@ const WaterQuality = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {data.data.map((row, index) => (
+                    {tableRows.map((row, index) => (
                       <TableRow
                         key={index}
                         sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
                       >
-                        {Object.keys(row).map((key) => (
+                        {Object.keys(row || {}).map((key) => (
                           <TableCell align="center" key={key}>
                             {row[key]}
                           </TableCell>

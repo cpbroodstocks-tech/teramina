@@ -81,6 +81,7 @@ const useFilter = () => {
       };
     },
     dirty: formState.isDirty,
+    errors: formState.errors,
     setFieldValue: setValue,
   };
 

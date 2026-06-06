@@ -16,7 +16,9 @@ import { useTranslation } from "react-i18next";
 const Filter = ({ filter, form, onFilterChange }) => {
   const { t } = useTranslation();
   const { classes: styles } = useStyles();
-  const { farms, ponds, cycles, daterange, variables } = filter;
+  const { farms, ponds, daterange } = filter;
+  const cycles = filter.cycles || [];
+  const variables = filter.variables || [];
 
   return (
     <Fragment>
@@ -135,7 +137,7 @@ const Filter = ({ filter, form, onFilterChange }) => {
             </Select>
           </FormControl>
           <Button
-            disabled={!form.dirty || Object.keys(form.errors).length > 0}
+            disabled={!form.dirty || Object.keys(form.errors || {}).length > 0}
             type="submit"
             classes={{
               disabled: styles.filterButtonDisabled,
