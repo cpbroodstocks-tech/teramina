@@ -1,7 +1,7 @@
 import { Fragment, useState, useEffect } from "react";
 import { Box } from "@mui/material";
 import { ReactSVG } from "react-svg";
-import { useFilter } from "features/filter/default/hooks";
+import { useFilter } from "features/filter/overview/hooks";
 import Filter from "features/filter/overview";
 import { useTranslation } from "react-i18next";
 import { Typography } from "@mui/material";

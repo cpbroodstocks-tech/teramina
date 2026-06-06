@@ -107,7 +107,7 @@ const mockOverviewData = {
   prompt_summary: "Summarize this farm data.",
 };
 
-vi.mock("features/filter/default/hooks", () => ({
+vi.mock("features/filter/overview/hooks", () => ({
   useFilter: () => ({
     loading: false,
     error: false,
