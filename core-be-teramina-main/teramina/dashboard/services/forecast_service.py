@@ -40,9 +40,9 @@ class ForecastDataService:
             for i in index:
                 harvest_type = "".join(filter(str.isalpha, i))
                 if (
-                    (harvest_type == "partial")
-                    & (forecasted_harvest_data[i]["doc"] != "")
-                    & (forecasted_harvest_data[i]["doc"] <= max_doc)
+                    harvest_type == "partial"
+                    and forecasted_harvest_data[i]["doc"] != ""
+                    and forecasted_harvest_data[i]["doc"] <= max_doc
                 ):
                     harvest_data[i] = {
                         "doc": forecasted_harvest_data[i]["doc"],

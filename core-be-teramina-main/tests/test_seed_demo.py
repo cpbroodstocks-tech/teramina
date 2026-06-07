@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -5,6 +6,9 @@ import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
 
+from teramina.advisory.models.advisory_model import AdvisoryCase, AdvisoryReport
+from teramina.agent.models.agent_model import AgentMemory, FarmAlert, WorkflowTask
+from teramina.content.models.content_model import ContentAccess
 from teramina.cost_data.models.cost_data_model import CostData
 from teramina.cycle.models.cycle_model import Cycle
 from teramina.cycle_data.models.cycle_data_model import CycleData, ForecastData, ResultData
@@ -15,7 +19,8 @@ from teramina.farm.models.farm_model import Farm
 from teramina.feeding.models.feed_realization_model import FeedRealization
 from teramina.harvest.models.harvest_record_model import HarvestRecord
 from teramina.helpers.default_data_updater import ensure_default_data_for_user, user_has_dashboard_data
-from teramina.helpers.management.commands.seed_demo import load_sample_seed_data
+from teramina.helpers.demo_artifacts import DEMO_BUNDLE_VERSION, DEMO_TAG
+from teramina.helpers.management.commands.seed_demo import CURRENT_DOC, load_sample_seed_data
 from teramina.pond.models.pond_model import Pond
 from teramina.user.models.user_model import User
 from teramina.user.services.profile_service import ProfileService
@@ -24,6 +29,21 @@ from teramina.water_quality_dashboard.services.water_quality_service import Wate
 
 
 SAMPLE_DATA_DIR = Path(__file__).resolve().parents[2] / "sample_data"
+
+
+def _seed_template_scenarios():
+    call_command("seed_demo", verbosity=0)
+    farm = Farm.objects(user_id="__seed__", demo_bundle_version=DEMO_BUNDLE_VERSION).first()
+    scenarios = {}
+    for pond in Pond.objects(farm_id=str(farm.id)):
+        cycle = Cycle.objects(id=pond.active_cycle_id, pond_id=str(pond.id), is_active=True).first()
+        scenarios[pond.demo_scenario] = (pond, cycle)
+    return farm, scenarios
+
+
+def _end_date(cycle_id, output_format):
+    value = CycleData.objects(cycle_id=cycle_id).first().result_data[-1]["date"]
+    return date.fromisoformat(str(value)[:10]).strftime(output_format)
 
 
 def test_sample_seed_loads_all_google_sheets_tabs():
@@ -74,53 +94,57 @@ def test_sample_seed_requires_exactly_120_daily_rows(tmp_path):
 
 
 def test_seed_demo_command_persists_complete_onboarding_template():
-    call_command("seed_demo", verbosity=0)
+    farm, scenarios = _seed_template_scenarios()
 
-    farm = Farm.objects(user_id="__seed__").order_by("-created_at").first()
-    pond = Pond.objects(farm_id=str(farm.id)).first()
-    cycle = Cycle.objects(pond_id=str(pond.id)).first()
-    cycle_id = str(cycle.id)
+    assert farm.name == "Demo A/B Farm"
+    assert set(scenarios) == {"healthy", "at_risk"}
+    for pond, cycle in scenarios.values():
+        cycle_id = str(cycle.id)
+        assert pond.active_cycle_id == cycle_id
+        assert cycle.start_date.date() == date.today() - timedelta(days=CURRENT_DOC - 1)
+        assert len(CycleData.objects(cycle_id=cycle_id).first().result_data) == CURRENT_DOC
+        assert len(ResultData.objects(cycle_id=cycle_id).first().result_data) == CURRENT_DOC
+        assert len(ForecastData.objects(cycle_id=cycle_id).first().result_data) == 120
+        assert FeedRealization.objects(cycle_id=cycle_id).count() == CURRENT_DOC
+        assert HarvestRecord.objects(cycle_id=cycle_id).count() == 1
+        assert CostData.objects(farm_id=cycle_id).first().data
 
-    assert len(CycleData.objects(cycle_id=cycle_id).first().result_data) == 120
-    assert len(ResultData.objects(cycle_id=cycle_id).first().result_data) == 120
-    assert len(ForecastData.objects(cycle_id=cycle_id).first().result_data) == 120
-    assert FeedRealization.objects(cycle_id=cycle_id).count() == 120
-    assert HarvestRecord.objects(cycle_id=cycle_id).count() == 1
-    assert len(CostData.objects(farm_id=cycle_id).first().data) == 40
+    healthy_cycle = scenarios["healthy"][1]
+    risk_cycle = scenarios["at_risk"][1]
+    healthy = ResultData.objects(cycle_id=str(healthy_cycle.id)).first().result_data[-1]
+    at_risk = ResultData.objects(cycle_id=str(risk_cycle.id)).first().result_data[-1]
+    assert at_risk["do"] < healthy["do"]
+    assert at_risk["nh3"] > healthy["nh3"]
+    assert at_risk["abw"] < healthy["abw"]
+    assert at_risk["cost_per_kg"] > healthy["cost_per_kg"]
 
 
 def test_seed_demo_supports_string_date_filter_and_economics_dashboard():
-    call_command("seed_demo", verbosity=0)
-
-    farm = Farm.objects(user_id="__seed__").order_by("-created_at").first()
-    pond = Pond.objects(farm_id=str(farm.id)).first()
-    cycle = Cycle.objects(pond_id=str(pond.id)).first()
+    farm, scenarios = _seed_template_scenarios()
+    pond, cycle = scenarios["healthy"]
 
     status, response = FilterData("__seed__").filter(
         str(farm.id), str(pond.id), str(cycle.id), "historical"
     )
     assert status == 200
     assert response.payload[0]["daterange"] == {
-        "start_date": "03/01/2024",
-        "end_date": "06/28/2024",
+        "start_date": (date.today() - timedelta(days=CURRENT_DOC - 1)).strftime("%m/%d/%Y"),
+        "end_date": date.today().strftime("%m/%d/%Y"),
     }
 
     status, response = DashboardEconomic(
         str(farm.id),
         str(pond.id),
         str(cycle.id),
-        "06/28/2024",
+        date.today().strftime("%m/%d/%Y"),
     ).economic()
     assert status == 200
-    assert response.payload["profit_n_lost"]["data"][0]["value"] == 120.0
+    assert response.payload["profit_n_lost"]["data"]
 
 
 def test_seed_demo_supports_csv_water_quality_parameters_and_wqi():
-    call_command("seed_demo", verbosity=0)
-
-    farm = Farm.objects(user_id="__seed__").order_by("-created_at").first()
-    pond = Pond.objects(farm_id=str(farm.id)).first()
-    cycle = Cycle.objects(pond_id=str(pond.id)).first()
+    farm, scenarios = _seed_template_scenarios()
+    pond, cycle = scenarios["healthy"]
     cycle_id = str(cycle.id)
 
     assert WQVariable.objects.count() == 7
@@ -148,28 +172,26 @@ def test_seed_demo_supports_csv_water_quality_parameters_and_wqi():
 
     status, response = WaterQuality().get_water_quality_data(
         cycle_id,
-        "2024-05-01",
-        "2024-06-28",
+        (date.today() - timedelta(days=CURRENT_DOC - 1)).isoformat(),
+        date.today().isoformat(),
         "wqi_1",
     )
     assert status == 200, response.message
-    assert len(response.payload["data"]) == 59
+    assert len(response.payload["data"]) == CURRENT_DOC
     assert response.payload["data"][0]["wqi_1"] is not None
 
 
-@pytest.mark.parametrize("date", ["03/31/2024", "06/01/2024"])
-def test_seed_demo_supports_feeding_dashboard(date):
-    call_command("seed_demo", verbosity=0)
-
-    farm = Farm.objects(user_id="__seed__").order_by("-created_at").first()
-    pond = Pond.objects(farm_id=str(farm.id)).first()
-    cycle = Cycle.objects(pond_id=str(pond.id)).first()
+@pytest.mark.parametrize("doc", [31, CURRENT_DOC])
+def test_seed_demo_supports_feeding_dashboard(doc):
+    farm, scenarios = _seed_template_scenarios()
+    pond, cycle = scenarios["healthy"]
+    query_date = (cycle.start_date.date() + timedelta(days=doc - 1)).strftime("%m/%d/%Y")
 
     status, response = DashboardFeed(
         str(farm.id),
         str(pond.id),
         str(cycle.id),
-        date,
+        query_date,
     ).feed()
 
     assert status == 200, response.message
@@ -183,11 +205,8 @@ def test_seed_demo_supports_feeding_dashboard(date):
 
 
 def test_feeding_dashboard_supports_legacy_seed_rows():
-    call_command("seed_demo", verbosity=0)
-
-    farm = Farm.objects(user_id="__seed__").order_by("-created_at").first()
-    pond = Pond.objects(farm_id=str(farm.id)).first()
-    cycle = Cycle.objects(pond_id=str(pond.id)).first()
+    farm, scenarios = _seed_template_scenarios()
+    pond, cycle = scenarios["healthy"]
     cycle_id = str(cycle.id)
 
     result_data = ResultData.objects(cycle_id=cycle_id).first()
@@ -201,7 +220,7 @@ def test_feeding_dashboard_supports_legacy_seed_rows():
         str(farm.id),
         str(pond.id),
         cycle_id,
-        "03/31/2024",
+        _end_date(cycle_id, "%m/%d/%Y"),
     ).feed()
 
     assert status == 200, response.message
@@ -214,10 +233,8 @@ def test_feeding_dashboard_supports_legacy_seed_rows():
 
 
 def test_existing_user_without_dashboard_ready_data_gets_seed_once(monkeypatch):
-    call_command("seed_demo", verbosity=0)
-    source_farm = Farm.objects(user_id="__seed__").order_by("-created_at").first()
-    source_pond = Pond.objects(farm_id=str(source_farm.id)).first()
-    source_cycle = Cycle.objects(pond_id=str(source_pond.id)).first()
+    source_farm, scenarios = _seed_template_scenarios()
+    source_pond, source_cycle = scenarios["healthy"]
 
     monkeypatch.setenv("SEEDER_FARM", str(source_farm.id))
     monkeypatch.setenv("SEEDER_POND", str(source_pond.id))
@@ -242,7 +259,7 @@ def test_existing_user_without_dashboard_ready_data_gets_seed_once(monkeypatch):
     ready_farm_id = response.payload[0]["id"]
     status, response = FilterData(str(user.id)).filter(farm_id=ready_farm_id)
     assert status == 200
-    assert len(response.payload) == 1
+    assert {item["name"] for item in response.payload} == {"Scenario A - Healthy", "Scenario B - At Risk"}
 
     ready_pond_id = response.payload[0]["id"]
     status, response = FilterData(str(user.id)).filter(farm_id=ready_farm_id, pond_id=ready_pond_id)
@@ -275,10 +292,8 @@ def test_existing_user_without_dashboard_ready_data_gets_seed_once(monkeypatch):
 
 
 def test_existing_matching_demo_cycle_is_repaired_in_place(monkeypatch):
-    call_command("seed_demo", verbosity=0)
-    source_farm = Farm.objects(user_id="__seed__").order_by("-created_at").first()
-    source_pond = Pond.objects(farm_id=str(source_farm.id)).first()
-    source_cycle = Cycle.objects(pond_id=str(source_pond.id)).first()
+    source_farm, scenarios = _seed_template_scenarios()
+    source_pond, source_cycle = scenarios["healthy"]
 
     monkeypatch.setenv("SEEDER_FARM", str(source_farm.id))
     monkeypatch.setenv("SEEDER_POND", str(source_pond.id))
@@ -293,9 +308,64 @@ def test_existing_matching_demo_cycle_is_repaired_in_place(monkeypatch):
 
     assert ensure_default_data_for_user(str(user.id)) is True
     assert Farm.objects(user_id=str(user.id)).count() == 1
-    assert Cycle.objects(pond_id=str(pond.id)).count() == 1
-    assert len(ResultData.objects(cycle_id=str(cycle.id)).first().result_data) == 120
+    assert Pond.objects(farm_id=str(farm.id)).count() == 2
+    assert Cycle.objects(pond_id=str(pond.id)).count() == 0
+    assert {
+        item.demo_scenario
+        for item in Pond.objects(farm_id=str(farm.id))
+    } == {"healthy", "at_risk"}
     assert user_has_dashboard_data(str(user.id)) is True
+
+
+def test_user_demo_bundle_seeds_linked_modules_and_passes_validator(monkeypatch):
+    call_command("seed_commercial_layer", verbosity=0)
+    source_farm, scenarios = _seed_template_scenarios()
+    source_pond, source_cycle = scenarios["healthy"]
+    monkeypatch.setenv("SEEDER_FARM", str(source_farm.id))
+    monkeypatch.setenv("SEEDER_POND", str(source_pond.id))
+    monkeypatch.setenv("SEEDER_CYCLE", str(source_cycle.id))
+
+    user = User(name="Bundle User", email="bundle-test@teramina.io").save()
+    assert ensure_default_data_for_user(str(user.id)) is True
+
+    user_id = str(user.id)
+    assert FarmAlert.objects(user_id=user_id, data__demo_bundle_version=DEMO_BUNDLE_VERSION).count() == 1
+    assert WorkflowTask.objects(user_id=user_id, title__startswith="[Demo]").count() == 2
+    assert AgentMemory.objects(user_id=user_id, tags=DEMO_TAG).count() == 2
+    assert ContentAccess.objects(user_id=user_id).count() >= 2
+    assert AdvisoryCase.objects(user_id=user_id, intake_data__demo_bundle_version=DEMO_BUNDLE_VERSION).count() == 1
+    assert AdvisoryReport.objects(user_id=user_id, status="delivered").count() == 1
+
+    call_command("validate_demo_bundle", email=user.email, include_template=True, verbosity=0)
+
+
+def test_user_provisioning_resolves_latest_template_when_environment_id_is_stale(monkeypatch):
+    source_farm, _ = _seed_template_scenarios()
+    monkeypatch.setenv("SEEDER_FARM", "stale-template-id")
+    monkeypatch.delenv("SEEDER_POND", raising=False)
+    monkeypatch.delenv("SEEDER_CYCLE", raising=False)
+
+    user = User(name="Stale Env User", email="stale-env-test@teramina.io").save()
+
+    assert ensure_default_data_for_user(str(user.id)) is True
+    assert Farm.objects(user_id=str(user.id), demo_bundle_version=DEMO_BUNDLE_VERSION).count() == 1
+    assert Farm.objects(id=source_farm.id).count() == 1
+
+
+def test_staging_reset_is_guarded_and_preserves_template(monkeypatch):
+    source_farm, _ = _seed_template_scenarios()
+    monkeypatch.setenv("SEEDER_FARM", str(source_farm.id))
+    user = User(name="Reset User", email="reset-test@teramina.io").save()
+    assert ensure_default_data_for_user(str(user.id)) is True
+
+    with pytest.raises(CommandError, match="only runs with --environment staging"):
+        call_command("reset_staging_demo", environment="production", confirm="RESET-STAGING", verbosity=0)
+
+    call_command("reset_staging_demo", environment="staging", confirm="RESET-STAGING", verbosity=0)
+
+    assert User.objects(id=user.id).count() == 0
+    assert Farm.objects(user_id=str(user.id)).count() == 0
+    assert Farm.objects(id=source_farm.id, user_id="__seed__").count() == 1
 
 
 def test_user_data_status_retries_default_seed_provisioning():

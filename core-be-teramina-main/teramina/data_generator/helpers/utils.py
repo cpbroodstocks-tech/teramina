@@ -78,7 +78,8 @@ def set_params_config(
         tuple: there are init_data, population_config, growth_config, & cost_config
     """
 
-    init_data = df[Column.single_data_columns].loc[0]
+    init_data = df[Column.single_data_columns].loc[0].copy()
+    init_data["protein_content"] = df["protein_content"].iloc[-1]
 
     population_config = {
         "initial_stocking": init_data["initial_stocking"],

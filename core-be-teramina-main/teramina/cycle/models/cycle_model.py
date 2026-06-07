@@ -8,6 +8,7 @@ class Cycle(Document):
     name = fields.StringField()
     start_date = fields.DateTimeField()
     pond_id = fields.StringField()
+    demo_scenario = fields.StringField(default="")
     last_updated = fields.DateTimeField()
     is_active = fields.BooleanField(default=True)
     vector_list = fields.ListField()
@@ -24,6 +25,7 @@ class Cycle(Document):
             "name": self.name,
             "start_date": self.start_date,
             "pond_id": self.pond_id,
+            "demo_scenario": self.demo_scenario,
             "last_updated": self.last_updated,
             "is_active": self.is_active,
             "vector_list": self.vector_list

@@ -5,7 +5,8 @@ import { z } from "zod";
 import { useEffect, useRef, useState } from "react";
 import { useNDayAfter } from "hooks/useNDayAfter";
 import { useFormatToQueryParams as formatToQueryParams } from "hooks/useFormatToQueryParams";
-import { fetchFilterUrl, fetchWaterQualityFilter } from "features/filter/queries";
+import { fetchFilterUrl } from "features/filter/queries";
+import { loadSharedFilterContext, persistDashboardSelection } from "features/filter/shared-context";
 
 const DOC_LENGTH = 120;
 
@@ -99,6 +100,10 @@ const useFilter = () => {
 
     if (["farm_id", "pond_id", "cycle_id"].includes(key))
       filterQueryParams.current[key] = value;
+    if (key === "farm_id" || key === "pond_id")
+      persistDashboardSelection(key, value, filterList.filter);
+    if (key === "cycle_id" && value.length === 1)
+      persistDashboardSelection("cycle_id", value[0], filterList.filter);
     setValue(key, value, { shouldDirty: true });
 
     for (const field of fields.slice(indexToExclude + 1)) {
@@ -205,13 +210,24 @@ const useFilter = () => {
   useEffect(() => {
     const fetchfilterListItem = async () => {
       try {
-        const filter = await fetchWaterQualityFilter();
-        if (!filter) throw filter;
+        const shared = await loadSharedFilterContext({ waterQuality: true });
+        if (!shared.values) throw shared;
+        filterQueryParams.current = {
+          farm_id: shared.values.farm_id,
+          pond_id: shared.values.pond_id,
+          cycle_id: [shared.values.cycle_id],
+        };
+        setValue("farm_id", shared.values.farm_id);
+        setValue("pond_id", shared.values.pond_id);
+        setValue("cycle_id", [shared.values.cycle_id]);
+        setValue("start_date", shared.filter.daterange?.start_date || "");
+        setValue("end_date", shared.filter.daterange?.end_date || "");
+        setValue("variables", shared.filter.variables?.includes("wqi_1") ? ["wqi_1"] : shared.filter.variables?.slice(0, 1) || []);
         setFilter((previousValue) => ({
           ...previousValue,
           filter: {
             ...previousValue.filter,
-            farms: filter.payload,
+            ...shared.filter,
           },
         }));
       } catch {

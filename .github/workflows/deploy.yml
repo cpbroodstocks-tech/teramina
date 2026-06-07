@@ -35,6 +35,16 @@ on:
         required: false
         default: false
         type: boolean
+      reset_staging_demo:
+        description: "Delete staging app users and user-owned data before fresh-login A/B testing"
+        required: false
+        default: false
+        type: boolean
+      validate_demo_bundle:
+        description: "Validate staging demo template and application users across all synchronized modules"
+        required: false
+        default: true
+        type: boolean
       reindex_advisory_sources:
         description: "Run reindex_advisory_sources after backend deploy"
         required: false
@@ -148,6 +158,21 @@ jobs:
           docker-compose exec -T web python manage.py seed_demo
           EOF
 
+      - name: Reject unsafe staging reset request
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.reset_staging_demo == 'true' && (github.event.inputs.target != 'staging' || github.event.inputs.run_demo_seed != 'true') }}
+        run: |
+          echo "reset_staging_demo requires target=staging and run_demo_seed=true."
+          exit 1
+
+      - name: Reset staging application data
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'staging' && github.event.inputs.reset_staging_demo == 'true' && github.event.inputs.run_demo_seed == 'true' }}
+        run: |
+          ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          set -e
+          cd ~/teramina/core-be-teramina-main/
+          docker-compose exec -T web python manage.py reset_staging_demo --environment staging --confirm RESET-STAGING
+          EOF
+
       - name: Backfill onboarding demo seed
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_onboarding_backfill == 'true' }}
         run: |
@@ -164,6 +189,15 @@ jobs:
           set -e
           cd ~/teramina/core-be-teramina-main/
           docker-compose exec -T web python manage.py reindex_advisory_sources
+          EOF
+
+      - name: Validate synchronized demo bundle
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'staging' && github.event.inputs.validate_demo_bundle == 'true' }}
+        run: |
+          ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          set -e
+          cd ~/teramina/core-be-teramina-main/
+          docker-compose exec -T web python manage.py validate_demo_bundle --include-template
           EOF
 
       - name: Backend health check with rollback

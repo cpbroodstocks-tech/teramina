@@ -9,22 +9,12 @@ const Filter = ({ filter, form, onFilterChange }) => {
   const { classes: styles } = useStyles();
   const { farms, ponds, cycles, daterange } = filter;
 
-  const saveFilterValuesToLocalstorage = (values) => {
-    localStorage.setItem("farm_id", values.farm_id);
-    localStorage.setItem("pond_id", values.pond_id);
-    localStorage.setItem("cycle_id", values.cycle_id);
+  const saveDateToLocalStorage = (values) => {
     localStorage.setItem("date", JSON.stringify(values.date));
-
-    const farm = farms?.find((f) => f.id === values.farm_id);
-    const pond = ponds?.find((p) => p.id === values.pond_id);
-    const cycle = cycles?.find((c) => c.id === values.cycle_id);
-    if (farm) localStorage.setItem("farm_name", farm.name);
-    if (pond) localStorage.setItem("pond_name", pond.name);
-    if (cycle) localStorage.setItem("cycle_name", cycle.name);
   };
 
   useEffect(() => {
-    saveFilterValuesToLocalstorage(form.values);
+    saveDateToLocalStorage(form.values);
   }, [form.values]); // Run this effect whenever form.values change
 
   return (

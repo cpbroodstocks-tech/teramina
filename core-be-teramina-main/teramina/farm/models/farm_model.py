@@ -7,6 +7,7 @@ class Farm(Document):
     name = fields.StringField()
     location = fields.StringField()
     user_id = fields.StringField()
+    demo_bundle_version = fields.StringField(default="")
     created_at = fields.DateTimeField(default=datetime.now())
     last_updated = fields.DateTimeField()
 
@@ -22,6 +23,7 @@ class Farm(Document):
             "name": self.name,
             "location": self.location,
             "user_id": self.user_id,
+            "demo_bundle_version": self.demo_bundle_version,
             "created_at": self.created_at,
             "last_updated": self.last_updated
         }

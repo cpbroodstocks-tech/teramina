@@ -4,7 +4,8 @@ import { z } from "zod";
 import { useEffect, useRef, useState } from "react";
 import { useToastStore } from "store/toast.store";
 import { useTranslation } from "react-i18next";
-import { fetchDashboardFilter, fetchFilteredData, fetchFilterUrl } from "features/filter/queries";
+import { fetchFilteredData, fetchFilterUrl } from "features/filter/queries";
+import { loadSharedFilterContext, persistDashboardSelection } from "features/filter/shared-context";
 
 const FILTER_SCHEMA = z.object({
   farm_id: z.string().min(1),
@@ -119,6 +120,7 @@ const useFilter = (api) => {
     const indexToExclude = fields.indexOf(key);
 
     filterQueryParams.current[key] = value;
+    persistDashboardSelection(key, value, filterList.filter);
     setValue(key, value, { shouldDirty: true });
 
     /**
@@ -198,15 +200,18 @@ const useFilter = (api) => {
   useEffect(() => {
     const fetchfilterListItem = async () => {
       try {
-        const filter = await fetchDashboardFilter();
-
-        if (!filter) throw filter;
+        const shared = await loadSharedFilterContext({ filterType: "historical" });
+        if (!shared.values) throw shared;
+        filterQueryParams.current = { ...shared.values };
+        setValue("farm_id", shared.values.farm_id);
+        setValue("pond_id", shared.values.pond_id);
+        setValue("cycle_id", shared.values.cycle_id);
 
         setFilter((previousValue) => ({
           ...previousValue,
           filter: {
             ...previousValue.filter,
-            farms: filter.payload,
+            ...shared.filter,
           },
           error: false,
         }));

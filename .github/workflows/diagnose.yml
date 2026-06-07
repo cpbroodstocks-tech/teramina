@@ -104,6 +104,9 @@ jobs:
                           print({'farm_id': str(farm.id), 'pond_id': str(pond.id), 'cycle_id': cycle_id, 'cycle': cycle.name, 'cycle_rows': len(cycle_data.result_data) if cycle_data else 0, 'result_rows': len(result_data.result_data) if result_data else 0, 'ready': ready, 'filter_status': filter_status, 'economics_status': economics_status, 'feeding_status': feeding_status, 'wq_filter_status': wq_filter_status, 'wq_status': wq_status, 'wq_variables': wq_data.get('variables', []), 'daterange': date_range})
           "
 
+          echo "== synchronized demo bundle validation =="
+          docker-compose exec -T web python manage.py validate_demo_bundle --include-template || true
+
           echo "== recent web logs =="
           docker-compose logs --tail=300 web
           EOF

@@ -10,6 +10,7 @@ class Pond(Document):
     pond_construction = fields.StringField()
     pond_shape = fields.StringField()
     farm_id = fields.StringField()
+    demo_scenario = fields.StringField(default="")
     is_active = fields.BooleanField(default=True)
     created_at = fields.DateTimeField(default=datetime.now())
     last_updated = fields.DateTimeField()
@@ -29,6 +30,7 @@ class Pond(Document):
             "depth": self.depth,
             "pond_construction": self.pond_construction,
             "farm_id": self.farm_id,
+            "demo_scenario": self.demo_scenario,
             "pond_shape": self.pond_shape,
             "created_at": self.created_at,
             "last_updated": self.last_updated,

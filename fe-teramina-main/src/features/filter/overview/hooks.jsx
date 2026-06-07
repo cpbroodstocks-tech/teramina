@@ -6,7 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { useNDayAfter } from "hooks/useNDayAfter";
 import { useToastStore } from "store/toast.store";
 import { useTranslation } from "react-i18next";
-import { fetchDashboardFilter, fetchFilteredData, fetchFilterUrl } from "features/filter/queries";
+import { fetchFilteredData, fetchFilterUrl } from "features/filter/queries";
+import { loadSharedFilterContext, persistDashboardSelection } from "features/filter/shared-context";
 
 const DOC_LENGTH = 120;
 
@@ -131,6 +132,7 @@ const useFilter = (api) => {
      * BUT NOT FOR FILTER QUERY PARAMS DATE REF
      */
     if (key !== "date") filterQueryParams.current[key] = value;
+    if (key !== "date") persistDashboardSelection(key, value, filterList.filter);
     setValue(key, value, { shouldDirty: true });
 
     /**
@@ -217,15 +219,19 @@ const useFilter = (api) => {
   useEffect(() => {
     const fetchfilterListItem = async () => {
       try {
-        const filter = await fetchDashboardFilter();
-
-        if (!filter) throw filter;
+        const shared = await loadSharedFilterContext({ filterType: "historical" });
+        if (!shared.values) throw shared;
+        filterQueryParams.current = { ...shared.values, filter_type: "historical" };
+        setValue("farm_id", shared.values.farm_id);
+        setValue("pond_id", shared.values.pond_id);
+        setValue("cycle_id", shared.values.cycle_id);
+        setValue("date", shared.filter.daterange?.end_date || "");
 
         setFilter((previousValue) => ({
           ...previousValue,
           filter: {
             ...previousValue.filter,
-            farms: filter.payload,
+            ...shared.filter,
           },
           error: false,
         }));

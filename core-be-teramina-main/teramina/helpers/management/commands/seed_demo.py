@@ -7,8 +7,9 @@ in the backend environment and restart Django.
 """
 
 import csv
+import copy
 import math
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -21,6 +22,7 @@ from teramina.cycle_data.models.cycle_data_model import CycleData, ForecastData,
 from teramina.farm.models.farm_model import Farm
 from teramina.feeding.models.feed_realization_model import FeedRealization
 from teramina.harvest.models.harvest_record_model import HarvestRecord
+from teramina.harvest.models.harvest_recommendation_model import HarvestRecommendation
 from teramina.pond.models.pond_model import Pond
 from teramina.water_quality_dashboard.services.variable_management import VariableManagement
 
@@ -29,6 +31,20 @@ POND_SIZE_M2 = 3000
 DEFAULT_INITIAL_STOCKING = 360_000
 ENERGY_DIVISOR = 820 * 24
 SOURCE = "seed_sample"
+DEMO_BUNDLE_VERSION = "abw-v2"
+CURRENT_DOC = 60
+SCENARIOS = (
+    {
+        "key": "healthy",
+        "pond_name": "Scenario A - Healthy",
+        "cycle_name": "Scenario A - Healthy Active",
+    },
+    {
+        "key": "at_risk",
+        "pond_name": "Scenario B - At Risk",
+        "cycle_name": "Scenario B - At-Risk Active",
+    },
+)
 
 DAILY_FIELDS = {
     "DO Morning": "do_morning",
@@ -397,6 +413,112 @@ def load_sample_seed_data(sample_dir: Path | None = None) -> dict:
     }
 
 
+def build_demo_scenario(seed: dict, scenario_key: str, today: date | None = None) -> dict:
+    """Build one rolling active scenario from the canonical 120-day CSV sample."""
+    today = today or date.today()
+    start_date = datetime.combine(today - timedelta(days=CURRENT_DOC - 1), datetime.min.time())
+    original_date_to_doc = {row["date"]: row["doc"] for row in seed["daily_rows"]}
+
+    daily_rows = copy.deepcopy(seed["daily_rows"])
+    result_rows = copy.deepcopy(seed["result_rows"])
+    feed_rows = copy.deepcopy(seed["feed_rows"])
+    cost_rows = copy.deepcopy(seed["cost_rows"])
+
+    for row in daily_rows:
+        row["date"] = (start_date + timedelta(days=row["doc"] - 1)).strftime("%Y-%m-%d")
+        row["demo_scenario"] = scenario_key
+        if scenario_key == "at_risk" and row["doc"] >= 45:
+            progress = (row["doc"] - 44) / 76
+            row["do_morning"] = round(max(1.8, row["do_morning"] - 2.8 * progress), 2)
+            row["do_afternoon"] = round(max(2.1, row["do_afternoon"] - 2.4 * progress), 2)
+            row["do_avg"] = round((row["do_morning"] + row["do_afternoon"]) / 2, 2)
+            row["nh3"] = round(row["nh3"] + 0.55 * progress, 3)
+            row["feed_leftover"] = round(max(row["feed_leftover"], row["feed_given_kg"] * 0.28), 2)
+            row["notes"] = "At-risk scenario: oxygen pressure, elevated ammonia, and feed leftovers."
+
+    for row in result_rows:
+        row["date"] = start_date + timedelta(days=row["doc"] - 1)
+        row["category"] = "historical" if row["doc"] <= CURRENT_DOC else "forecast"
+        row["demo_scenario"] = scenario_key
+        row["biomass"] = row["biomass_kg"]
+        if scenario_key == "at_risk" and row["doc"] >= 45:
+            progress = (row["doc"] - 44) / 76
+            growth_factor = 1 - (0.22 * progress)
+            survival_factor = 1 - (0.12 * progress)
+            row["do"] = round(max(1.8, row["do"] - 2.8 * progress), 2)
+            row["nh3"] = round(row["nh3"] + 0.55 * progress, 3)
+            row["abw"] *= growth_factor
+            row["adj_abw"] *= growth_factor
+            row["sr"] *= survival_factor
+            for field in ("population", "biomass_kg", "origin_biomass", "total_biomass", "biomass"):
+                row[field] *= growth_factor * survival_factor
+            row["fcr"] *= 1 + (0.35 * progress)
+            row["realized_fcr"] = row["fcr"]
+            row["cum_total_cost"] *= 1 + (0.18 * progress)
+            row["cost_per_kg"] = row["cum_total_cost"] / row["total_biomass"] if row["total_biomass"] else 0
+            row["potential_revenue"] *= growth_factor * survival_factor
+            row["potential_profit"] = row["profit"] + row["potential_revenue"] - (row["cum_total_cost"] * 0.18 * progress)
+            row["profit"] -= row["cum_total_cost"] * 0.18 * progress
+
+    for row in feed_rows:
+        if scenario_key == "at_risk" and row["doc"] >= 45:
+            row["feed_leftover"] = round(max(row["feed_leftover"], row["feed_given"] * 0.28), 2)
+
+    shifted_cost_rows = []
+    for row in cost_rows:
+        doc = original_date_to_doc[row["date"]]
+        if doc > CURRENT_DOC:
+            continue
+        row["date"] = (start_date + timedelta(days=doc - 1)).strftime("%Y-%m-%d")
+        row["demo_scenario"] = scenario_key
+        if scenario_key == "at_risk" and row["category"] in {"Pakan", "Probiotik", "Kimia", "Vitamin"}:
+            row["total"] = round(row["total"] * 1.18, 2)
+            row["unit_price"] = round(row["total"] / row["quantity"], 2) if row["quantity"] else row["unit_price"]
+        shifted_cost_rows.append(row)
+
+    empty_harvest = {
+        "partial1": {"doc": "", "biomass": "", "revenue": ""},
+        "partial2": {"doc": "", "biomass": "", "revenue": ""},
+        "partial3": {"doc": "", "biomass": "", "revenue": ""},
+        "final": {"doc": "", "biomass": "", "revenue": ""},
+    }
+    recommendation = {
+        "partial1": {"doc": 90 if scenario_key == "healthy" else 78, "biomass": 20},
+        "partial2": {"doc": "", "biomass": ""},
+        "partial3": {"doc": "", "biomass": ""},
+        "final": {"doc": 110 if scenario_key == "healthy" else 96, "biomass": ""},
+    }
+
+    return {
+        "start_date": start_date,
+        "daily_rows": daily_rows[:CURRENT_DOC],
+        "result_rows": result_rows[:CURRENT_DOC],
+        "forecast_rows": result_rows,
+        "feed_rows": feed_rows[:CURRENT_DOC],
+        "cost_rows": shifted_cost_rows,
+        "harvest_data": empty_harvest,
+        "harvest_recommendation": recommendation,
+    }
+
+
+def _delete_seed_templates():
+    """Remove existing template bundles and their child documents before reseeding."""
+    for farm in Farm.objects(user_id="__seed__"):
+        for pond in Pond.objects(farm_id=str(farm.id)):
+            for cycle in Cycle.objects(pond_id=str(pond.id)):
+                cycle_id = str(cycle.id)
+                CycleData.objects(cycle_id=cycle_id).delete()
+                ResultData.objects(cycle_id=cycle_id).delete()
+                ForecastData.objects(cycle_id=cycle_id).delete()
+                FeedRealization.objects(cycle_id=cycle_id).delete()
+                HarvestRecord.objects(cycle_id=cycle_id).delete()
+                HarvestRecommendation.objects(cycle_id=cycle_id).delete()
+                CostData.objects(farm_id=cycle_id).delete()
+                cycle.delete()
+            pond.delete()
+        farm.delete()
+
+
 class Command(BaseCommand):
     help = "Seed the Google Sheets-style demo cycle cloned during new-user onboarding"
 
@@ -405,58 +527,68 @@ class Command(BaseCommand):
         VariableManagement().ensure_default_variables()
         seed = load_sample_seed_data()
         now = datetime.utcnow()
+        _delete_seed_templates()
 
-        farm = Farm(name="Demo Farm", location="Jawa Timur", user_id="__seed__")
+        farm = Farm(
+            name="Demo A/B Farm",
+            location="Jawa Timur",
+            user_id="__seed__",
+            demo_bundle_version=DEMO_BUNDLE_VERSION,
+        )
         farm.save()
         farm_id = str(farm.id)
+        first_pond_id = first_cycle_id = ""
+        for scenario in SCENARIOS:
+            scenario_data = build_demo_scenario(seed, scenario["key"])
+            pond = Pond(
+                name=scenario["pond_name"],
+                size=float(POND_SIZE_M2),
+                depth=1.5,
+                pond_construction="Tambak tanah",
+                pond_shape="Persegi",
+                farm_id=farm_id,
+                demo_scenario=scenario["key"],
+            ).save()
+            cycle = Cycle(
+                name=scenario["cycle_name"],
+                start_date=scenario_data["start_date"],
+                pond_id=str(pond.id),
+                demo_scenario=scenario["key"],
+                last_updated=now,
+                is_active=True,
+            ).save()
+            cycle_id = str(cycle.id)
+            pond.active_cycle_id = cycle_id
+            pond.save()
 
-        pond = Pond(
-            name="Kolam Demo 1",
-            size=float(POND_SIZE_M2),
-            depth=1.5,
-            pond_construction="Tambak tanah",
-            pond_shape="Persegi",
-            farm_id=farm_id,
-        )
-        pond.save()
-        pond_id = str(pond.id)
-
-        cycle = Cycle(
-            name="Siklus Demo 120 Hari",
-            start_date=seed["start_date"],
-            pond_id=pond_id,
-            last_updated=now,
-            is_active=False,
-        )
-        cycle.save()
-        cycle_id = str(cycle.id)
-
-        pond.active_cycle_id = cycle_id
-        pond.save()
-
-        CycleData(cycle_id=cycle_id, result_data=seed["daily_rows"], last_updated=now).save()
-        ResultData(cycle_id=cycle_id, result_data=seed["result_rows"], last_updated=now).save()
-        ForecastData(cycle_id=cycle_id, result_data=seed["result_rows"], last_updated=now).save()
-
-        for row in seed["feed_rows"]:
-            FeedRealization(cycle_id=cycle_id, last_updated=now, **row).save()
-
-        HarvestRecord(cycle_id=cycle_id, harvest_data=seed["harvest_data"], last_updated=now).save()
-        CostData(
-            farm_id=cycle_id,
-            start_date=seed["daily_rows"][0]["date"],
-            end_date=seed["daily_rows"][-1]["date"],
-            data=seed["cost_rows"],
-            last_updated=now,
-        ).save()
+            CycleData(cycle_id=cycle_id, result_data=scenario_data["daily_rows"], last_updated=now).save()
+            ResultData(cycle_id=cycle_id, result_data=scenario_data["result_rows"], last_updated=now).save()
+            ForecastData(cycle_id=cycle_id, result_data=scenario_data["forecast_rows"], last_updated=now).save()
+            for row in scenario_data["feed_rows"]:
+                FeedRealization(cycle_id=cycle_id, last_updated=now, **row).save()
+            HarvestRecord(cycle_id=cycle_id, harvest_data=scenario_data["harvest_data"], last_updated=now).save()
+            HarvestRecommendation(
+                cycle_id=cycle_id,
+                harvest_data=scenario_data["harvest_recommendation"],
+                last_updated=now,
+            ).save()
+            CostData(
+                farm_id=cycle_id,
+                start_date=scenario_data["daily_rows"][0]["date"],
+                end_date=scenario_data["daily_rows"][-1]["date"],
+                data=scenario_data["cost_rows"],
+                last_updated=now,
+            ).save()
+            first_pond_id = first_pond_id or str(pond.id)
+            first_cycle_id = first_cycle_id or cycle_id
+            self.stdout.write(
+                f"{scenario['pond_name']}: historical={len(scenario_data['daily_rows'])} "
+                f"forecast={len(scenario_data['forecast_rows'])}"
+            )
 
         self.stdout.write(f"Farm created:  {farm_id}")
-        self.stdout.write(f"Pond created:  {pond_id}")
-        self.stdout.write(f"Cycle created: {cycle_id}")
-        self.stdout.write(f"Daily/derived rows: {len(seed['daily_rows'])}/{len(seed['result_rows'])}")
-        self.stdout.write(f"Feed/cost rows:     {len(seed['feed_rows'])}/{len(seed['cost_rows'])}")
         self.stdout.write("\nAdd these to the deployed backend environment:")
         self.stdout.write(f"SEEDER_FARM={farm_id}")
-        self.stdout.write(f"SEEDER_POND={pond_id}")
-        self.stdout.write(f"SEEDER_CYCLE={cycle_id}")
-        self.stdout.write("Done. New users will receive this sample cycle on first login.")
+        self.stdout.write(f"SEEDER_POND={first_pond_id}")
+        self.stdout.write(f"SEEDER_CYCLE={first_cycle_id}")
+        self.stdout.write("Done. New users will receive this synchronized A/B demo bundle on first login.")
