@@ -69,13 +69,6 @@ const Home = () => {
               >
                 {t("HOME.HERO_CTA_PRIMARY")}
               </Button>
-              {!token && (
-                <Link to="/signin" style={{ textDecoration: "none" }}>
-                  <Button variant="outlined" className={styles.btnHeroSecondary}>
-                    {t("HOME.HERO_CTA_SECONDARY")}
-                  </Button>
-                </Link>
-              )}
             </div>
           </div>
         </div>

@@ -332,24 +332,6 @@ const useStyles = makeStyles()((theme) => ({
       padding: "8px 30px",
     },
   },
-  btnHeroSecondary: {
-    fontFamily: "Lato",
-    fontWeight: "700",
-    fontSize: "20px",
-    padding: "16px 56px",
-    borderRadius: "15px",
-    border: "2px solid #474DA4",
-    color: "#474DA4",
-    [theme.breakpoints.down("sm")]: {
-      padding: "10px 32px",
-      fontSize: "16px",
-    },
-    [theme.breakpoints.between("481", "1025")]: {
-      fontSize: "14px",
-      padding: "8px 30px",
-    },
-  },
-
   // ── Social proof bar ───────────────────────────────────────────────────────
   sectionSocialProof: {
     borderTop: "1px solid #e8eaf0",
