@@ -10,29 +10,62 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import { MdArrowForward } from "react-icons/md";
 import { useContentItem, useContentItems, useDownloadContentPdf, useMyContentItems } from "./queries";
 import { contentFallbacks } from "./catalog";
 
-const ContentCard = ({ item }) => (
-  <Paper variant="outlined" sx={{ p: 2.5 }}>
-    <Stack gap={1}>
-      <Stack direction="row" gap={1} sx={{ flexWrap: "wrap" }}>
-        <Chip size="small" label={item.category} />
-        <Chip size="small" variant="outlined" label={item.language || "en"} />
-        <Chip size="small" variant="outlined" label={item.variant_type || "master"} />
-        <Chip size="small" variant="outlined" label={item.access_status === "free" ? "free" : item.access_status || item.access_level} />
+const contentStatus = (item) => item.access_status === "free" ? "free" : item.access_status || item.access_level;
+
+const ContentCard = ({ item }) => {
+  const status = contentStatus(item);
+  const accessible = status === "free" || status === "granted";
+
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        height: "100%",
+        p: { xs: 2, md: 2.5 },
+        borderColor: "#e2e8f0",
+        borderRadius: 1,
+        transition: "border-color 160ms ease, box-shadow 160ms ease",
+        "&:hover": {
+          borderColor: "primary.main",
+          boxShadow: "0 4px 14px rgba(71, 77, 164, 0.08)",
+        },
+      }}
+    >
+      <Stack gap={1.5} sx={{ height: "100%" }}>
+        <Stack direction="row" gap={0.75} sx={{ flexWrap: "wrap" }}>
+          <Chip size="small" label={item.category} />
+          <Chip size="small" variant="outlined" label={(item.language || "en").toUpperCase()} />
+          <Chip size="small" variant="outlined" label={item.variant_type || "master"} />
+          <Chip size="small" color={accessible ? "success" : "default"} variant="outlined" label={status} />
+        </Stack>
+        <Box>
+          <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.35, mb: 0.75 }}>
+            {item.title}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.55 }}>
+            {item.summary}
+          </Typography>
+        </Box>
+        <Stack direction="row" gap={0.75} sx={{ flexWrap: "wrap" }}>
+          {(item.tags || []).map((tag) => <Chip key={tag} size="small" variant="outlined" label={tag} />)}
+        </Stack>
+        <Button
+          component={Link}
+          to={`/knowledge/${item.slug}`}
+          variant="outlined"
+          endIcon={<MdArrowForward />}
+          sx={{ alignSelf: "flex-start", mt: "auto" }}
+        >
+          View
+        </Button>
       </Stack>
-      <Typography variant="h5" fontWeight={700}>{item.title}</Typography>
-      <Typography color="text.secondary">{item.summary}</Typography>
-      <Stack direction="row" gap={0.75} sx={{ flexWrap: "wrap" }}>
-        {(item.tags || []).map((tag) => <Chip key={tag} size="small" variant="outlined" label={tag} />)}
-      </Stack>
-      <Button component={Link} to={`/knowledge/${item.slug}`} variant="contained" sx={{ alignSelf: "flex-start" }}>
-        View
-      </Button>
-    </Stack>
-  </Paper>
-);
+    </Paper>
+  );
+};
 
 export const KnowledgePage = () => {
   const { data = [], isLoading, isError } = useContentItems();
@@ -134,15 +167,29 @@ export const DashboardLibraryPage = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
-      <Stack gap={2} sx={{ mb: 3 }}>
-        <Typography variant="h4" fontWeight={700}>Library</Typography>
-        <Typography color="text.secondary">Free and manually granted Teramina operating documents.</Typography>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        gap={2}
+        sx={{ mb: 3, justifyContent: "space-between", alignItems: { sm: "flex-end" } }}
+      >
+        <Box>
+          <Typography variant="h4" fontWeight={700}>Library</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Free and manually granted Teramina operating documents.
+          </Typography>
+        </Box>
+        {!isLoading && !isError && data.length > 0 && (
+          <Chip variant="outlined" label={`${data.length} ${data.length === 1 ? "document" : "documents"}`} />
+        )}
       </Stack>
       {isError && <Alert severity="error">Failed to load library access.</Alert>}
       {isLoading ? (
-        <CircularProgress />
+        <Stack direction="row" gap={1} sx={{ alignItems: "center", py: 2 }}>
+          <CircularProgress size={20} />
+          <Typography variant="body2" color="text.secondary">Loading library...</Typography>
+        </Stack>
       ) : data.length ? (
-        <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
+        <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" }, pb: 3 }}>
           {data.map((item) => <ContentCard item={item} key={item.slug} />)}
         </Box>
       ) : (

@@ -5,6 +5,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Container,
   IconButton,
   MenuItem,
   Paper,
@@ -26,6 +27,12 @@ import {
 import { useToastStore } from "store/toast.store";
 
 const typeOptions = ["all", "fact", "preference", "event", "advice", "note"];
+
+const panelSx = {
+  p: { xs: 2, md: 2.5 },
+  borderColor: "#e2e8f0",
+  borderRadius: 1,
+};
 
 const formatDate = (value) => {
   if (!value) return "-";
@@ -52,8 +59,19 @@ const MemoryCard = ({
   onDraftChange,
   onSave,
 }) => (
-  <Paper key={memory.id} variant="outlined" sx={{ p: 2 }}>
-    <Stack direction="row" gap={1.5} sx={{ alignItems: "flex-start" }}>
+  <Paper
+    key={memory.id}
+    variant="outlined"
+    sx={{
+      ...panelSx,
+      transition: "border-color 160ms ease, box-shadow 160ms ease",
+      "&:hover": {
+        borderColor: "primary.main",
+        boxShadow: "0 4px 14px rgba(71, 77, 164, 0.08)",
+      },
+    }}
+  >
+    <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} sx={{ alignItems: { sm: "flex-start" } }}>
       <Box flex={1}>
         <Stack direction="row" gap={1} sx={{ flexWrap: "wrap", mb: 1 }}>
           <Chip size="small" label={editing ? draft.memory_type : memory.memory_type} />
@@ -106,7 +124,7 @@ const MemoryCard = ({
             />
           </Stack>
         ) : (
-          <Typography variant="body1" mb={1}>
+          <Typography variant="body1" fontWeight={600} sx={{ lineHeight: 1.55, mb: 1 }}>
             {memory.content}
           </Typography>
         )}
@@ -121,7 +139,7 @@ const MemoryCard = ({
           Created {formatDate(memory.created_at)}
         </Typography>
       </Box>
-      <Stack direction="row" gap={0.5}>
+      <Stack direction="row" gap={0.5} sx={{ alignSelf: { xs: "flex-end", sm: "flex-start" } }}>
         {editing ? (
           <>
             <IconButton
@@ -130,6 +148,7 @@ const MemoryCard = ({
               onClick={() => onSave(memory.id)}
               title="Save correction"
               color="primary"
+              sx={{ border: "1px solid", borderColor: "divider" }}
             >
               <MdSave />
             </IconButton>
@@ -138,6 +157,7 @@ const MemoryCard = ({
               disabled={updating}
               onClick={onCancel}
               title="Cancel correction"
+              sx={{ border: "1px solid", borderColor: "divider" }}
             >
               <MdClose />
             </IconButton>
@@ -149,6 +169,7 @@ const MemoryCard = ({
             onClick={() => onEdit(memory)}
             title="Correct memory"
             color="primary"
+            sx={{ border: "1px solid", borderColor: "divider" }}
           >
             <MdEdit />
           </IconButton>
@@ -160,6 +181,7 @@ const MemoryCard = ({
             onClick={() => onVerify(memory.id)}
             title="Verify memory"
             color="success"
+            sx={{ border: "1px solid", borderColor: "divider" }}
           >
             <MdCheckCircleOutline />
           </IconButton>
@@ -169,6 +191,7 @@ const MemoryCard = ({
           disabled={deleting}
           onClick={() => onDelete(memory.id)}
           title="Delete memory"
+          sx={{ border: "1px solid", borderColor: "divider" }}
         >
           <MdDeleteOutline />
         </IconButton>}
@@ -328,8 +351,12 @@ const MemoryPage = () => {
   const contextLabel = [farmName || farmId, pondName || pondId].filter(Boolean).join(" / ");
 
   return (
-    <Box>
-      <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+    <Container maxWidth="lg" sx={{ py: 3 }}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        gap={2}
+        sx={{ justifyContent: "space-between", alignItems: { sm: "center" }, mb: 3 }}
+      >
         <Box>
           <Typography variant="h4" fontWeight={700}>
             Farmer Memory
@@ -344,23 +371,33 @@ const MemoryPage = () => {
             refetchGraph();
           }}
           title="Refresh"
+          sx={{ alignSelf: { xs: "flex-start", sm: "center" }, border: "1px solid", borderColor: "divider" }}
         >
           <MdRefresh />
         </IconButton>
       </Stack>
 
-      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Typography variant="subtitle1" fontWeight={600} mb={1.5}>
+      <Paper variant="outlined" sx={{ ...panelSx, mb: 2.5 }}>
+        <Typography variant="h6" fontWeight={700}>
           Add verified memory
         </Typography>
-        <Stack direction={{ xs: "column", md: "row" }} gap={2} sx={{ alignItems: { md: "flex-start" } }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25, mb: 2 }}>
+          Save a durable fact, preference, event, or note for future recommendations.
+        </Typography>
+        <Box
+          sx={{
+            display: "grid",
+            gap: 2,
+            gridTemplateColumns: { xs: "1fr", md: "180px minmax(0, 1fr) 220px" },
+            alignItems: "start",
+          }}
+        >
           <TextField
             select
             size="small"
             label="Type"
             value={newType}
             onChange={(event) => setNewType(event.target.value)}
-            sx={{ minWidth: 170 }}
           >
             {typeOptions.filter((option) => option !== "all").map((option) => (
               <MenuItem key={option} value={option}>
@@ -383,42 +420,61 @@ const MemoryPage = () => {
             value={newTags}
             onChange={(event) => setNewTags(event.target.value)}
             placeholder="do, harvest"
-            sx={{ minWidth: 180 }}
           />
-        </Stack>
-        <Stack direction={{ xs: "column", md: "row" }} gap={1.5} sx={{ alignItems: { md: "center" }, mt: 1.5 }}>
+        </Box>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          gap={1}
+          sx={{ alignItems: { sm: "center" }, justifyContent: "space-between", mt: 2 }}
+        >
+          <Stack direction={{ xs: "column", sm: "row" }} gap={1} sx={{ alignItems: { sm: "center" } }}>
+            <Button
+              variant={saveWithContext ? "outlined" : "text"}
+              onClick={() => setSaveWithContext((value) => !value)}
+            >
+              {saveWithContext ? "Using current context" : "Saving without context"}
+            </Button>
+            {saveWithContext && contextLabel && (
+              <Typography variant="body2" color="text.secondary">
+                {contextLabel}
+              </Typography>
+            )}
+          </Stack>
           <Button
-            variant={saveWithContext ? "contained" : "outlined"}
-            onClick={() => setSaveWithContext((value) => !value)}
+            variant="contained"
+            disabled={creating}
+            onClick={handleCreate}
+            startIcon={<MdSave />}
+            sx={{ alignSelf: { xs: "stretch", sm: "center" } }}
           >
-            {saveWithContext ? "Save to current context" : "Save without context"}
+            {creating ? "Saving..." : "Save memory"}
           </Button>
-          <Button variant="contained" disabled={creating} onClick={handleCreate}>
-            Save memory
-          </Button>
-          {saveWithContext && contextLabel && (
-            <Typography variant="body2" color="text.secondary">
-              {contextLabel}
-            </Typography>
-          )}
         </Stack>
       </Paper>
 
-      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Typography variant="subtitle1" fontWeight={600} mb={1.5}>
-          Graph memory
-        </Typography>
-        <Typography variant="body2" color="text.secondary" mb={1.5}>
-          Connected farm, pond, cycle, action, and observation context.
-        </Typography>
-        <Stack direction="row" gap={1} sx={{ flexWrap: "wrap", mb: 1.5 }}>
-          <Chip size="small" label={`${graph.entities.length} entities`} />
-          <Chip size="small" label={`${graph.relations.length} links`} />
-          <Chip size="small" label={`${graph.observations.length} observations`} />
+      <Paper variant="outlined" sx={{ ...panelSx, mb: 2.5 }}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          gap={2}
+          sx={{ justifyContent: "space-between", alignItems: { sm: "flex-start" }, mb: 2 }}
+        >
+          <Box>
+            <Typography variant="h6" fontWeight={700}>
+              Graph memory
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+              Connected farm, pond, cycle, action, and observation context.
+            </Typography>
+          </Box>
+          <Stack direction="row" gap={1} sx={{ flexWrap: "wrap" }}>
+            <Chip size="small" variant="outlined" label={`${graph.entities.length} entities`} />
+            <Chip size="small" variant="outlined" label={`${graph.relations.length} links`} />
+            <Chip size="small" variant="outlined" label={`${graph.observations.length} observations`} />
+          </Stack>
         </Stack>
 
         {isGraphLoading && (
-          <Stack direction="row" gap={1} sx={{ alignItems: "center" }}>
+          <Stack direction="row" gap={1} sx={{ alignItems: "center", py: 1 }}>
             <CircularProgress size={18} />
             <Typography variant="body2">Loading graph memory...</Typography>
           </Stack>
@@ -447,7 +503,11 @@ const MemoryPage = () => {
         )}
       </Paper>
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+      <Tabs
+        value={tab}
+        onChange={(_, v) => setTab(v)}
+        sx={{ mb: 2, borderBottom: "1px solid", borderColor: "divider" }}
+      >
         <Tab label="All memories" />
         <Tab
           label={
@@ -460,40 +520,48 @@ const MemoryPage = () => {
 
       {tab === 0 && (
         <>
-          <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-            <Stack direction={{ xs: "column", md: "row" }} gap={2} sx={{ alignItems: { md: "center" } }}>
-              <TextField
-                size="small"
-                label="Search memory"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                sx={{ minWidth: 260 }}
-              />
-              <TextField
-                select
-                size="small"
-                label="Type"
-                value={type}
-                onChange={(event) => setType(event.target.value)}
-                sx={{ minWidth: 180 }}
-              >
-                {typeOptions.map((option) => (
-                  <MenuItem key={option} value={option}>
-                    {option}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <Button
-                variant={useCurrentContext ? "contained" : "outlined"}
-                onClick={() => setUseCurrentContext((value) => !value)}
-              >
-                {useCurrentContext ? "Current context" : "All memories"}
-              </Button>
-              {contextLabel && (
-                <Typography variant="body2" color="text.secondary">
-                  {contextLabel}
-                </Typography>
-              )}
+          <Paper variant="outlined" sx={{ ...panelSx, mb: 2 }}>
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              gap={1.5}
+              sx={{ alignItems: { md: "center" }, justifyContent: "space-between" }}
+            >
+              <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} sx={{ flex: 1 }}>
+                <TextField
+                  size="small"
+                  label="Search memory"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  sx={{ minWidth: { sm: 260 }, flex: 1 }}
+                />
+                <TextField
+                  select
+                  size="small"
+                  label="Type"
+                  value={type}
+                  onChange={(event) => setType(event.target.value)}
+                  sx={{ minWidth: 180 }}
+                >
+                  {typeOptions.map((option) => (
+                    <MenuItem key={option} value={option}>
+                      {option}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Stack>
+              <Stack direction={{ xs: "column", sm: "row" }} gap={1} sx={{ alignItems: { sm: "center" } }}>
+                <Button
+                  variant={useCurrentContext ? "contained" : "outlined"}
+                  onClick={() => setUseCurrentContext((value) => !value)}
+                >
+                  {useCurrentContext ? "Current context" : "All memories"}
+                </Button>
+                {contextLabel && (
+                  <Typography variant="body2" color="text.secondary">
+                    {contextLabel}
+                  </Typography>
+                )}
+              </Stack>
             </Stack>
           </Paper>
 
@@ -507,7 +575,7 @@ const MemoryPage = () => {
           {!isLoading && !isError && filtered.length === 0 && (
             <Alert severity="info">No memories match the current filters.</Alert>
           )}
-          <Stack gap={1.5}>
+          <Stack gap={1.5} sx={{ pb: 3 }}>
             {filtered.map((memory) => (
               <MemoryCard
                 key={memory.id}
@@ -544,7 +612,7 @@ const MemoryPage = () => {
           {!isLoading && needsReview.length === 0 && (
             <Alert severity="success">All memories have been reviewed. Nothing pending.</Alert>
           )}
-          <Stack gap={1.5}>
+          <Stack gap={1.5} sx={{ pb: 3 }}>
             {needsReview.map((memory) => (
               <MemoryCard
                 key={memory.id}
@@ -565,7 +633,7 @@ const MemoryPage = () => {
           </Stack>
         </>
       )}
-    </Box>
+    </Container>
   );
 };
 

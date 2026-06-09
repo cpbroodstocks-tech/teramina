@@ -7,9 +7,10 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Container,
   Divider,
-  Grid,
   IconButton,
+  Paper,
   Stack,
   Tooltip,
   Typography,
@@ -40,6 +41,11 @@ const STATUS_COLORS = {
   unknown: { bg: "#f5f5f5", border: "#bdbdbd", label: "#616161" },
 };
 
+const panelSx = {
+  borderColor: "#e2e8f0",
+  borderRadius: 1,
+};
+
 const worstStatus = (...statuses) => {
   if (statuses.includes("critical")) return "critical";
   if (statuses.includes("warning")) return "warning";
@@ -47,10 +53,13 @@ const worstStatus = (...statuses) => {
   return "unknown";
 };
 
-const SectionTitle = ({ children }) => (
-  <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5 }}>
-    {children}
-  </Typography>
+const SectionTitle = ({ children, count }) => (
+  <Stack direction="row" gap={1} sx={{ alignItems: "center", mb: 1.5 }}>
+    <Typography variant="h6" fontWeight={700}>
+      {children}
+    </Typography>
+    {count != null && <Chip size="small" variant="outlined" label={count} />}
+  </Stack>
 );
 
 const PondCard = ({ pond }) => {
@@ -64,69 +73,81 @@ const PondCard = ({ pond }) => {
       sx={{
         background: colors.bg,
         borderColor: colors.border,
-        borderWidth: status !== "ok" ? 2 : 1,
+        borderWidth: 1,
+        borderRadius: 1,
         height: "100%",
+        minHeight: 260,
+        transition: "box-shadow 160ms ease, transform 160ms ease",
+        "&:hover": {
+          boxShadow: "0 4px 14px rgba(31, 41, 55, 0.1)",
+          transform: "translateY(-1px)",
+        },
       }}
     >
-      <CardContent sx={{ pb: "12px !important" }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+      <CardContent sx={{ display: "flex", flexDirection: "column", height: "100%", p: 2.25, pb: "18px !important" }}>
+        <Stack direction="row" gap={1} sx={{ justifyContent: "space-between", alignItems: "flex-start" }}>
           <Box>
-            <Typography variant="subtitle2" fontWeight={700} color={colors.label}>
+            <Typography variant="h6" fontWeight={700} color={colors.label} sx={{ lineHeight: 1.3 }}>
               {pond.pond_name}
             </Typography>
             {pond.current_doc != null && (
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
                 DOC {pond.current_doc}
               </Typography>
             )}
           </Box>
-          {status !== "ok" && (
-            <MdWarningAmber size={18} color={colors.label} />
-          )}
+          <Chip
+            size="small"
+            variant="outlined"
+            icon={status !== "ok" ? <MdWarningAmber /> : undefined}
+            label={status === "ok" ? "Healthy" : status === "warning" ? "At risk" : status}
+            sx={{ color: colors.label, borderColor: colors.border, backgroundColor: "#ffffffb8", fontWeight: 700 }}
+          />
         </Stack>
 
-        <Stack gap={0.5} sx={{ mt: 1 }}>
+        <Stack gap={0} divider={<Divider />} sx={{ mt: 2 }}>
           {pond.do_avg != null && (
-            <Stack direction="row" justifyContent="space-between">
-              <Typography variant="caption" color="text.secondary">DO</Typography>
+            <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", py: 0.85 }}>
+              <Typography variant="body2" color="text.secondary">Dissolved oxygen</Typography>
               <Chip
                 label={`${pond.do_avg} mg/L`}
                 size="small"
                 color={pond.do_status === "critical" ? "error" : pond.do_status === "warning" ? "warning" : "success"}
-                sx={{ height: 18, fontSize: 11 }}
+                sx={{ fontWeight: 700 }}
               />
             </Stack>
           )}
           {pond.temp_avg != null && (
-            <Stack direction="row" justifyContent="space-between">
-              <Typography variant="caption" color="text.secondary">Suhu</Typography>
-              <Typography variant="caption">{pond.temp_avg}°C</Typography>
+            <Stack direction="row" sx={{ justifyContent: "space-between", py: 0.85 }}>
+              <Typography variant="body2" color="text.secondary">Temperature</Typography>
+              <Typography variant="body2" fontWeight={700}>{pond.temp_avg}°C</Typography>
             </Stack>
           )}
           {pond.nh3 != null && (
-            <Stack direction="row" justifyContent="space-between">
-              <Typography variant="caption" color="text.secondary">NH3</Typography>
+            <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", py: 0.85 }}>
+              <Typography variant="body2" color="text.secondary">NH3</Typography>
               <Chip
                 label={`${pond.nh3} mg/L`}
                 size="small"
                 color={pond.nh3_status === "critical" ? "error" : pond.nh3_status === "warning" ? "warning" : "success"}
-                sx={{ height: 18, fontSize: 11 }}
+                sx={{ fontWeight: 700 }}
               />
             </Stack>
           )}
           {pond.abw_g != null && (
-            <Stack direction="row" justifyContent="space-between">
-              <Typography variant="caption" color="text.secondary">ABW</Typography>
-              <Typography variant="caption">{pond.abw_g}g</Typography>
+            <Stack direction="row" sx={{ justifyContent: "space-between", py: 0.85 }}>
+              <Typography variant="body2" color="text.secondary">Average body weight</Typography>
+              <Typography variant="body2" fontWeight={700}>{pond.abw_g} g</Typography>
             </Stack>
           )}
         </Stack>
 
         {pond.active_cycle_id && (
-          <Stack direction="row" gap={0.5} sx={{ mt: 1 }}>
+          <Stack direction="row" gap={0.75} sx={{ mt: "auto", pt: 2 }}>
             <Button
               size="small"
-              startIcon={<MdSmartToy size={12} />}
+              variant="outlined"
+              startIcon={<MdSmartToy size={16} />}
               onClick={() => {
                 localStorage.setItem("pond_id", pond.pond_id);
                 localStorage.setItem("pond_name", pond.pond_name);
@@ -135,15 +156,14 @@ const PondCard = ({ pond }) => {
                   detail: { message: `What should I do about ${pond.pond_name} today? DO: ${pond.do_avg ?? "?"} mg/L, NH3: ${pond.nh3 ?? "?"} mg/L, DOC: ${pond.current_doc ?? "?"}` },
                 }));
               }}
-              sx={{ fontSize: 11, p: "2px 8px" }}
             >
               Ask
             </Button>
             <Button
               size="small"
-              startIcon={<MdTimeline size={12} />}
+              variant="outlined"
+              startIcon={<MdTimeline size={16} />}
               onClick={() => navigate(`/dashboard/pond-timeline/${pond.active_cycle_id}`)}
-              sx={{ fontSize: 11, p: "2px 8px" }}
             >
               Timeline
             </Button>
@@ -157,19 +177,25 @@ const PondCard = ({ pond }) => {
 const AlertRow = ({ alert, onResolve, onDismiss }) => {
   const color = alert.severity === "critical" ? "error" : alert.severity === "warning" ? "warning" : "info";
   return (
-    <Stack direction="row" alignItems="flex-start" gap={1} sx={{ py: 1 }}>
+    <Stack direction={{ xs: "column", sm: "row" }} gap={1.25} sx={{ alignItems: { sm: "center" }, py: 1.25 }}>
       <Chip label={alert.severity} size="small" color={color} sx={{ flexShrink: 0 }} />
-      <Typography variant="body2" sx={{ flex: 1, fontSize: 13 }}>{alert.message}</Typography>
-      <Tooltip title="Mark resolved">
-        <IconButton size="small" onClick={() => onResolve(alert.id)} sx={{ color: "#4caf50" }}>
-          <MdDone size={16} />
-        </IconButton>
-      </Tooltip>
-      <Tooltip title="Dismiss">
-        <IconButton size="small" onClick={() => onDismiss(alert.id)}>
-          <MdDeleteOutline size={16} />
-        </IconButton>
-      </Tooltip>
+      <Typography variant="body2" fontWeight={600} sx={{ flex: 1, lineHeight: 1.5 }}>{alert.message}</Typography>
+      <Stack direction="row" gap={0.5} sx={{ alignSelf: { xs: "flex-end", sm: "center" } }}>
+        <Tooltip title="Mark resolved">
+          <IconButton
+            size="small"
+            onClick={() => onResolve(alert.id)}
+            sx={{ color: "#2e7d32", border: "1px solid", borderColor: "divider" }}
+          >
+            <MdDone size={18} />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Dismiss">
+          <IconButton size="small" onClick={() => onDismiss(alert.id)} sx={{ border: "1px solid", borderColor: "divider" }}>
+            <MdDeleteOutline size={18} />
+          </IconButton>
+        </Tooltip>
+      </Stack>
     </Stack>
   );
 };
@@ -178,9 +204,9 @@ const TaskRow = ({ task, onComplete }) => {
   const due = task.due_at ? new Date(task.due_at) : null;
   const overdue = task.is_overdue;
   return (
-    <Stack direction="row" alignItems="flex-start" gap={1} sx={{ py: 1 }}>
+    <Stack direction="row" gap={1.5} sx={{ alignItems: "center", py: 1.25 }}>
       <Box flex={1}>
-        <Typography variant="body2" sx={{ fontSize: 13, fontWeight: overdue ? 600 : 400 }}>
+        <Typography variant="body2" fontWeight={600}>
           {task.title}
         </Typography>
         {due && (
@@ -191,8 +217,12 @@ const TaskRow = ({ task, onComplete }) => {
         )}
       </Box>
       <Tooltip title="Mark done">
-        <IconButton size="small" onClick={() => onComplete(task.id)} sx={{ color: "#4caf50" }}>
-          <MdCheckCircleOutline size={18} />
+        <IconButton
+          size="small"
+          onClick={() => onComplete(task.id)}
+          sx={{ color: "#2e7d32", border: "1px solid", borderColor: "divider" }}
+        >
+          <MdCheckCircleOutline size={20} />
         </IconButton>
       </Tooltip>
     </Stack>
@@ -245,15 +275,19 @@ const TodayView = () => {
 
   if (!farmId) {
     return (
-      <Box sx={{ p: 3 }}>
+      <Container maxWidth="lg" sx={{ py: 3 }}>
         <Alert severity="info">Select a farm to see today&apos;s summary.</Alert>
-      </Box>
+      </Container>
     );
   }
 
   return (
-    <Box>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+    <Container maxWidth="lg" sx={{ py: 3 }}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        gap={2}
+        sx={{ mb: 3, justifyContent: "space-between", alignItems: { sm: "center" } }}
+      >
         <Box>
           <Typography variant="h4" fontWeight={700}>
             Today
@@ -264,13 +298,17 @@ const TodayView = () => {
             </Typography>
           )}
         </Box>
-        <IconButton onClick={() => refetch()} title="Refresh">
+        <IconButton
+          onClick={() => refetch()}
+          title="Refresh"
+          sx={{ alignSelf: { xs: "flex-start", sm: "center" }, border: "1px solid", borderColor: "divider" }}
+        >
           <MdRefresh />
         </IconButton>
       </Stack>
 
       {isLoading && (
-        <Stack direction="row" gap={1} alignItems="center">
+        <Stack direction="row" gap={1} sx={{ alignItems: "center", py: 2 }}>
           <CircularProgress size={18} />
           <Typography variant="body2">Loading today&apos;s summary…</Typography>
         </Stack>
@@ -283,62 +321,60 @@ const TodayView = () => {
           {/* ── Urgent actions ── */}
           {criticalAlerts.length > 0 && (
             <Box>
-              <SectionTitle>Urgent Actions</SectionTitle>
-              <Card variant="outlined" sx={{ borderColor: "#ef5350", borderWidth: 2, background: "#fff5f5" }}>
-                <CardContent sx={{ pb: "12px !important" }}>
-                  <Stack divider={<Divider />}>
-                    {criticalAlerts.map((a) => (
-                      <AlertRow key={a.id} alert={a} onResolve={handleResolve} onDismiss={handleDismiss} />
-                    ))}
-                  </Stack>
-                </CardContent>
-              </Card>
+              <SectionTitle count={criticalAlerts.length}>Urgent Actions</SectionTitle>
+              <Paper variant="outlined" sx={{ ...panelSx, borderColor: "#ef5350", background: "#fff8f8", px: 2.5 }}>
+                <Stack divider={<Divider />}>
+                  {criticalAlerts.map((a) => (
+                    <AlertRow key={a.id} alert={a} onResolve={handleResolve} onDismiss={handleDismiss} />
+                  ))}
+                </Stack>
+              </Paper>
             </Box>
           )}
 
           {/* ── Pond status grid ── */}
           {data.ponds?.length > 0 && (
             <Box>
-              <SectionTitle>Pond Status</SectionTitle>
-              <Grid container spacing={2}>
+              <SectionTitle count={data.ponds.length}>Pond Status</SectionTitle>
+              <Box
+                sx={{
+                  display: "grid",
+                  gap: 2,
+                  gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(3, minmax(0, 1fr))" },
+                }}
+              >
                 {data.ponds.map((pond) => (
-                  <Grid item xs={12} sm={6} md={4} lg={3} key={pond.pond_id}>
-                    <PondCard pond={pond} />
-                  </Grid>
+                  <PondCard pond={pond} key={pond.pond_id} />
                 ))}
-              </Grid>
+              </Box>
             </Box>
           )}
 
           {/* ── Other alerts ── */}
           {otherAlerts.length > 0 && (
             <Box>
-              <SectionTitle>Active Alerts</SectionTitle>
-              <Card variant="outlined">
-                <CardContent sx={{ pb: "12px !important" }}>
-                  <Stack divider={<Divider />}>
-                    {otherAlerts.map((a) => (
-                      <AlertRow key={a.id} alert={a} onResolve={handleResolve} onDismiss={handleDismiss} />
-                    ))}
-                  </Stack>
-                </CardContent>
-              </Card>
+              <SectionTitle count={otherAlerts.length}>Active Alerts</SectionTitle>
+              <Paper variant="outlined" sx={{ ...panelSx, px: 2.5 }}>
+                <Stack divider={<Divider />}>
+                  {otherAlerts.map((a) => (
+                    <AlertRow key={a.id} alert={a} onResolve={handleResolve} onDismiss={handleDismiss} />
+                  ))}
+                </Stack>
+              </Paper>
             </Box>
           )}
 
           {/* ── Tasks ── */}
           {data.tasks?.length > 0 && (
             <Box>
-              <SectionTitle>Tasks Due Today</SectionTitle>
-              <Card variant="outlined">
-                <CardContent sx={{ pb: "12px !important" }}>
-                  <Stack divider={<Divider />}>
-                    {data.tasks.map((t) => (
-                      <TaskRow key={t.id} task={t} onComplete={handleComplete} />
-                    ))}
-                  </Stack>
-                </CardContent>
-              </Card>
+              <SectionTitle count={data.tasks.length}>Tasks Due Today</SectionTitle>
+              <Paper variant="outlined" sx={{ ...panelSx, px: 2.5 }}>
+                <Stack divider={<Divider />}>
+                  {data.tasks.map((t) => (
+                    <TaskRow key={t.id} task={t} onComplete={handleComplete} />
+                  ))}
+                </Stack>
+              </Paper>
             </Box>
           )}
 
@@ -349,7 +385,7 @@ const TodayView = () => {
           )}
         </Stack>
       )}
-    </Box>
+    </Container>
   );
 };
 
