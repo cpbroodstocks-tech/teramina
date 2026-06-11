@@ -40,4 +40,15 @@ describe("Dashboard context store", () => {
       cycle_name: "",
     });
   });
+
+  it("uses dashboard query parameters as the canonical context", () => {
+    window.history.replaceState({}, "", "/dashboard?farm_id=farm-url&pond_id=pond-url&cycle_id=cycle-url");
+    localStorage.setItem("farm_id", "farm-local");
+
+    expect(getDashboardContext()).toMatchObject({
+      farm_id: "farm-url",
+      pond_id: "pond-url",
+      cycle_id: "cycle-url",
+    });
+  });
 });

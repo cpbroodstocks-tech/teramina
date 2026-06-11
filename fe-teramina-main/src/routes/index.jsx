@@ -30,7 +30,7 @@ const Dashboard = lazy(() => import("pages/dashboard/home"));
 const Profile = lazy(() => import("pages/dashboard/profile"));
 const ProfileEdit = lazy(() => import("pages/dashboard/profile_edit"));
 const CostData = lazy(() => import("pages/dashboard/cost_data"));
-const Farm = lazy(() => import("pages/dashboard/farm"));
+const FarmManagement = lazy(() => import("pages/dashboard/farm-management"));
 const Pond = lazy(() => import("pages/dashboard/pond"));
 const Cycle = lazy(() => import("pages/dashboard/cycle"));
 const CycleDetail = lazy(() => import("pages/dashboard/cycle_detail"));
@@ -113,7 +113,14 @@ const routes = [
       {
         path: "farm",
         label: "MENU.FARM_MANAGEMENT",
-        element: <Farm />,
+        element: <Navigate to="/dashboard/farm-management" replace />,
+        icon: <ReactSVG src={iconFarm} />,
+        category: "children",
+      },
+      {
+        path: "farm-management",
+        label: "MENU.FARM_MANAGEMENT",
+        element: <FarmManagement />,
         icon: <ReactSVG src={iconFarm} />,
         category: "parrent",
       },

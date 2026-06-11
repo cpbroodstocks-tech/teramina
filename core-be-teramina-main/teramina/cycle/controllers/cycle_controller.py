@@ -41,4 +41,22 @@ def update_cycle(request, cycle_id, data: UpdateCycleSchema = Body(...)):
 @router.delete("/delete-cycle", response=response_schema, auth=AuthBearer())
 def delete_cycle(request, cycle_id):
     user = get_signed_in_user(request)
+    if not verify_cycle_owner(cycle_id, str(user.id)):
+        return 401, DataErrorSchema(code=401, message="Unauthorized")
     return CycleService().delete_cycle(cycle_id, str(user.id))
+
+
+@router.post("/archive-cycle", response=response_schema, auth=AuthBearer())
+def archive_cycle(request, cycle_id):
+    user = get_signed_in_user(request)
+    if not verify_cycle_owner(cycle_id, str(user.id)):
+        return 401, DataErrorSchema(code=401, message="Unauthorized")
+    return CycleService().archive_cycle(cycle_id, str(user.id))
+
+
+@router.post("/restore-cycle", response=response_schema, auth=AuthBearer())
+def restore_cycle(request, cycle_id):
+    user = get_signed_in_user(request)
+    if not verify_cycle_owner(cycle_id, str(user.id)):
+        return 401, DataErrorSchema(code=401, message="Unauthorized")
+    return CycleService().restore_cycle(cycle_id)

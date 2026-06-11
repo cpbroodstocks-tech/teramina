@@ -19,6 +19,8 @@ class PondService:
     def add_pond(farm_id, data: PondDataSchema):
         """add a new pond"""
         try:
+            if not Farm.objects(id=farm_id, archived_at=None).only("id").first():
+                return 400, DataErrorSchema(code=400, message="Cannot add a pond to an archived farm")
             pond = Pond(
                 name=data.name,
                 size=data.size,
@@ -50,7 +52,7 @@ class PondService:
         try:
             limit = min(limit, 100)
             offset = (page - 1) * limit
-            pond = Pond.objects(farm_id=farm_id).skip(offset).limit(limit).all()
+            pond = Pond.objects(farm_id=farm_id, archived_at=None).skip(offset).limit(limit).all()
             pond = [i.to_mongo().to_dict() for i in pond]
 
             for i in pond:
@@ -102,9 +104,7 @@ class PondService:
     def delete_pond(pond_id, user_id):
         """delete a pond"""
         try:
-            cycle = Cycle.objects(pond_id=pond_id).first()
-
-            if cycle:
+            for cycle in Cycle.objects(pond_id=pond_id).only("id").all():
                 CycleService().delete_cycle(str(cycle.id), user_id)
 
             pond_object = Pond.objects(id=pond_id)
@@ -118,4 +118,37 @@ class PondService:
             code=200,
             message=f"Pond {pond_name} with id {pond_id} deleted",
             payload={"id": pond_id, "name": pond_name},
+        )
+
+    @staticmethod
+    def archive_pond(pond_id, user_id):
+        archived_at = datetime.now()
+        Pond.objects(id=pond_id).update(
+            set__archived_at=archived_at,
+            set__archived_by=str(user_id),
+            set__active_cycle_id="",
+        )
+        Cycle.objects(pond_id=pond_id).update(set__archived_at=archived_at, set__archived_by=str(user_id))
+        return 200, DataSuccessSchema(code=200, message="Pond archived", payload={"id": pond_id})
+
+    @staticmethod
+    def restore_pond(pond_id):
+        pond = Pond.objects(id=pond_id).only("farm_id").first()
+        if not pond or not Farm.objects(id=pond.farm_id, archived_at=None).only("id").first():
+            return 400, DataErrorSchema(code=400, message="Restore the parent farm first")
+        Pond.objects(id=pond_id).update(unset__archived_at=1, set__archived_by="")
+        Cycle.objects(pond_id=pond_id).update(unset__archived_at=1, set__archived_by="")
+        CycleService().repair_active_cycle(pond_id)
+        return 200, DataSuccessSchema(code=200, message="Pond restored", payload={"id": pond_id})
+
+    @staticmethod
+    def set_active_cycle(pond_id, cycle_id):
+        cycle = Cycle.objects(id=cycle_id, pond_id=pond_id, archived_at=None).only("id").first()
+        if not cycle:
+            return 400, DataErrorSchema(code=400, message="Cycle does not belong to pond or is archived")
+        Pond.objects(id=pond_id, archived_at=None).update(set__active_cycle_id=str(cycle.id))
+        return 200, DataSuccessSchema(
+            code=200,
+            message="Active cycle updated",
+            payload={"id": pond_id, "active_cycle_id": str(cycle.id)},
         )

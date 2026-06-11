@@ -20,8 +20,12 @@ const EMPTY_CONTEXT: DashboardContext = {
 
 const readContext = (): DashboardContext => {
   if (typeof window === "undefined") return EMPTY_CONTEXT;
+  const params = new URLSearchParams(window.location.search);
   return Object.fromEntries(
-    Object.keys(EMPTY_CONTEXT).map((key) => [key, localStorage.getItem(key) || ""])
+    Object.keys(EMPTY_CONTEXT).map((key) => [
+      key,
+      key.endsWith("_id") ? params.get(key) || localStorage.getItem(key) || "" : localStorage.getItem(key) || "",
+    ])
   ) as unknown as DashboardContext;
 };
 
@@ -31,6 +35,15 @@ const writeContext = (context: DashboardContext) => {
     if (value) localStorage.setItem(key, value);
     else localStorage.removeItem(key);
   });
+  if (window.location.pathname.startsWith("/dashboard")) {
+    const url = new URL(window.location.href);
+    ["farm_id", "pond_id", "cycle_id"].forEach((key) => {
+      const value = context[key as keyof DashboardContext];
+      if (value) url.searchParams.set(key, value);
+      else url.searchParams.delete(key);
+    });
+    window.history.replaceState(window.history.state, "", url);
+  }
 };
 
 interface DashboardContextStore extends DashboardContext {

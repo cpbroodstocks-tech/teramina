@@ -24,6 +24,7 @@ import { useDebounce } from "hooks/useDebounce";
 import { useTranslation } from "react-i18next";
 import { useToastStore } from "store/toast.store";
 import { useDownloadPLReport } from "features/pond/queries";
+import { useDashboardContextStore } from "store/dashboard-context.store";
 
 const PondList = ({ data }) => {
   const { t } = useTranslation();
@@ -32,6 +33,7 @@ const PondList = ({ data }) => {
   const [search, setSearch] = useState("");
   const { setToast: toast } = useToastStore();
   const { mutate: downloadPLReport } = useDownloadPLReport();
+  const setContext = useDashboardContextStore((state) => state.setContext);
 
   const handleSearchChange = useDebounce(
     (event) => setSearch(event.target.value),
@@ -124,10 +126,7 @@ const PondList = ({ data }) => {
                     <Button
                       className={styles.btnViewMore}
                       onClick={() => {
-                        localStorage.setItem("pond_id", pond._id);
-                        localStorage.setItem("pond_name", pond.name);
-                        localStorage.removeItem("cycle_id");
-                        localStorage.removeItem("cycle_name");
+                        setContext({ pond_id: pond._id, pond_name: pond.name, cycle_id: "", cycle_name: "" });
                         navigate(`/dashboard/cycle/${pond._id}`);
                       }}
                     >

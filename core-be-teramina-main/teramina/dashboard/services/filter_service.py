@@ -44,24 +44,24 @@ class FilterData:
 
     @staticmethod
     def _ready_cycles(pond_ids):
-        cycles = Cycle.objects(pond_id__in=pond_ids).only("id", "name", "start_date").all()
+        cycles = Cycle.objects(pond_id__in=pond_ids, archived_at=None).only("id", "name", "start_date").all()
         return [cycle for cycle in cycles if is_dashboard_ready_cycle(str(cycle.id))]
 
     def get_list_data_main(self, farm_id=None, pond_id=None, dashboard_ready=False):
         """Get the farm, pond, or cycle options available to the signed-in user."""
         if not farm_id and not pond_id:
-            farms = Farm.objects(user_id=self.user_id).only("id", "name").all()
+            farms = Farm.objects(user_id=self.user_id, archived_at=None).only("id", "name").all()
             if not dashboard_ready:
                 return farms
             data = []
             for farm in farms:
-                pond_ids = [str(pond.id) for pond in Pond.objects(farm_id=str(farm.id)).only("id")]
+                pond_ids = [str(pond.id) for pond in Pond.objects(farm_id=str(farm.id), archived_at=None).only("id")]
                 if pond_ids and self._ready_cycles(pond_ids):
                     data.append(farm)
         elif farm_id and not pond_id:
-            if not Farm.objects(id=farm_id, user_id=self.user_id).only("id").first():
+            if not Farm.objects(id=farm_id, user_id=self.user_id, archived_at=None).only("id").first():
                 return []
-            ponds = Pond.objects(farm_id=farm_id).only("id", "name").all()
+            ponds = Pond.objects(farm_id=farm_id, archived_at=None).only("id", "name").all()
             if not dashboard_ready:
                 return ponds
             data = [
@@ -72,14 +72,14 @@ class FilterData:
         elif not farm_id and pond_id:
             raise ValueError("farm_id should be not None, if pond_id is not None")
         else:
-            if not Farm.objects(id=farm_id, user_id=self.user_id).only("id").first():
+            if not Farm.objects(id=farm_id, user_id=self.user_id, archived_at=None).only("id").first():
                 return []
-            if not Pond.objects(id=pond_id, farm_id=farm_id).only("id").first():
+            if not Pond.objects(id=pond_id, farm_id=farm_id, archived_at=None).only("id").first():
                 return []
             if dashboard_ready:
                 data = self._ready_cycles([pond_id])
             else:
-                data = Cycle.objects(pond_id=pond_id).only("id", "name", "start_date").all()
+                data = Cycle.objects(pond_id=pond_id, archived_at=None).only("id", "name", "start_date").all()
         return data
 
     def get_list_data(self, farm_id=None, pond_id=None, cycle_id=None):
@@ -90,11 +90,11 @@ class FilterData:
             else:
                 if not farm_id or not pond_id:
                     raise ValueError("farm_id and pond_id are required when cycle_id is provided")
-                if not Farm.objects(id=farm_id, user_id=self.user_id).only("id").first():
+                if not Farm.objects(id=farm_id, user_id=self.user_id, archived_at=None).only("id").first():
                     raise ValueError("Farm does not exist")
-                if not Pond.objects(id=pond_id, farm_id=farm_id).only("id").first():
+                if not Pond.objects(id=pond_id, farm_id=farm_id, archived_at=None).only("id").first():
                     raise ValueError("Pond does not exist")
-                data = Cycle.objects(id=cycle_id, pond_id=pond_id).only("id", "name", "start_date").all()
+                data = Cycle.objects(id=cycle_id, pond_id=pond_id, archived_at=None).only("id", "name", "start_date").all()
                 if not data or not is_dashboard_ready_cycle(cycle_id):
                     raise ValueError(f"Dashboard data with cycle {cycle_id} doesn't exist")
 

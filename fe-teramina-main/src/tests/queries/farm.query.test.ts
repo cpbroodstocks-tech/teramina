@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import React, { createElement } from "react";
 import { server } from "../mocks/server";
-import { farmKeys, useFarmList } from "features/farm/queries";
+import { farmKeys, useFarmHierarchy, useFarmList } from "features/farm/queries";
 
 // Pure key structure tests
 describe("farmKeys", () => {
@@ -50,5 +50,21 @@ describe("useFarmList", () => {
     const { result } = renderHook(() => useFarmList(), { wrapper });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+});
+
+describe("useFarmHierarchy", () => {
+  function wrapper({ children }: { children: React.ReactNode }) {
+    return createElement(QueryClientProvider, { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) }, children);
+  }
+
+  it("returns the nested hierarchy payload", async () => {
+    const farms = [{ id: "farm-1", name: "Farm", ponds: [] }];
+    server.use(http.get("*/farm/hierarchy", () => HttpResponse.json({ payload: { farms } })));
+
+    const { result } = renderHook(() => useFarmHierarchy(), { wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual(farms);
   });
 });

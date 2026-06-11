@@ -12,6 +12,8 @@ class Pond(Document):
     farm_id = fields.StringField()
     demo_scenario = fields.StringField(default="")
     is_active = fields.BooleanField(default=True)
+    archived_at = fields.DateTimeField()
+    archived_by = fields.StringField(default="")
     created_at = fields.DateTimeField(default=datetime.now())
     last_updated = fields.DateTimeField()
     active_cycle_id = fields.StringField()
@@ -35,5 +37,7 @@ class Pond(Document):
             "created_at": self.created_at,
             "last_updated": self.last_updated,
             "is_active": self.is_active,
+            "archived_at": self.archived_at,
+            "archived_by": self.archived_by,
             "active_cycle_id": self.active_cycle_id
         }

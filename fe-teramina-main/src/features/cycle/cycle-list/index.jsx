@@ -21,6 +21,7 @@ import Search from "components/search";
 import { useDebounce } from "hooks/useDebounce";
 import { useTranslation } from "react-i18next";
 import PondMemoryPanel from "components/pond-memory-panel";
+import { useDashboardContextStore } from "store/dashboard-context.store";
 
 const PondList = ({ data }) => {
   const { t } = useTranslation();
@@ -29,6 +30,7 @@ const PondList = ({ data }) => {
   const [search, setSearch] = useState("");
   const farmId = data.farm_id || localStorage.getItem("farm_id") || "";
   const pondId = data.pond_id || localStorage.getItem("pond_id") || "";
+  const setContext = useDashboardContextStore((state) => state.setContext);
 
   const handleSearchChange = useDebounce(
     (event) => setSearch(event.target.value),
@@ -85,8 +87,7 @@ const PondList = ({ data }) => {
                       className={styles.btnViewMore}
                       onClick={() => {
                         localStorage.setItem("selectedCycleStartDate", cycle.start_date);
-                        localStorage.setItem("cycle_id", cycle._id);
-                        localStorage.setItem("cycle_name", cycle.name);
+                        setContext({ cycle_id: cycle._id, cycle_name: cycle.name });
                         navigate(`/dashboard/cycle/detail/${cycle._id}`);
                       }}
                     >

@@ -35,6 +35,12 @@ def list_farm(request, page: int = 1, limit: int = 50):
     return FarmService().get_all_farm(user_id=user.id, page=page, limit=limit)
 
 
+@router.get("/hierarchy", response=response_schema, auth=AuthBearer())
+def hierarchy(request, include_archived: bool = False):
+    user = get_signed_in_user(request)
+    return FarmService().get_hierarchy(str(user.id), include_archived=include_archived)
+
+
 @router.put("/update-farm", response=response_schema, auth=AuthBearer())
 def update_farm(request, farm_id, data: FarmDataSchema = Body(...)):
     user = get_signed_in_user(request)
@@ -46,4 +52,22 @@ def update_farm(request, farm_id, data: FarmDataSchema = Body(...)):
 @router.delete("/delete-farm", response=response_schema, auth=AuthBearer())
 def delete_farm(request, farm_id):
     user = get_signed_in_user(request)
+    if not verify_farm_owner(farm_id, str(user.id)):
+        return 401, DataErrorSchema(code=401, message="Unauthorized")
     return FarmService.delete_farm(farm_id=farm_id, user_id=str(user.id))
+
+
+@router.post("/archive-farm", response=response_schema, auth=AuthBearer())
+def archive_farm(request, farm_id):
+    user = get_signed_in_user(request)
+    if not verify_farm_owner(farm_id, str(user.id)):
+        return 401, DataErrorSchema(code=401, message="Unauthorized")
+    return FarmService.archive_farm(farm_id, str(user.id))
+
+
+@router.post("/restore-farm", response=response_schema, auth=AuthBearer())
+def restore_farm(request, farm_id):
+    user = get_signed_in_user(request)
+    if not verify_farm_owner(farm_id, str(user.id)):
+        return 401, DataErrorSchema(code=401, message="Unauthorized")
+    return FarmService.restore_farm(farm_id)

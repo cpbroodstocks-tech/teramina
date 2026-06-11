@@ -11,6 +11,8 @@ class Cycle(Document):
     demo_scenario = fields.StringField(default="")
     last_updated = fields.DateTimeField()
     is_active = fields.BooleanField(default=True)
+    archived_at = fields.DateTimeField()
+    archived_by = fields.StringField(default="")
     vector_list = fields.ListField()
 
     meta = {"indexes": ["pond_id"]}
@@ -28,6 +30,8 @@ class Cycle(Document):
             "demo_scenario": self.demo_scenario,
             "last_updated": self.last_updated,
             "is_active": self.is_active,
+            "archived_at": self.archived_at,
+            "archived_by": self.archived_by,
             "vector_list": self.vector_list
         }
 

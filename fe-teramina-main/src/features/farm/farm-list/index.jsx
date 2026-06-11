@@ -20,12 +20,14 @@ import { useStyles } from "features/farm/farm-list/styles";
 import Search from "components/search";
 import { useDebounce } from "hooks/useDebounce";
 import { useTranslation } from "react-i18next";
+import { useDashboardContextStore } from "store/dashboard-context.store";
 
 const FarmList = ({ data }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { classes: styles } = useStyles();
   const [search, setSearch] = useState("");
+  const setContext = useDashboardContextStore((state) => state.setContext);
 
   const handleSearchChange = useDebounce(
     (event) => setSearch(event.target.value),
@@ -92,12 +94,7 @@ const FarmList = ({ data }) => {
                     <Button
                       className={styles.btnViewMore}
                       onClick={() => {
-                        localStorage.setItem("farm_id", farm._id);
-                        localStorage.setItem("farm_name", farm.name);
-                        localStorage.removeItem("pond_id");
-                        localStorage.removeItem("pond_name");
-                        localStorage.removeItem("cycle_id");
-                        localStorage.removeItem("cycle_name");
+                        setContext({ farm_id: farm._id, farm_name: farm.name, pond_id: "", pond_name: "", cycle_id: "", cycle_name: "" });
                         navigate(`/dashboard/pond/${farm._id}`);
                       }}
                     >

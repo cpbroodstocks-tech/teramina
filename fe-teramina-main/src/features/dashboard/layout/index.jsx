@@ -3,24 +3,21 @@ import { Fragment, Suspense, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Header from "components/header";
 import Loader from "components/loader";
-import { Typography } from "@mui/material";
+import { Stack, Typography } from "@mui/material";
 import { useStyles } from "./styles";
+import ContextSelector from "components/context-selector";
+import { useDashboardContextStore } from "store/dashboard-context.store";
 
 const ContextBar = () => {
-  const farmName = localStorage.getItem("farm_name");
-  const pondName = localStorage.getItem("pond_name");
-  const cycleName = localStorage.getItem("cycle_name");
-
-  if (!farmName) return null;
+  const { farm_name: farmName, pond_name: pondName, cycle_name: cycleName } = useDashboardContextStore();
 
   const parts = [farmName, pondName, cycleName].filter(Boolean);
 
   return (
-    <div style={{ padding: "4px 20px", background: "#f5f5f5", borderBottom: "1px solid #e0e0e0" }}>
-      <Typography variant="caption" color="textSecondary">
-        {parts.join(" › ")}
-      </Typography>
-    </div>
+    <Stack spacing={0.75} sx={{ padding: "10px 16px", mb: 2, background: "#f7f8fa", border: "1px solid #e0e3e7", borderRadius: 1 }}>
+      <ContextSelector />
+      {parts.length > 0 && <Typography variant="caption" color="textSecondary">{parts.join(" › ")}</Typography>}
+    </Stack>
   );
 };
 

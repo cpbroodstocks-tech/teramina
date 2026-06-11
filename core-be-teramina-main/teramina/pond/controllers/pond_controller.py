@@ -41,4 +41,30 @@ def update_pond(request, pond_id, data: UpdatePondSchema = Body(...)):
 @router.delete("/delete-pond", response=response_schema, auth=AuthBearer())
 def delete_pond(request, pond_id):
     user = get_signed_in_user(request)
+    if not verify_pond_owner(pond_id, str(user.id)):
+        return 401, DataErrorSchema(code=401, message="Unauthorized")
     return PondService.delete_pond(pond_id, str(user.id))
+
+
+@router.post("/archive-pond", response=response_schema, auth=AuthBearer())
+def archive_pond(request, pond_id):
+    user = get_signed_in_user(request)
+    if not verify_pond_owner(pond_id, str(user.id)):
+        return 401, DataErrorSchema(code=401, message="Unauthorized")
+    return PondService.archive_pond(pond_id, str(user.id))
+
+
+@router.post("/restore-pond", response=response_schema, auth=AuthBearer())
+def restore_pond(request, pond_id):
+    user = get_signed_in_user(request)
+    if not verify_pond_owner(pond_id, str(user.id)):
+        return 401, DataErrorSchema(code=401, message="Unauthorized")
+    return PondService.restore_pond(pond_id)
+
+
+@router.post("/set-active-cycle", response=response_schema, auth=AuthBearer())
+def set_active_cycle(request, pond_id, cycle_id):
+    user = get_signed_in_user(request)
+    if not verify_pond_owner(pond_id, str(user.id)) or not verify_cycle_owner(cycle_id, str(user.id)):
+        return 401, DataErrorSchema(code=401, message="Unauthorized")
+    return PondService.set_active_cycle(pond_id, cycle_id)

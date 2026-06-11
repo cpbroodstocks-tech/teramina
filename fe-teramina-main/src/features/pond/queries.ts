@@ -8,7 +8,10 @@ export const pondKeys = {
 
 export const useInvalidatePondList = () => {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: ["ponds"] });
+  return () => {
+    queryClient.invalidateQueries({ queryKey: ["ponds"] });
+    queryClient.invalidateQueries({ queryKey: ["farm-hierarchy"] });
+  };
 };
 
 export const usePondList = () => {

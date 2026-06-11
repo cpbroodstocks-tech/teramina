@@ -8,7 +8,10 @@ export const cycleKeys = {
 
 export const useInvalidateCycleList = () => {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: ["cycles"] });
+  return () => {
+    queryClient.invalidateQueries({ queryKey: ["cycles"] });
+    queryClient.invalidateQueries({ queryKey: ["farm-hierarchy"] });
+  };
 };
 
 export const useCycleList = () => {
