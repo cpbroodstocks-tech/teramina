@@ -29,9 +29,10 @@ import { useToastStore } from "store/toast.store";
 const typeOptions = ["all", "fact", "preference", "event", "advice", "note"];
 
 const panelSx = {
-  p: { xs: 2, md: 2.5 },
+  p: { xs: 1.5, md: 2 },
   borderColor: "#e2e8f0",
-  borderRadius: 1,
+  borderRadius: 2,
+  boxShadow: "0 1px 2px rgba(15, 23, 42, 0.03)",
 };
 
 const formatDate = (value) => {
@@ -72,7 +73,7 @@ const MemoryCard = ({
     }}
   >
     <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} sx={{ alignItems: { sm: "flex-start" } }}>
-      <Box flex={1}>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
         <Stack direction="row" gap={1} sx={{ flexWrap: "wrap", mb: 1 }}>
           <Chip size="small" label={editing ? draft.memory_type : memory.memory_type} />
           <Chip
@@ -124,7 +125,7 @@ const MemoryCard = ({
             />
           </Stack>
         ) : (
-          <Typography variant="body1" fontWeight={600} sx={{ lineHeight: 1.55, mb: 1 }}>
+          <Typography variant="body2" fontWeight={600} sx={{ lineHeight: 1.55, mb: 1 }}>
             {memory.content}
           </Typography>
         )}
@@ -351,14 +352,14 @@ const MemoryPage = () => {
   const contextLabel = [farmName || farmId, pondName || pondId].filter(Boolean).join(" / ");
 
   return (
-    <Container maxWidth="lg" sx={{ py: 3 }}>
+    <Container maxWidth={false} disableGutters sx={{ py: 0.5 }}>
       <Stack
         direction={{ xs: "column", sm: "row" }}
         gap={2}
         sx={{ justifyContent: "space-between", alignItems: { sm: "center" }, mb: 3 }}
       >
         <Box>
-          <Typography variant="h4" fontWeight={700}>
+          <Typography variant="h5" fontWeight={700}>
             Farmer Memory
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -377,7 +378,7 @@ const MemoryPage = () => {
         </IconButton>
       </Stack>
 
-      <Paper variant="outlined" sx={{ ...panelSx, mb: 2.5 }}>
+      <Paper variant="outlined" sx={{ ...panelSx, mb: 2 }}>
         <Typography variant="h6" fontWeight={700}>
           Add verified memory
         </Typography>
@@ -427,7 +428,7 @@ const MemoryPage = () => {
           gap={1}
           sx={{ alignItems: { sm: "center" }, justifyContent: "space-between", mt: 2 }}
         >
-          <Stack direction={{ xs: "column", sm: "row" }} gap={1} sx={{ alignItems: { sm: "center" } }}>
+          <Stack direction={{ xs: "column", sm: "row" }} gap={1} sx={{ alignItems: { sm: "center" }, minWidth: 0 }}>
             <Button
               variant={saveWithContext ? "outlined" : "text"}
               onClick={() => setSaveWithContext((value) => !value)}
@@ -435,9 +436,7 @@ const MemoryPage = () => {
               {saveWithContext ? "Using current context" : "Saving without context"}
             </Button>
             {saveWithContext && contextLabel && (
-              <Typography variant="body2" color="text.secondary">
-                {contextLabel}
-              </Typography>
+              <Chip size="small" variant="outlined" label={contextLabel} sx={{ maxWidth: { xs: "100%", sm: 360 } }} />
             )}
           </Stack>
           <Button
@@ -452,7 +451,7 @@ const MemoryPage = () => {
         </Stack>
       </Paper>
 
-      <Paper variant="outlined" sx={{ ...panelSx, mb: 2.5 }}>
+      <Paper variant="outlined" sx={{ ...panelSx, mb: 2 }}>
         <Stack
           direction={{ xs: "column", sm: "row" }}
           gap={2}
@@ -486,7 +485,7 @@ const MemoryPage = () => {
         {!isGraphLoading && !isGraphError && recentGraphObservations.length > 0 && (
           <Stack gap={1}>
             {recentGraphObservations.map((observation) => (
-              <Box key={observation.id} sx={{ borderTop: "1px solid #eeeeee", pt: 1 }}>
+              <Box key={observation.id} sx={{ p: 1.25, borderRadius: 1.5, bgcolor: "rgba(71, 77, 164, 0.04)" }}>
                 <Stack direction="row" gap={1} sx={{ flexWrap: "wrap", mb: 0.5 }}>
                   <Chip size="small" label={observation.observation_type} />
                   <Chip
@@ -503,66 +502,49 @@ const MemoryPage = () => {
         )}
       </Paper>
 
-      <Tabs
-        value={tab}
-        onChange={(_, v) => setTab(v)}
-        sx={{ mb: 2, borderBottom: "1px solid", borderColor: "divider" }}
-      >
-        <Tab label="All memories" />
-        <Tab
-          label={
-            needsReview.length > 0
-              ? `Needs review (${needsReview.length})`
-              : "Needs review"
-          }
-        />
-      </Tabs>
+      <Paper variant="outlined" sx={{ mb: 1.5, borderColor: "divider", borderRadius: 2, overflow: "hidden" }}>
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 1 }}>
+          <Tab label="All memories" />
+          <Tab label={needsReview.length > 0 ? `Needs review (${needsReview.length})` : "Needs review"} />
+        </Tabs>
+      </Paper>
 
       {tab === 0 && (
         <>
-          <Paper variant="outlined" sx={{ ...panelSx, mb: 2 }}>
-            <Stack
-              direction={{ xs: "column", md: "row" }}
-              gap={1.5}
-              sx={{ alignItems: { md: "center" }, justifyContent: "space-between" }}
-            >
-              <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} sx={{ flex: 1 }}>
-                <TextField
-                  size="small"
-                  label="Search memory"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  sx={{ minWidth: { sm: 260 }, flex: 1 }}
-                />
-                <TextField
-                  select
-                  size="small"
-                  label="Type"
-                  value={type}
-                  onChange={(event) => setType(event.target.value)}
-                  sx={{ minWidth: 180 }}
-                >
-                  {typeOptions.map((option) => (
-                    <MenuItem key={option} value={option}>
-                      {option}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Stack>
-              <Stack direction={{ xs: "column", sm: "row" }} gap={1} sx={{ alignItems: { sm: "center" } }}>
+          <Paper variant="outlined" sx={{ ...panelSx, mb: 1.5 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "minmax(240px, 1fr) 180px minmax(260px, auto)" }, gap: 1.25, alignItems: "center" }}>
+              <TextField
+                size="small"
+                label="Search memory"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                fullWidth
+              />
+              <TextField
+                select
+                size="small"
+                label="Type"
+                value={type}
+                onChange={(event) => setType(event.target.value)}
+              >
+                {typeOptions.map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <Stack direction="row" gap={1} sx={{ alignItems: "center", minWidth: 0 }}>
                 <Button
+                  size="small"
                   variant={useCurrentContext ? "contained" : "outlined"}
                   onClick={() => setUseCurrentContext((value) => !value)}
+                  sx={{ whiteSpace: "nowrap" }}
                 >
                   {useCurrentContext ? "Current context" : "All memories"}
                 </Button>
-                {contextLabel && (
-                  <Typography variant="body2" color="text.secondary">
-                    {contextLabel}
-                  </Typography>
-                )}
+                {contextLabel && <Chip size="small" variant="outlined" label={contextLabel} sx={{ maxWidth: 260 }} />}
               </Stack>
-            </Stack>
+            </Box>
           </Paper>
 
           {isLoading && (
