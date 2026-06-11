@@ -1,4 +1,5 @@
 import { FormControl, InputLabel, MenuItem, Select, Stack } from "@mui/material";
+import { trackDemoEvent } from "features/demo-experience/analytics";
 import { useFarmHierarchy } from "features/farm/queries";
 import { useDashboardContextStore } from "store/dashboard-context.store";
 
@@ -14,6 +15,12 @@ const ContextSelector = () => {
 
   const setContextAndRefresh = (next: Parameters<typeof context.setContext>[0]) => {
     context.setContext(next);
+    const scenario = farms
+      .flatMap((farm) => farm.ponds)
+      .find((pond) => pond.id === next.pond_id)?.demo_scenario;
+    if (scenario) {
+      trackDemoEvent("demo_context_selected", { scenario }).catch(() => undefined);
+    }
     window.location.reload();
   };
 

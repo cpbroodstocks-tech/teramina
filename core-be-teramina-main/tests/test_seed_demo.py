@@ -18,11 +18,13 @@ from teramina.dashboard.services.historical.feed import DashboardFeed
 from teramina.farm.models.farm_model import Farm
 from teramina.feeding.models.feed_realization_model import FeedRealization
 from teramina.harvest.models.harvest_record_model import HarvestRecord
-from teramina.helpers.default_data_updater import ensure_default_data_for_user, user_has_dashboard_data
+from teramina.helpers.default_data_updater import DataSeeder, ensure_default_data_for_user, user_has_dashboard_data
 from teramina.helpers.demo_artifacts import DEMO_BUNDLE_VERSION, DEMO_TAG
 from teramina.helpers.management.commands.seed_demo import CURRENT_DOC, load_sample_seed_data
 from teramina.pond.models.pond_model import Pond
 from teramina.user.models.user_model import User
+from teramina.user.models.demo_experience_model import DemoExperienceState, ProductEvent
+from teramina.user.services.demo_experience_service import DemoExperienceService, user_has_real_dashboard_data
 from teramina.user.services.profile_service import ProfileService
 from teramina.water_quality_dashboard.models.variable_model import WQVariable
 from teramina.water_quality_dashboard.services.water_quality_service import WaterQuality
@@ -337,6 +339,55 @@ def test_user_demo_bundle_seeds_linked_modules_and_passes_validator(monkeypatch)
     assert AdvisoryReport.objects(user_id=user_id, status="delivered").count() == 1
 
     call_command("validate_demo_bundle", email=user.email, include_template=True, verbosity=0)
+
+
+def test_demo_experience_defaults_to_at_risk_and_tracks_comparison(monkeypatch):
+    source_farm, scenarios = _seed_template_scenarios()
+    monkeypatch.setenv("SEEDER_FARM", str(source_farm.id))
+    user = User(name="Demo Experience User", email="demo-experience@teramina.io").save()
+    user_id = str(user.id)
+    assert ensure_default_data_for_user(user_id) is True
+
+    status, response = DemoExperienceService.get(user_id)
+    assert status == 200
+    assert response.payload["demo_available"] is True
+    assert response.payload["has_real_data"] is False
+    assert response.payload["default_context"]["pond_name"] == "Scenario B - At Risk"
+
+    DemoExperienceService.record_event(user_id, "demo_context_selected", {"scenario": "healthy"})
+    status, response = DemoExperienceService.record_event(user_id, "demo_context_selected", {"scenario": "at_risk"})
+    assert status == 200
+    assert "compare_scenarios" in response.payload["completed_steps"]
+    assert ProductEvent.objects(user_id=user_id, event_name="demo_context_selected").count() == 2
+
+
+def test_demo_experience_prefers_real_ready_data_and_reset_preserves_it(monkeypatch):
+    source_farm, _ = _seed_template_scenarios()
+    monkeypatch.setenv("SEEDER_FARM", str(source_farm.id))
+    user = User(name="Real Transition User", email="real-transition@teramina.io").save()
+    user_id = str(user.id)
+    assert ensure_default_data_for_user(user_id) is True
+
+    real_farm = Farm(name="Real Farm", location="Test", user_id=user_id).save()
+    real_pond = Pond(name="Real Pond", farm_id=str(real_farm.id)).save()
+    source_pond = Pond.objects(farm_id=str(source_farm.id), demo_scenario="healthy").first()
+    DataSeeder(str(source_farm.id), user_id=user_id)._clone_cycle(  # pylint: disable=protected-access
+        DataSeeder._source_cycle(str(source_pond.id)), real_pond,
+        {"farm_id": str(real_farm.id), "farm_name": real_farm.name, "farm_location": real_farm.location},
+    )
+    Farm.objects(id=real_farm.id).update(unset__demo_bundle_version=1)
+    assert user_has_real_dashboard_data(user_id) is True
+
+    status, response = DemoExperienceService.get(user_id)
+    assert status == 200
+    assert response.payload["has_real_data"] is True
+    assert response.payload["default_context"]["farm_id"] == str(real_farm.id)
+
+    status, reset_response = DemoExperienceService.reset(user_id, True)
+    assert status == 200
+    assert Farm.objects(id=real_farm.id).first() is not None
+    assert reset_response.payload["demo_context"]["pond_name"] == "Scenario B - At Risk"
+    assert DemoExperienceState.objects(user_id=user_id).first().reset_count == 1
 
 
 def test_user_provisioning_resolves_latest_template_when_environment_id_is_stale(monkeypatch):

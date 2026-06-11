@@ -15,6 +15,7 @@ export interface CycleHierarchyItem {
   is_active: boolean;
   is_archived: boolean;
   dashboard_ready: boolean;
+  demo_scenario: string;
 }
 
 export interface PondHierarchyItem {
@@ -28,6 +29,7 @@ export interface PondHierarchyItem {
   is_archived: boolean;
   active_cycle_id: string;
   cycles: CycleHierarchyItem[];
+  demo_scenario: string;
 }
 
 export interface FarmHierarchyItem {
@@ -35,6 +37,8 @@ export interface FarmHierarchyItem {
   name: string;
   location: string;
   is_archived: boolean;
+  demo_bundle_version: string;
+  is_demo: boolean;
   ponds: PondHierarchyItem[];
 }
 

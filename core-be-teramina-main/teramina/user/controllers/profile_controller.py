@@ -3,7 +3,14 @@
 from ninja import Router, Body, File, Form
 from ninja.files import UploadedFile
 
-from ..schemas.profile_schema import FcmTokenSchema, UpdateProfileSchema
+from ..schemas.profile_schema import (
+    DemoExperienceEventSchema,
+    DemoExperienceResetSchema,
+    DemoExperienceUpdateSchema,
+    FcmTokenSchema,
+    UpdateProfileSchema,
+)
+from ..services.demo_experience_service import DemoExperienceService
 from ...schemas.general_schema import DataErrorSchema, DataSuccessSchema
 from ...user.services.profile_service import ProfileService
 
@@ -52,3 +59,27 @@ def update_fcm_token(request, data: FcmTokenSchema = Body(...)):
     user.fcm_token = data.token
     user.save()
     return 200, DataSuccessSchema(code=200, message="Token updated", payload={})
+
+
+@router.get("/demo-experience", response=response_schema, auth=AuthBearer())
+def get_demo_experience(request):
+    user = get_signed_in_user(request)
+    return DemoExperienceService.get(str(user.id))
+
+
+@router.post("/demo-experience/events", response=response_schema, auth=AuthBearer())
+def record_demo_experience_event(request, data: DemoExperienceEventSchema = Body(...)):
+    user = get_signed_in_user(request)
+    return DemoExperienceService.record_event(str(user.id), data.event_name, data.properties)
+
+
+@router.patch("/demo-experience", response=response_schema, auth=AuthBearer())
+def update_demo_experience(request, data: DemoExperienceUpdateSchema = Body(...)):
+    user = get_signed_in_user(request)
+    return DemoExperienceService.update(str(user.id), data.checklist_dismissed)
+
+
+@router.post("/demo-experience/reset", response=response_schema, auth=AuthBearer())
+def reset_demo_experience(request, data: DemoExperienceResetSchema = Body(...)):
+    user = get_signed_in_user(request)
+    return DemoExperienceService.reset(str(user.id), data.confirmed)

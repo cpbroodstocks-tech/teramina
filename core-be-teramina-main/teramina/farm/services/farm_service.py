@@ -148,6 +148,7 @@ class FarmService:
                 "is_active": cycle.is_active,
                 "is_archived": cycle.archived_at is not None,
                 "dashboard_ready": is_dashboard_ready_cycle(str(cycle.id)),
+                "demo_scenario": cycle.demo_scenario,
             })
 
         ponds_by_farm = {}
@@ -163,6 +164,7 @@ class FarmService:
                 "is_active": pond.is_active,
                 "is_archived": pond.archived_at is not None,
                 "active_cycle_id": pond.active_cycle_id or "",
+                "demo_scenario": pond.demo_scenario,
                 "cycles": pond_cycles,
             })
 
@@ -172,6 +174,8 @@ class FarmService:
                 "name": farm.name,
                 "location": farm.location,
                 "is_archived": farm.archived_at is not None,
+                "demo_bundle_version": farm.demo_bundle_version,
+                "is_demo": bool(farm.demo_bundle_version),
                 "ponds": ponds_by_farm.get(str(farm.id), []),
             } for farm in farms]
         }

@@ -105,6 +105,7 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
     const token = localStorage.getItem("authentication") || "";
     const baseURL = getEndpoint() || "";
     const memoryCandidate = extractMemoryCandidate(userMessage);
+    window.dispatchEvent(new CustomEvent("demo-assistant-question-sent"));
 
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
     if (memoryCandidate) {
