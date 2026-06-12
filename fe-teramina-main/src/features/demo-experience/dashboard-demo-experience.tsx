@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef } from "react";
-import { Box, Button, Chip, LinearProgress, Paper, Stack, Typography } from "@mui/material";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, LinearProgress, Menu, MenuItem, Stack, Typography } from "@mui/material";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { MdCheck, MdOutlineExplore } from "react-icons/md";
+import { MdCheck, MdMoreVert } from "react-icons/md";
 import { useFarmHierarchy } from "features/farm/queries";
 import { useDashboardContextStore } from "store/dashboard-context.store";
 import {
@@ -61,20 +61,14 @@ export const DashboardDemoInitializer = () => {
   return null;
 };
 
-export const DemoExperiencePanel = () => {
+export const DemoExperienceTracker = () => {
   const location = useLocation();
-  const navigate = useNavigate();
   const { data: farms = [] } = useFarmHierarchy();
-  const { data: experience } = useDemoExperience();
   const context = useDashboardContextStore();
   const track = useTrackDemoEvent();
-  const update = useUpdateDemoExperience();
-  const reset = useResetDemoExperience();
   const lastRoute = useRef("");
   const selectedFarm = farms.find((farm) => farm.id === context.farm_id);
-  const selectedPond = selectedFarm?.ponds.find((pond) => pond.id === context.pond_id);
   const isDemo = !!selectedFarm?.is_demo;
-  const completed = useMemo(() => new Set(experience?.completed_steps || []), [experience?.completed_steps]);
 
   useEffect(() => {
     if (!isDemo || lastRoute.current === location.pathname) return;
@@ -91,23 +85,34 @@ export const DemoExperiencePanel = () => {
     return () => window.removeEventListener("demo-assistant-question-sent", handler);
   }, [isDemo]);
 
+  return null;
+};
+
+export const DemoContextActions = () => {
+  const navigate = useNavigate();
+  const { data: farms = [] } = useFarmHierarchy();
+  const { data: experience } = useDemoExperience();
+  const context = useDashboardContextStore();
+  const track = useTrackDemoEvent();
+  const update = useUpdateDemoExperience();
+  const reset = useResetDemoExperience();
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const selectedFarm = farms.find((farm) => farm.id === context.farm_id);
+  const isDemo = !!selectedFarm?.is_demo;
+  const completed = useMemo(() => new Set(experience?.completed_steps || []), [experience?.completed_steps]);
+
+  useEffect(() => {
+    if (isDemo && experience && !experience.checklist_dismissed) setGuideOpen(true);
+  }, [isDemo, experience?.checklist_dismissed]);
+
   if (!isDemo || !experience) return null;
 
-  const compare = () => {
-    const nextScenario = selectedPond?.demo_scenario === "healthy" ? "at_risk" : "healthy";
-    const pond = selectedFarm.ponds.find((item) => item.demo_scenario === nextScenario);
-    const cycle = pond?.cycles.find((item) => item.dashboard_ready) || pond?.cycles[0];
-    if (!pond || !cycle) return;
-    context.setContext({
-      farm_id: selectedFarm.id,
-      farm_name: selectedFarm.name,
-      pond_id: pond.id,
-      pond_name: pond.name,
-      cycle_id: cycle.id,
-      cycle_name: cycle.name,
+  const closeGuide = () => {
+    setGuideOpen(false);
+    update.mutate(true, {
+      onSuccess: () => track.mutate({ eventName: "demo_checklist_dismissed" }),
     });
-    track.mutate({ eventName: "demo_context_selected", properties: { scenario: nextScenario } });
-    window.location.reload();
   };
 
   const resetDemo = async () => {
@@ -121,64 +126,46 @@ export const DemoExperiencePanel = () => {
   };
 
   return (
-    <Paper
-      variant="outlined"
-      sx={{
-        mb: 2.5,
-        p: { xs: 1.5, md: 2 },
-        borderColor: "rgba(71, 77, 164, 0.24)",
-        borderRadius: 2,
-        background: "linear-gradient(135deg, rgba(71, 77, 164, 0.06), rgba(255, 255, 255, 0.96) 45%)",
-      }}
-    >
-      <Stack direction={{ xs: "column", lg: "row" }} spacing={1.5} sx={{ justifyContent: "space-between", alignItems: { lg: "center" } }}>
-        <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
-          <Box sx={{ display: "grid", placeItems: "center", width: 36, height: 36, borderRadius: 1.5, color: "primary.main", bgcolor: "rgba(71, 77, 164, 0.08)" }}>
-            <MdOutlineExplore size={22} />
-          </Box>
-          <Box>
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Explore with sample data</Typography>
-              <Chip size="small" color="info" label="Demo mode" />
-            </Stack>
-            <Typography variant="body2" color="text.secondary">Editable sample farm. Your real farm is not affected.</Typography>
-          </Box>
-        </Stack>
-        <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap" }}>
-          <Button size="small" variant="contained" onClick={compare}>Compare scenarios</Button>
-          <Button size="small" component={Link} to="/dashboard/farm-management" variant="outlined">Add my farm</Button>
-          {experience.checklist_dismissed && (
-            <Button
-              size="small"
-              variant="text"
-              onClick={() => update.mutate(false, {
-                onSuccess: () => track.mutate({ eventName: "demo_checklist_reopened" }),
-              })}
-            >
-              Show guide
-            </Button>
-          )}
-          <Button size="small" variant="text" color="warning" disabled={reset.isPending} onClick={resetDemo}>Reset</Button>
-        </Stack>
+    <>
+      <Stack direction="row" spacing={0.25} sx={{ alignItems: "center", flexShrink: 0 }}>
+        <Chip size="small" color="info" label="Demo" />
+        <IconButton size="small" aria-label="Demo options" onClick={(event) => setAnchorEl(event.currentTarget)}>
+          <MdMoreVert />
+        </IconButton>
       </Stack>
-      {!experience.checklist_dismissed && (
-        <Box sx={{ mt: 1.75, pt: 1.5, borderTop: "1px solid", borderColor: "divider" }}>
+      <Menu anchorEl={anchorEl} open={!!anchorEl} onClose={() => setAnchorEl(null)}>
+        <MenuItem onClick={() => {
+          setAnchorEl(null);
+          setGuideOpen(true);
+          track.mutate({ eventName: "demo_checklist_reopened" });
+        }}>
+          Exploration guide
+        </MenuItem>
+        <MenuItem component={Link} to="/dashboard/farm-management" onClick={() => setAnchorEl(null)}>Add my farm</MenuItem>
+        <MenuItem
+          disabled={reset.isPending}
+          onClick={() => {
+            setAnchorEl(null);
+            resetDemo();
+          }}
+          sx={{ color: "warning.main" }}
+        >
+          Reset demo data
+        </MenuItem>
+      </Menu>
+      <Dialog open={guideOpen} onClose={closeGuide} maxWidth="md" fullWidth>
+        <DialogTitle>Explore Teramina</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Follow these steps using editable sample data. Use the Pond selector to compare Healthy and At Risk scenarios.
+          </Typography>
           <Stack direction="row" spacing={2} sx={{ justifyContent: "space-between", alignItems: "center", mb: 1 }}>
             <Typography variant="body2" sx={{ fontWeight: 700 }}>
               Quick start <Typography component="span" variant="caption" color="text.secondary">{completed.size}/{STEPS.length} complete</Typography>
             </Typography>
-            <Button
-              size="small"
-              color="inherit"
-              onClick={() => update.mutate(true, {
-                onSuccess: () => track.mutate({ eventName: "demo_checklist_dismissed" }),
-              })}
-            >
-              Hide guide
-            </Button>
           </Stack>
-          <LinearProgress variant="determinate" value={(completed.size / STEPS.length) * 100} sx={{ mb: 1.25, height: 4, borderRadius: 4 }} />
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(4, minmax(0, 1fr))" }, gap: 0.75 }}>
+          <LinearProgress variant="determinate" value={(completed.size / STEPS.length) * 100} sx={{ mb: 1.5, height: 4, borderRadius: 4 }} />
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" }, gap: 1 }}>
             {STEPS.map((step, index) => {
               const isComplete = completed.has(step.key);
               return (
@@ -189,11 +176,14 @@ export const DemoExperiencePanel = () => {
                   color={isComplete ? "success" : "primary"}
                   component={step.to ? Link : "button"}
                   to={step.to}
-                  onClick={step.action === "assistant" ? () => window.dispatchEvent(new CustomEvent("open-agent-chat")) : undefined}
+                  onClick={() => {
+                    closeGuide();
+                    if (step.action === "assistant") window.dispatchEvent(new CustomEvent("open-agent-chat"));
+                  }}
                   startIcon={isComplete ? <MdCheck /> : <Box component="span" sx={{ fontSize: 12, fontWeight: 700 }}>{index + 1}</Box>}
                   sx={{
                     justifyContent: "flex-start",
-                    minHeight: 38,
+                    minHeight: 42,
                     px: 1,
                     textAlign: "left",
                     bgcolor: isComplete ? "rgba(46, 125, 50, 0.08)" : "rgba(71, 77, 164, 0.05)",
@@ -205,8 +195,11 @@ export const DemoExperiencePanel = () => {
               );
             })}
           </Box>
-        </Box>
-      )}
-    </Paper>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeGuide}>Close guide</Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 };
