@@ -26,7 +26,7 @@ function getActiveLabelKey(path) {
   return null;
 }
 
-const MenuList = ({ menus, activeLabelKey, styles }) => (
+const MenuList = ({ menus, activeLabelKey, styles, onNavigate }) => (
   <>
     <div className={styles.sidebarHeader}>
       <Typography variant="h2">
@@ -40,19 +40,24 @@ const MenuList = ({ menus, activeLabelKey, styles }) => (
       {menus.map((menu, key) => {
         const isActive = menu.labelKey === activeLabelKey;
         return (
-          <Link
-            to={menu.path}
-            key={key}
-            className={classNames(
-              styles.sidebarMenu,
-              isActive ? styles.sidebarMenuActive : ""
+          <div key={menu.path}>
+            {(key === 0 || menu.group !== menus[key - 1].group) && (
+              <Typography className={styles.sidebarGroup}>{menu.group}</Typography>
             )}
-          >
-            <Button fullWidth>
-              {menu.icon}
-              {menu.label}
-            </Button>
-          </Link>
+            <Link
+              to={menu.path}
+              className={classNames(
+                styles.sidebarMenu,
+                isActive ? styles.sidebarMenuActive : ""
+              )}
+              onClick={onNavigate}
+            >
+              <Button fullWidth>
+                {menu.icon}
+                {menu.label}
+              </Button>
+            </Link>
+          </div>
         );
       })}
     </div>
@@ -72,6 +77,7 @@ const Sidebar = ({ open, setOpen, activePath }) => {
       icon: route.icon,
       label: t(route.label),
       labelKey: route.label,
+      group: t(route.group || "MENU_GROUP.OTHER"),
     }));
 
   return (
@@ -85,7 +91,7 @@ const Sidebar = ({ open, setOpen, activePath }) => {
           paper: styles.sidebarDrawer,
         }}
       >
-        <MenuList menus={menus} activeLabelKey={activeLabelKey} styles={styles} />
+        <MenuList menus={menus} activeLabelKey={activeLabelKey} styles={styles} onNavigate={() => setOpen(false)} />
       </SwipeableDrawer>
       <div className={styles.sidebar}>
         <MenuList menus={menus} activeLabelKey={activeLabelKey} styles={styles} />

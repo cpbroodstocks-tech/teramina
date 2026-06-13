@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, LinearProgress, Menu, MenuItem, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, LinearProgress, Menu, MenuItem, Paper, Stack, Typography } from "@mui/material";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { MdCheck, MdMoreVert } from "react-icons/md";
 import { useFarmHierarchy } from "features/farm/queries";
 import { useDashboardContextStore } from "store/dashboard-context.store";
 import {
   useDemoExperience,
+  useActivationStatus,
   useResetDemoExperience,
   useTrackDemoEvent,
   useUpdateDemoExperience,
@@ -59,6 +60,42 @@ export const DashboardDemoInitializer = () => {
     }
   }, [experience, farms]);
   return null;
+};
+
+export const RealDataActivation = () => {
+  const { data: activation, isLoading } = useActivationStatus();
+  if (isLoading || !activation || activation.complete) return null;
+  const completed = (activation.stages || []).filter((stage) => stage.complete).length;
+  const action = activation.recommended_next_action;
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2, mb: 2, borderColor: "warning.light", bgcolor: "warning.50" }}>
+      <Stack spacing={1.25}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ justifyContent: "space-between", alignItems: { sm: "center" } }}>
+          <Box>
+            <Typography sx={{ fontWeight: 700 }}>Activate your real farm</Typography>
+            <Typography variant="body2" color="text.secondary">{activation.blocking_reason}</Typography>
+          </Box>
+          {action && <Button component={Link} to={action.route} variant="contained">{action.label}</Button>}
+        </Stack>
+        <LinearProgress variant="determinate" value={(completed / Math.max(activation.stages.length, 1)) * 100} />
+        <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap" }}>
+          {(activation.stages || []).map((stage) => (
+            <Chip
+              key={stage.key}
+              size="small"
+              color={stage.complete ? "success" : "default"}
+              variant={stage.complete ? "filled" : "outlined"}
+              label={stage.label}
+            />
+          ))}
+        </Stack>
+        {activation.context && !activation.sheet_connected && (
+          <Alert severity="info">Google Sheets is recommended. Manual cycle-data entry remains available on the cycle Data tab.</Alert>
+        )}
+      </Stack>
+    </Paper>
+  );
 };
 
 export const DemoExperienceTracker = () => {
@@ -121,7 +158,6 @@ export const DemoContextActions = () => {
     if (result?.demo_context) {
       context.setContext(result.demo_context);
       navigate("/dashboard/today", { replace: true });
-      window.location.reload();
     }
   };
 

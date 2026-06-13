@@ -7,14 +7,14 @@ const useStyles = makeStyles()((theme) => ({
     flexDirection: "column",
     verticalAlign: "middle",
     textAlign: "center",
-    height: "50vh",
+    minHeight: "50vh",
     justifyContent: "center",
   },
   lgError: {
     "& img": {
-      height: "400px",
+      height: "220px",
       [theme.breakpoints.down("sm")]: {
-        height: "300px",
+        height: "180px",
       },
     },
         

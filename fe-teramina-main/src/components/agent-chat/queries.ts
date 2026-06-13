@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { axios } from "helper/axios";
-import type { AgentAlert, AgentMemory, AgentMemoryGraph, AgentMessage, AgentPageContext, AgentTask, ChatPayload } from "components/agent-chat/types";
+import type { AgentAlert, AgentMemory, AgentMemoryGraph, AgentMessage, AgentPageContext, AgentTask, ChatPayload, ControlLoop } from "components/agent-chat/types";
 
 export const useAgentAlerts = (enabled: boolean) =>
   useQuery<AgentAlert[]>({
@@ -50,8 +50,12 @@ export const useDismissAlert = () => {
 
 export const useResolveAlert = () => {
   const invalidate = useInvalidateAgentAlerts();
-  return useMutation<void, Error, string>({
-    mutationFn: (alertId) => axios.patch(`/agent/alerts/${alertId}/resolve`),
+  return useMutation<void, Error, string | { alertId: string; resolutionNote?: string }>({
+    mutationFn: (input) => {
+      const alertId = typeof input === "string" ? input : input.alertId;
+      const resolutionNote = typeof input === "string" ? "" : input.resolutionNote || "";
+      return axios.patch(`/agent/alerts/${alertId}/resolve`, null, { params: { resolution_note: resolutionNote } });
+    },
     onSuccess: () => invalidate(),
   });
 };
@@ -72,6 +76,70 @@ export const useCompleteAgentTask = () => {
   const invalidate = useInvalidateAgentTasks();
   return useMutation<void, Error, string>({
     mutationFn: (taskId) => axios.patch(`/agent/tasks/${taskId}/complete`),
+    onSuccess: () => invalidate(),
+  });
+};
+
+export const useControlLoops = ({
+  enabled = true,
+  farm_id,
+  cycle_id,
+  include_closed = false,
+}: {
+  enabled?: boolean;
+  farm_id?: string;
+  cycle_id?: string;
+  include_closed?: boolean;
+}) =>
+  useQuery<ControlLoop[]>({
+    queryKey: ["agent-control-loops", farm_id || "", cycle_id || "", include_closed],
+    queryFn: () =>
+      axios
+        .get("/agent/control-loops", { params: { farm_id, cycle_id, include_closed } })
+        .then((r: any) => r?.payload?.control_loops ?? []),
+    enabled,
+  });
+
+const useInvalidateControlLoops = () => {
+  const queryClient = useQueryClient();
+  return () => {
+    queryClient.invalidateQueries({ queryKey: ["agent-control-loops"] });
+    queryClient.invalidateQueries({ queryKey: ["agent-today"] });
+    queryClient.invalidateQueries({ queryKey: ["agent-pond-timeline"] });
+    queryClient.invalidateQueries({ queryKey: ["agent-tasks"] });
+    queryClient.invalidateQueries({ queryKey: ["agent-memories"] });
+  };
+};
+
+export const useCreateControlLoop = () => {
+  const invalidate = useInvalidateControlLoops();
+  return useMutation<ControlLoop, Error, {
+    farm_id?: string;
+    pond_id?: string;
+    cycle_id?: string;
+    source_type: ControlLoop["source_type"];
+    source_id?: string;
+    action: string;
+    reason?: string;
+    expected_benefit?: string;
+    tradeoff?: string;
+    confidence?: ControlLoop["confidence"];
+    next_check_at?: string | null;
+    success_signal?: string;
+  }>({
+    mutationFn: (payload) => axios.post("/agent/control-loops", payload).then((r: any) => r?.payload),
+    onSuccess: () => invalidate(),
+  });
+};
+
+export const useRecordControlLoopOutcome = () => {
+  const invalidate = useInvalidateControlLoops();
+  return useMutation<ControlLoop, Error, {
+    loopId: string;
+    outcome: string;
+    outcome_status: ControlLoop["outcome_status"];
+  }>({
+    mutationFn: ({ loopId, ...payload }) => axios.patch(`/agent/control-loops/${loopId}/outcome`, payload).then((r: any) => r?.payload),
     onSuccess: () => invalidate(),
   });
 };

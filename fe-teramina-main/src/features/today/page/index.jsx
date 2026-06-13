@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Alert,
@@ -9,9 +10,15 @@ import {
   CircularProgress,
   Container,
   Divider,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
+  MenuItem,
   Paper,
   Stack,
+  TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -29,9 +36,12 @@ import {
   useDismissAlert,
   useResolveAlert,
   useCompleteAgentTask,
+  useCreateControlLoop,
   useInvalidateAgentAlerts,
   useInvalidateAgentTasks,
+  useRecordControlLoopOutcome,
 } from "components/agent-chat/queries";
+import { useDashboardContextStore } from "store/dashboard-context.store";
 import { useToastStore } from "store/toast.store";
 
 const STATUS_COLORS = {
@@ -64,6 +74,7 @@ const SectionTitle = ({ children, count }) => (
 
 const PondCard = ({ pond }) => {
   const navigate = useNavigate();
+  const setContext = useDashboardContextStore((state) => state.setContext);
   const status = worstStatus(pond.do_status, pond.nh3_status);
   const colors = STATUS_COLORS[status];
 
@@ -149,9 +160,11 @@ const PondCard = ({ pond }) => {
               variant="outlined"
               startIcon={<MdSmartToy size={16} />}
               onClick={() => {
-                localStorage.setItem("pond_id", pond.pond_id);
-                localStorage.setItem("pond_name", pond.pond_name);
-                localStorage.setItem("cycle_id", pond.active_cycle_id);
+                setContext({
+                  pond_id: pond.pond_id,
+                  pond_name: pond.pond_name,
+                  cycle_id: pond.active_cycle_id,
+                });
                 window.dispatchEvent(new CustomEvent("open-agent-chat", {
                   detail: { message: `What should I do about ${pond.pond_name} today? DO: ${pond.do_avg ?? "?"} mg/L, NH3: ${pond.nh3 ?? "?"} mg/L, DOC: ${pond.current_doc ?? "?"}` },
                 }));
@@ -184,14 +197,20 @@ const AlertRow = ({ alert, onResolve, onDismiss }) => {
         <Tooltip title="Mark resolved">
           <IconButton
             size="small"
-            onClick={() => onResolve(alert.id)}
+            onClick={() => onResolve(alert)}
+            aria-label={`Resolve alert: ${alert.message}`}
             sx={{ color: "#2e7d32", border: "1px solid", borderColor: "divider" }}
           >
             <MdDone size={18} />
           </IconButton>
         </Tooltip>
         <Tooltip title="Dismiss">
-          <IconButton size="small" onClick={() => onDismiss(alert.id)} sx={{ border: "1px solid", borderColor: "divider" }}>
+          <IconButton
+            size="small"
+            onClick={() => onDismiss(alert.id)}
+            aria-label={`Dismiss alert: ${alert.message}`}
+            sx={{ border: "1px solid", borderColor: "divider" }}
+          >
             <MdDeleteOutline size={18} />
           </IconButton>
         </Tooltip>
@@ -220,6 +239,7 @@ const TaskRow = ({ task, onComplete }) => {
         <IconButton
           size="small"
           onClick={() => onComplete(task.id)}
+          aria-label={`Complete task: ${task.title}`}
           sx={{ color: "#2e7d32", border: "1px solid", borderColor: "divider" }}
         >
           <MdCheckCircleOutline size={20} />
@@ -229,9 +249,40 @@ const TaskRow = ({ task, onComplete }) => {
   );
 };
 
+const ControlLoopRow = ({ loop, onRecordOutcome }) => (
+  <Stack direction={{ xs: "column", sm: "row" }} gap={1.25} sx={{ alignItems: { sm: "center" }, py: 1.25 }}>
+    <Box flex={1}>
+      <Typography variant="body2" fontWeight={700}>{loop.action}</Typography>
+      <Typography variant="caption" color="text.secondary">
+        {loop.next_check_at ? `Check ${new Date(loop.next_check_at).toLocaleString()}` : "Outcome check not scheduled"}
+        {loop.success_signal ? ` · Success: ${loop.success_signal}` : ""}
+      </Typography>
+    </Box>
+    <Button size="small" variant="outlined" onClick={() => onRecordOutcome(loop)}>
+      Record outcome
+    </Button>
+  </Stack>
+);
+
+const tomorrowLocalInput = () => {
+  const value = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  value.setMinutes(value.getMinutes() - value.getTimezoneOffset());
+  return value.toISOString().slice(0, 16);
+};
+
 const TodayView = () => {
   const { setToast } = useToastStore();
-  const farmId = localStorage.getItem("farm_id") || "";
+  const farmId = useDashboardContextStore((state) => state.farm_id);
+  const [selectedAlert, setSelectedAlert] = useState(null);
+  const [selectedLoop, setSelectedLoop] = useState(null);
+  const [actionForm, setActionForm] = useState({
+    action: "",
+    expected_benefit: "",
+    next_check_at: tomorrowLocalInput(),
+    success_signal: "",
+    confidence: "medium",
+  });
+  const [outcomeForm, setOutcomeForm] = useState({ outcome: "", outcome_status: "worked" });
 
   const { data, isLoading, isError, refetch } = useGetTodaySummary(farmId || null);
   const invalidateAlerts = useInvalidateAgentAlerts();
@@ -239,14 +290,39 @@ const TodayView = () => {
   const { mutateAsync: resolveAlert } = useResolveAlert();
   const { mutateAsync: dismissAlert } = useDismissAlert();
   const { mutateAsync: completeTask } = useCompleteAgentTask();
+  const { mutateAsync: createControlLoop, isPending: isCreatingLoop } = useCreateControlLoop();
+  const { mutateAsync: recordOutcome, isPending: isRecordingOutcome } = useRecordControlLoopOutcome();
 
-  const handleResolve = async (alertId) => {
+  const openResolve = (alert) => {
+    setSelectedAlert(alert);
+    setActionForm({
+      action: "",
+      expected_benefit: "",
+      next_check_at: tomorrowLocalInput(),
+      success_signal: "",
+      confidence: "medium",
+    });
+  };
+
+  const handleResolve = async () => {
     try {
-      await resolveAlert(alertId);
+      await createControlLoop({
+        source_type: "alert",
+        source_id: selectedAlert.id,
+        action: actionForm.action,
+        reason: selectedAlert.message,
+        expected_benefit: actionForm.expected_benefit,
+        next_check_at: actionForm.next_check_at ? new Date(actionForm.next_check_at).toISOString() : null,
+        success_signal: actionForm.success_signal,
+        confidence: actionForm.confidence,
+      });
+      await resolveAlert({ alertId: selectedAlert.id, resolutionNote: actionForm.action });
       invalidateAlerts();
       refetch();
+      setSelectedAlert(null);
+      setToast({ open: true, variant: "success", text: "Action and follow-up recorded" });
     } catch {
-      setToast({ open: true, variant: "error", text: "Failed to resolve alert" });
+      setToast({ open: true, variant: "error", text: "Failed to record action" });
     }
   };
 
@@ -267,6 +343,18 @@ const TodayView = () => {
       refetch();
     } catch {
       setToast({ open: true, variant: "error", text: "Failed to complete task" });
+    }
+  };
+
+  const handleRecordOutcome = async () => {
+    try {
+      await recordOutcome({ loopId: selectedLoop.id, ...outcomeForm });
+      setSelectedLoop(null);
+      setOutcomeForm({ outcome: "", outcome_status: "worked" });
+      refetch();
+      setToast({ open: true, variant: "success", text: "Outcome recorded for future recommendations" });
+    } catch {
+      setToast({ open: true, variant: "error", text: "Failed to record outcome" });
     }
   };
 
@@ -301,6 +389,7 @@ const TodayView = () => {
         <IconButton
           onClick={() => refetch()}
           title="Refresh"
+          aria-label="Refresh today's summary"
           sx={{ alignSelf: { xs: "flex-start", sm: "center" }, border: "1px solid", borderColor: "divider" }}
         >
           <MdRefresh />
@@ -325,7 +414,7 @@ const TodayView = () => {
               <Paper variant="outlined" sx={{ ...panelSx, borderColor: "#ef5350", background: "#fff8f8", px: 2.5 }}>
                 <Stack divider={<Divider />}>
                   {criticalAlerts.map((a) => (
-                    <AlertRow key={a.id} alert={a} onResolve={handleResolve} onDismiss={handleDismiss} />
+                    <AlertRow key={a.id} alert={a} onResolve={openResolve} onDismiss={handleDismiss} />
                   ))}
                 </Stack>
               </Paper>
@@ -357,7 +446,7 @@ const TodayView = () => {
               <Paper variant="outlined" sx={{ ...panelSx, px: 2.5 }}>
                 <Stack divider={<Divider />}>
                   {otherAlerts.map((a) => (
-                    <AlertRow key={a.id} alert={a} onResolve={handleResolve} onDismiss={handleDismiss} />
+                    <AlertRow key={a.id} alert={a} onResolve={openResolve} onDismiss={handleDismiss} />
                   ))}
                 </Stack>
               </Paper>
@@ -378,13 +467,111 @@ const TodayView = () => {
             </Box>
           )}
 
-          {criticalAlerts.length === 0 && otherAlerts.length === 0 && data.tasks?.length === 0 && (
+          {data.control_loops?.length > 0 && (
+            <Box>
+              <SectionTitle count={data.control_loops.length}>Actions Awaiting Outcome</SectionTitle>
+              <Paper variant="outlined" sx={{ ...panelSx, px: 2.5 }}>
+                <Stack divider={<Divider />}>
+                  {data.control_loops.map((loop) => (
+                    <ControlLoopRow key={loop.id} loop={loop} onRecordOutcome={setSelectedLoop} />
+                  ))}
+                </Stack>
+              </Paper>
+            </Box>
+          )}
+
+          {criticalAlerts.length === 0 && otherAlerts.length === 0 && data.tasks?.length === 0 && data.control_loops?.length === 0 && (
             <Alert severity="success" icon={<MdCheckCircleOutline />}>
               All clear — no urgent alerts or tasks due today.
             </Alert>
           )}
         </Stack>
       )}
+
+      <Dialog open={!!selectedAlert} onClose={() => setSelectedAlert(null)} fullWidth maxWidth="sm">
+        <DialogTitle>Record action and follow-up</DialogTitle>
+        <DialogContent>
+          <Stack gap={2} sx={{ pt: 1 }}>
+            <Alert severity={selectedAlert?.severity === "critical" ? "error" : "warning"}>{selectedAlert?.message}</Alert>
+            <TextField
+              label="Action taken"
+              value={actionForm.action}
+              onChange={(event) => setActionForm((prev) => ({ ...prev, action: event.target.value }))}
+              required
+              multiline
+              minRows={2}
+              slotProps={{ htmlInput: { "aria-label": "Action taken" } }}
+            />
+            <TextField
+              label="Expected benefit"
+              value={actionForm.expected_benefit}
+              onChange={(event) => setActionForm((prev) => ({ ...prev, expected_benefit: event.target.value }))}
+            />
+            <TextField
+              label="Next check"
+              type="datetime-local"
+              value={actionForm.next_check_at}
+              onChange={(event) => setActionForm((prev) => ({ ...prev, next_check_at: event.target.value }))}
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+            <TextField
+              label="Success signal"
+              value={actionForm.success_signal}
+              onChange={(event) => setActionForm((prev) => ({ ...prev, success_signal: event.target.value }))}
+              placeholder="Example: DO remains above 5 mg/L"
+            />
+            <TextField
+              select
+              label="Confidence"
+              value={actionForm.confidence}
+              onChange={(event) => setActionForm((prev) => ({ ...prev, confidence: event.target.value }))}
+            >
+              {["low", "medium", "high"].map((value) => <MenuItem key={value} value={value}>{value}</MenuItem>)}
+            </TextField>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSelectedAlert(null)}>Cancel</Button>
+          <Button variant="contained" onClick={handleResolve} disabled={!actionForm.action.trim() || isCreatingLoop}>
+            {isCreatingLoop ? "Recording..." : "Record action"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!selectedLoop} onClose={() => setSelectedLoop(null)} fullWidth maxWidth="sm">
+        <DialogTitle>Record action outcome</DialogTitle>
+        <DialogContent>
+          <Stack gap={2} sx={{ pt: 1 }}>
+            <Typography fontWeight={700}>{selectedLoop?.action}</Typography>
+            <TextField
+              select
+              label="Result"
+              value={outcomeForm.outcome_status}
+              onChange={(event) => setOutcomeForm((prev) => ({ ...prev, outcome_status: event.target.value }))}
+            >
+              <MenuItem value="worked">Worked</MenuItem>
+              <MenuItem value="partial">Partially worked</MenuItem>
+              <MenuItem value="failed">Did not work</MenuItem>
+              <MenuItem value="unknown">Too early to tell</MenuItem>
+            </TextField>
+            <TextField
+              label="What happened?"
+              value={outcomeForm.outcome}
+              onChange={(event) => setOutcomeForm((prev) => ({ ...prev, outcome: event.target.value }))}
+              multiline
+              minRows={3}
+              required
+              slotProps={{ htmlInput: { "aria-label": "What happened?" } }}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSelectedLoop(null)}>Cancel</Button>
+          <Button variant="contained" onClick={handleRecordOutcome} disabled={!outcomeForm.outcome.trim() || isRecordingOutcome}>
+            {isRecordingOutcome ? "Recording..." : "Save outcome"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

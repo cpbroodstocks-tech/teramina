@@ -5,6 +5,7 @@ from teramina.dashboard.services.readiness import is_dashboard_ready_cycle
 from teramina.farm.models.farm_model import Farm
 from teramina.helpers.default_data_updater import DataSeeder
 from teramina.helpers.demo_artifacts import DEMO_BUNDLE_VERSION
+from teramina.google_sheets.models.sheet_integration_model import SheetIntegration
 from teramina.pond.models.pond_model import Pond
 from teramina.schemas.general_schema import DataErrorSchema, DataSuccessSchema
 
@@ -63,6 +64,61 @@ def user_has_real_dashboard_data(user_id):
 
 
 class DemoExperienceService:
+    @staticmethod
+    def activation_status(user_id):
+        farms = list(Farm.objects(
+            user_id=user_id,
+            demo_bundle_version__in=["", None],
+            archived_at=None,
+        ).order_by("-created_at"))
+        farm = farms[0] if farms else None
+        ponds = list(Pond.objects(farm_id=str(farm.id), archived_at=None).order_by("created_at")) if farm else []
+        pond = ponds[0] if ponds else None
+        cycles = list(Cycle.objects(pond_id=str(pond.id), archived_at=None).order_by("-start_date")) if pond else []
+        cycle = cycles[0] if cycles else None
+        ready = bool(cycle and is_dashboard_ready_cycle(str(cycle.id)))
+        sheet = SheetIntegration.objects(cycle_id=str(cycle.id), is_active=True).first() if cycle else None
+
+        stages = [
+            {"key": "farm", "label": "Create farm", "complete": bool(farm)},
+            {"key": "pond", "label": "Create pond", "complete": bool(pond)},
+            {"key": "cycle", "label": "Create cycle", "complete": bool(cycle)},
+            {"key": "data_source", "label": "Connect or enter data", "complete": bool(sheet or ready)},
+            {"key": "dashboard_ready", "label": "Dashboard ready", "complete": ready},
+        ]
+        if not farm:
+            next_action = {"key": "create_farm", "label": "Create your farm", "route": "/dashboard/farm-management"}
+            blocker = "Create a real farm to begin activation."
+        elif not pond:
+            next_action = {"key": "create_pond", "label": "Add a pond", "route": f"/dashboard/pond/{farm.id}"}
+            blocker = "Add a pond to your farm."
+        elif not cycle:
+            next_action = {"key": "create_cycle", "label": "Add a cycle", "route": f"/dashboard/cycle/{pond.id}"}
+            blocker = "Add an active production cycle."
+        elif not ready:
+            next_action = {
+                "key": "add_data",
+                "label": "Connect or enter cycle data",
+                "route": f"/dashboard/cycle/detail/{cycle.id}?setup=sheets",
+            }
+            blocker = "Import or enter the records required by operational dashboards."
+        else:
+            next_action = {"key": "open_today", "label": "Open Today", "route": "/dashboard/today"}
+            blocker = ""
+
+        return 200, DataSuccessSchema(
+            code=200,
+            message="OK",
+            payload={
+                "complete": ready,
+                "stages": stages,
+                "blocking_reason": blocker,
+                "recommended_next_action": next_action,
+                "context": _context(farm, pond, cycle) if farm and pond and cycle else None,
+                "sheet_connected": bool(sheet),
+            },
+        )
+
     @staticmethod
     def _state(user_id):
         return DemoExperienceState.objects(user_id=user_id).modify(

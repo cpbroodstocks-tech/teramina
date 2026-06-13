@@ -26,3 +26,9 @@ class CommercialInvoicePaidSchema(Schema):
     payment_reference: str = ""
     notes: str = ""
     access_expires_at: Optional[datetime] = None
+
+
+class CommercialInvoicePaymentSubmissionSchema(Schema):
+    payment_reference: str
+    payment_proof_url: str = ""
+    notes: str = ""

@@ -7,7 +7,7 @@ import { Stack, Typography } from "@mui/material";
 import { useStyles } from "./styles";
 import ContextSelector from "components/context-selector";
 import { useDashboardContextStore } from "store/dashboard-context.store";
-import { DashboardDemoInitializer, DemoContextActions, DemoExperienceTracker } from "features/demo-experience/dashboard-demo-experience";
+import { DashboardDemoInitializer, DemoContextActions, DemoExperienceTracker, RealDataActivation } from "features/demo-experience/dashboard-demo-experience";
 
 const ContextBar = () => {
   const { farm_name: farmName, pond_name: pondName, cycle_name: cycleName } = useDashboardContextStore();
@@ -38,6 +38,7 @@ const Dashboard = () => {
         <DemoExperienceTracker />
         <Header open={open} setOpen={setOpen} />
         <ContextBar />
+        <RealDataActivation />
         <main className={styles.maincontent}>
           <Suspense fallback={<Loader />}>
             <Outlet />

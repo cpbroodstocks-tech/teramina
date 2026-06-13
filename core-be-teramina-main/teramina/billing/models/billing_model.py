@@ -11,7 +11,7 @@ class CommercialInvoice(Document):
         default="content_access",
     )
     status = fields.StringField(
-        choices=["draft", "issued", "paid", "cancelled"],
+        choices=["draft", "issued", "payment_submitted", "paid", "cancelled"],
         default="issued",
     )
     description = fields.StringField(default="")
@@ -26,6 +26,8 @@ class CommercialInvoice(Document):
     paid_at = fields.DateTimeField(null=True)
     payment_method = fields.StringField(default="manual_transfer")
     payment_reference = fields.StringField(default="")
+    payment_proof_url = fields.StringField(default="")
+    payment_submitted_at = fields.DateTimeField(null=True)
     notes = fields.StringField(default="")
     created_at = fields.DateTimeField(default=datetime.now)
     updated_at = fields.DateTimeField(default=datetime.now)
@@ -55,6 +57,8 @@ class CommercialInvoice(Document):
             "paid_at": self.paid_at.isoformat() if self.paid_at else None,
             "payment_method": self.payment_method,
             "payment_reference": self.payment_reference,
+            "payment_proof_url": self.payment_proof_url,
+            "payment_submitted_at": self.payment_submitted_at.isoformat() if self.payment_submitted_at else None,
             "notes": self.notes,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,

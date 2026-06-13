@@ -48,3 +48,23 @@ class ExplainSchema(BaseModel):
     farm_id: str
     cycle_id: Optional[str] = ""
     pond_id: Optional[str] = ""
+
+
+class ControlLoopCreateSchema(BaseModel):
+    farm_id: Optional[str] = ""
+    pond_id: Optional[str] = ""
+    cycle_id: Optional[str] = ""
+    source_type: str = "manual"
+    source_id: Optional[str] = ""
+    action: str
+    reason: Optional[str] = ""
+    expected_benefit: Optional[str] = ""
+    tradeoff: Optional[str] = ""
+    confidence: str = "medium"
+    next_check_at: Optional[str] = None
+    success_signal: Optional[str] = ""
+
+
+class ControlLoopOutcomeSchema(BaseModel):
+    outcome: str
+    outcome_status: str = "unknown"

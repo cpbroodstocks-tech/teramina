@@ -6,6 +6,7 @@ import { http, HttpResponse } from "msw";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { server } from "../mocks/server";
 import TodayView from "pages/dashboard/today";
+import { useDashboardContextStore } from "store/dashboard-context.store";
 
 const mockSetToast = vi.fn();
 vi.mock("store/toast.store", () => ({
@@ -65,11 +66,12 @@ const todayPayload = {
         is_overdue: true,
       },
     ],
+    control_loops: [],
   },
 };
 
 function renderComponent() {
-  localStorage.setItem("farm_id", "farm-1");
+  useDashboardContextStore.getState().setContext({ farm_id: "farm-1" });
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -85,7 +87,7 @@ function renderComponent() {
 describe("TodayView", () => {
   beforeEach(() => {
     mockSetToast.mockClear();
-    localStorage.setItem("farm_id", "farm-1");
+    useDashboardContextStore.getState().setContext({ farm_id: "farm-1" });
   });
 
   it("renders pond name and DO chip in the pond grid", async () => {
@@ -150,7 +152,7 @@ describe("TodayView", () => {
     renderComponent();
     await screen.findByText("DO is critically low: 1.8 mg/L");
 
-    const dismissButtons = screen.getAllByRole("button", { name: "Dismiss" });
+    const dismissButtons = screen.getAllByRole("button", { name: /Dismiss alert/ });
     await userEvent.click(dismissButtons[0]);
 
     await waitFor(() => {
@@ -168,14 +170,17 @@ describe("TodayView", () => {
         resolvedId = params.id as string;
         return HttpResponse.json({ code: 200, message: "OK", payload: {} });
       }),
+      http.post("*/agent/control-loops", () => HttpResponse.json({ payload: { id: "loop-1" } })),
       http.get("*/agent/alerts", () => HttpResponse.json({ payload: { alerts: [] } }))
     );
 
     renderComponent();
     await screen.findByText("DO is critically low: 1.8 mg/L");
 
-    const resolveButtons = screen.getAllByRole("button", { name: "Mark resolved" });
+    const resolveButtons = screen.getAllByRole("button", { name: /Resolve alert/ });
     await userEvent.click(resolveButtons[0]);
+    await userEvent.type(screen.getByLabelText("Action taken"), "Turn on backup aerator");
+    await userEvent.click(screen.getByRole("button", { name: "Record action" }));
 
     await waitFor(() => {
       expect(resolvedId).toBe("alert-1");
@@ -183,7 +188,7 @@ describe("TodayView", () => {
   });
 
   it("shows no-farm message when farm_id is not set", () => {
-    localStorage.removeItem("farm_id");
+    useDashboardContextStore.getState().clearContext();
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });

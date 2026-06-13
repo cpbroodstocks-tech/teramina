@@ -14,11 +14,11 @@ import {
 } from "@mui/material";
 import {
   useAcceptBenchmarkConsent,
-  useAddAdvisoryCaseFile,
   useAdvisoryCase,
   useAdvisoryCases,
   useRevokeBenchmarkConsent,
   useServicePackages,
+  useUploadAdvisoryCaseFile,
 } from "./queries";
 import { servicePackageFallbacks } from "./catalog";
 
@@ -342,13 +342,8 @@ export const DashboardAdvisoryNewPage = () => {
 export const DashboardAdvisoryDetailPage = () => {
   const { case_id = "" } = useParams();
   const { data, isLoading, isError } = useAdvisoryCase(case_id);
-  const addFile = useAddAdvisoryCaseFile();
-  const [fileForm, setFileForm] = useState({
-    name: "",
-    url: "",
-    content_type: "",
-    description: "",
-  });
+  const uploadFile = useUploadAdvisoryCaseFile();
+  const [fileForm, setFileForm] = useState({ file: null, description: "" });
   const item = data?.case;
   const report = data?.report;
   const expertReviews = data?.expert_reviews || [];
@@ -359,8 +354,8 @@ export const DashboardAdvisoryDetailPage = () => {
   const benchmarkConsent = data?.benchmark_consent;
   const submitFile = async (event) => {
     event.preventDefault();
-    await addFile.mutateAsync({ caseId: case_id, payload: fileForm });
-    setFileForm({ name: "", url: "", content_type: "", description: "" });
+    await uploadFile.mutateAsync({ caseId: case_id, file: fileForm.file, description: fileForm.description });
+    setFileForm({ file: null, description: "" });
   };
 
   return (
@@ -383,20 +378,17 @@ export const DashboardAdvisoryDetailPage = () => {
               <FileList files={item.uploaded_files || []} />
               <Stack component="form" gap={1.5} onSubmit={submitFile}>
                 <Typography variant="h6">Attach Private File</Typography>
-                {addFile.isError && <Alert severity="error">Failed to attach file reference.</Alert>}
-                {addFile.isSuccess && <Alert severity="success">File reference attached.</Alert>}
-                <TextField
-                  label="File name"
-                  value={fileForm.name}
-                  onChange={(e) => setFileForm((prev) => ({ ...prev, name: e.target.value }))}
-                  required
-                />
-                <TextField
-                  label="Private file URL"
-                  value={fileForm.url}
-                  onChange={(e) => setFileForm((prev) => ({ ...prev, url: e.target.value }))}
-                  required
-                />
+                {uploadFile.isError && <Alert severity="error">Failed to upload private file.</Alert>}
+                {uploadFile.isSuccess && <Alert severity="success">Private file uploaded.</Alert>}
+                <Button variant="outlined" component="label">
+                  {fileForm.file?.name || "Select file"}
+                  <input
+                    hidden
+                    type="file"
+                    accept=".pdf,.csv,.xls,.xlsx,.doc,.docx,image/jpeg,image/png,image/webp"
+                    onChange={(event) => setFileForm((prev) => ({ ...prev, file: event.target.files?.[0] || null }))}
+                  />
+                </Button>
                 <TextField
                   label="Description"
                   value={fileForm.description}
@@ -404,8 +396,8 @@ export const DashboardAdvisoryDetailPage = () => {
                   multiline
                   minRows={2}
                 />
-                <Button type="submit" variant="outlined" disabled={addFile.isPending}>
-                  {addFile.isPending ? "Attaching..." : "Attach File"}
+                <Button type="submit" variant="outlined" disabled={uploadFile.isPending || !fileForm.file}>
+                  {uploadFile.isPending ? "Uploading..." : "Upload Private File"}
                 </Button>
               </Stack>
             </Stack>

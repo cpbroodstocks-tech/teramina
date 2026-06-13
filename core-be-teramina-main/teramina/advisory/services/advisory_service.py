@@ -1,6 +1,9 @@
+import os
 from datetime import datetime
 from uuid import uuid4
 
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from mongoengine.errors import NotUniqueError, ValidationError
 
 from teramina.content.models.content_model import ContentItem
@@ -1135,6 +1138,36 @@ class AdvisoryService:
         case.updated_at = datetime.now()
         case.save()
         return 200, DataSuccessSchema(code=200, message="Advisory file attached", payload={"case": case.to_dict(include_private=_is_admin(user))})
+
+    @staticmethod
+    def upload_case_file(user, case_id: str, file, description: str = ""):
+        case = AdvisoryCase.objects(id=case_id).first()
+        if not case:
+            return 404, DataErrorSchema(code=404, message="Advisory case not found")
+        if not _can_access_case(user, case):
+            return 401, DataErrorSchema(code=401, message="Unauthorized")
+
+        original_name = os.path.basename(file.name)
+        storage_name = f"advisory/{case.user_id}/{case_id}/{uuid4().hex}-{original_name}"
+        saved_name = default_storage.save(storage_name, ContentFile(file.read()))
+        file_data = AdvisoryService._normalize_case_file(
+            {
+                "name": original_name,
+                "url": default_storage.url(saved_name),
+                "content_type": file.content_type,
+                "description": description,
+            },
+            case,
+            str(user.id),
+        )
+        case.uploaded_files = list(case.uploaded_files or []) + [file_data]
+        case.updated_at = datetime.now()
+        case.save()
+        return 200, DataSuccessSchema(
+            code=200,
+            message="Advisory file uploaded",
+            payload={"case": case.to_dict(include_private=_is_admin(user))},
+        )
 
     @staticmethod
     def _normalize_case_file(file_ref, case: AdvisoryCase, uploaded_by: str):

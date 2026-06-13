@@ -2,6 +2,7 @@
 
 import re
 from ninja import Schema
+from typing import Optional
 from pydantic import validator
 
 
@@ -74,3 +75,22 @@ class RegisterSchema(Schema):
             raise ValueError("Please, use valid number for Indonesia provider")
 
         return value
+
+
+class BetaAccessRequestCreateSchema(Schema):
+    email: str
+    name: str = ""
+    source: str = "landing"
+
+    @validator("email")
+    @classmethod
+    def validate_email(cls, value):
+        email_pattern = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
+        if not re.match(email_pattern, value):
+            raise ValueError("invalid email format")
+        return value
+
+
+class BetaAccessRequestUpdateSchema(Schema):
+    status: str
+    admin_note: Optional[str] = ""

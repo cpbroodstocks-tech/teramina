@@ -66,3 +66,20 @@ export const useMarkInvoicePaid = () => {
     },
   });
 };
+
+export const useSubmitInvoicePayment = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      invoiceId,
+      payload,
+    }: {
+      invoiceId: string;
+      payload: { payment_reference: string; payment_proof_url?: string; notes?: string };
+    }) => axios.post(`/billing/invoices/${invoiceId}/payment-submission`, payload).then((r: any) => r?.payload?.invoice ?? null),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: billingKeys.adminInvoices });
+      queryClient.invalidateQueries({ queryKey: billingKeys.myInvoices });
+    },
+  });
+};

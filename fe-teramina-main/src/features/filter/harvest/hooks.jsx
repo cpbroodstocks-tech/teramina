@@ -6,6 +6,7 @@ import { useToastStore } from "store/toast.store";
 import { useTranslation } from "react-i18next";
 import { fetchFilteredData, fetchFilterUrl } from "features/filter/queries";
 import { loadSharedFilterContext, persistDashboardSelection } from "features/filter/shared-context";
+import { useDashboardContextStore } from "store/dashboard-context.store";
 
 const FILTER_SCHEMA = z.object({
   farm_id: z.string().min(1),
@@ -14,6 +15,7 @@ const FILTER_SCHEMA = z.object({
 });
 
 const useFilter = (api) => {
+  const contextKey = useDashboardContextStore((state) => `${state.farm_id}:${state.pond_id}:${state.cycle_id}`);
   const { t } = useTranslation();
   const { setToast: toast } = useToastStore();
   const filterQueryParams = useRef({
@@ -206,6 +208,7 @@ const useFilter = (api) => {
         setValue("farm_id", shared.values.farm_id);
         setValue("pond_id", shared.values.pond_id);
         setValue("cycle_id", shared.values.cycle_id);
+        setSelectedFilter({ cycle_id: shared.values.cycle_id });
 
         setFilter((previousValue) => ({
           ...previousValue,
@@ -215,6 +218,7 @@ const useFilter = (api) => {
           },
           error: false,
         }));
+        await fetchMVPWithFilter(shared.values);
       } catch (err) {
         setFilter((previousValue) => ({
           ...previousValue,
@@ -228,7 +232,7 @@ const useFilter = (api) => {
       }
     };
     fetchfilterListItem();
-  }, []);
+  }, [contextKey]);
 
   return {
     ...filterList,

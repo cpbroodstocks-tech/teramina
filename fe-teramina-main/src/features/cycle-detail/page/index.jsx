@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Box, Breadcrumbs, Button, IconButton, Tab, Tabs, Tooltip, Typography } from "@mui/material";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import TimelineIcon from "@mui/icons-material/Timeline";
@@ -23,8 +23,9 @@ const PopulateContent = () => {
 };
 
 const CycleDetail = () => {
+  const location = useLocation();
   const [tab, setTab] = useState(0);
-  const [sheetsOpen, setSheetsOpen] = useState(false);
+  const [sheetsOpen, setSheetsOpen] = useState(() => new URLSearchParams(location.search).get("setup") === "sheets");
   const { data } = useCycleDataList();
   const { cycle_id } = useParams();
   const navigate = useNavigate();
@@ -73,6 +74,7 @@ const CycleDetail = () => {
             sx={{ mr: 1.5 }}
             onClick={() => setSheetsOpen((v) => !v)}
             color={sheetsOpen ? "primary" : "default"}
+            aria-label={sheetsOpen ? "Close Google Sheets setup" : "Connect Google Sheets"}
           >
             <SiGooglesheets size={20} color={sheetsOpen ? "#474DA4" : "#34A853"} />
           </IconButton>

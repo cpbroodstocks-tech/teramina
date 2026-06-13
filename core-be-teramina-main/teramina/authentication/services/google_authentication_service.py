@@ -11,7 +11,7 @@ from firebase_admin._auth_utils import InvalidIdTokenError
 from mongoengine.errors import DoesNotExist
 
 from ..auth_bearer import AuthBearer
-from ...user.models.user_model import User
+from ...user.models.user_model import BetaAccessRequest, User
 from ...schemas.general_schema import DataErrorSchema, DataSuccessSchema
 
 from ...helpers.default_data_updater import ensure_default_data_for_user
@@ -47,14 +47,17 @@ def authenticate(email):
 
 def verify_user(email):
     """user verification"""
-    if email in WHITE_LIST:
+    normalized_email = email.strip().lower()
+    if User.objects(email=normalized_email).first() or normalized_email in WHITE_LIST:
         return True
 
     allowed_domain = "teramina.io"
     try:
         pattern = r"(?<=@)\S+"
-        domain = re.findall(pattern, email)
+        domain = re.findall(pattern, normalized_email)
         if domain and (domain[0] == allowed_domain):
+            return True
+        if BetaAccessRequest.objects(email=normalized_email, status="approved").first():
             return True
 
         raise ValueError
@@ -110,6 +113,7 @@ def signed_token_using_firebase(token):
         user = authenticate(decoded_token["email"])
 
         if user is None:
+            verify_user(decoded_token["email"])
             user = User(
                 name=decoded_token["displayName"],
                 email=decoded_token["email"],

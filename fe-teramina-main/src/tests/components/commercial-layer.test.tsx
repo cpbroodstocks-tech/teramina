@@ -161,6 +161,7 @@ describe("Commercial public surfaces", () => {
           },
         })
       ),
+      http.get("*/farm/hierarchy", () => HttpResponse.json({ payload: { farms: [] } })),
       http.post("*/advisory/cases", async ({ request }) => {
         submittedPayload = await request.json();
         return HttpResponse.json({
@@ -758,6 +759,9 @@ describe("Commercial admin surface", () => {
             ],
           },
         })
+      ),
+      http.get("*/user/admin/access-requests", () =>
+        HttpResponse.json({ payload: { requests: [] } })
       )
     );
 

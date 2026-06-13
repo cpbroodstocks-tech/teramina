@@ -4,6 +4,7 @@ import { axios } from "helper/axios";
 export const userKeys = {
   profile: ["user-profile"] as const,
   dataStatus: ["user-data-status"] as const,
+  adminAccessRequests: ["admin-access-requests"] as const,
 };
 
 export const useUserProfile = () =>
@@ -18,6 +19,25 @@ export const verifyFirebaseUser = (token: string) =>
 export const fetchUserProfile = () => axios.get("/user/get-profile").then((r: any) => r.payload);
 
 export const registerFcmToken = (token: string) => axios.post("/user/fcm-token", { token });
+
+export const requestBetaAccess = (email: string, source = "landing") =>
+  axios.post("/user/access-requests", { email, source }).then((r: any) => r.payload);
+
+export const useAdminAccessRequests = (enabled = true) =>
+  useQuery({
+    queryKey: userKeys.adminAccessRequests,
+    queryFn: () => axios.get("/user/admin/access-requests").then((r: any) => r?.payload?.requests ?? []),
+    enabled,
+  });
+
+export const useUpdateAdminAccessRequest = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ requestId, status }: { requestId: string; status: "approved" | "rejected" }) =>
+      axios.patch(`/user/admin/access-requests/${requestId}`, { status }).then((r: any) => r?.payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: userKeys.adminAccessRequests }),
+  });
+};
 
 export const useUpdateProfile = () => {
   const queryClient = useQueryClient();

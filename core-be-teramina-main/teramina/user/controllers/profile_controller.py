@@ -67,6 +67,12 @@ def get_demo_experience(request):
     return DemoExperienceService.get(str(user.id))
 
 
+@router.get("/activation-status", response=response_schema, auth=AuthBearer())
+def get_activation_status(request):
+    user = get_signed_in_user(request)
+    return DemoExperienceService.activation_status(str(user.id))
+
+
 @router.post("/demo-experience/events", response=response_schema, auth=AuthBearer())
 def record_demo_experience_event(request, data: DemoExperienceEventSchema = Body(...)):
     user = get_signed_in_user(request)

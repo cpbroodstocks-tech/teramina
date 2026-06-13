@@ -7,6 +7,7 @@ import { useNDayAfter } from "hooks/useNDayAfter";
 import { useFormatToQueryParams as formatToQueryParams } from "hooks/useFormatToQueryParams";
 import { fetchFilterUrl } from "features/filter/queries";
 import { loadSharedFilterContext, persistDashboardSelection } from "features/filter/shared-context";
+import { useDashboardContextStore } from "store/dashboard-context.store";
 
 const DOC_LENGTH = 120;
 
@@ -20,6 +21,7 @@ const FILTER_SCHEMA = z.object({
 });
 
 const useFilter = () => {
+  const contextKey = useDashboardContextStore((state) => `${state.farm_id}:${state.pond_id}:${state.cycle_id}`);
   const N_DOC_AFTER = useNDayAfter(new Date(), DOC_LENGTH);
   const filterQueryParams = useRef({
     farm_id: "",
@@ -220,9 +222,18 @@ const useFilter = () => {
         setValue("farm_id", shared.values.farm_id);
         setValue("pond_id", shared.values.pond_id);
         setValue("cycle_id", [shared.values.cycle_id]);
-        setValue("start_date", shared.filter.daterange?.start_date || "");
-        setValue("end_date", shared.filter.daterange?.end_date || "");
-        setValue("variables", shared.filter.variables?.includes("wqi_1") ? ["wqi_1"] : shared.filter.variables?.slice(0, 1) || []);
+        const startDate = shared.filter.daterange?.start_date || "";
+        const endDate = shared.filter.daterange?.end_date || "";
+        const variables = shared.filter.variables?.includes("wqi_1") ? ["wqi_1"] : shared.filter.variables?.slice(0, 1) || [];
+        setValue("start_date", startDate);
+        setValue("end_date", endDate);
+        setValue("variables", variables);
+        setSubmittedParams({
+          cycles: shared.values.cycle_id,
+          start_date: dayjs(startDate).format("YYYY-MM-DD"),
+          end_date: dayjs(endDate).format("YYYY-MM-DD"),
+          variables: variables.join(","),
+        });
         setFilter((previousValue) => ({
           ...previousValue,
           filter: {
@@ -240,7 +251,7 @@ const useFilter = () => {
       }
     };
     fetchfilterListItem();
-  }, []);
+  }, [contextKey]);
 
   return {
     ...filterList,

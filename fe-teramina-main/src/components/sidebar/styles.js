@@ -54,7 +54,9 @@ const useStyles = makeStyles()(theme => ({
   sidebarContent: {
     display: "flex",
     flexDirection: "column",
-    padding: 15
+    padding: 15,
+    maxHeight: "calc(100vh - 115px)",
+    overflowY: "auto"
   },
   sidebarMenu: {
     textDecoration: "none",
@@ -87,6 +89,14 @@ const useStyles = makeStyles()(theme => ({
       }
     }
 
+  },
+  sidebarGroup: {
+    color: "rgba(255,255,255,0.66)",
+    fontSize: 11,
+    fontWeight: 800,
+    letterSpacing: "0.08em",
+    margin: "14px 8px 5px",
+    textTransform: "uppercase",
   },
   sidebarMenuActive: {
     borderLeft: "3px solid rgba(255,255,255,0.85)",

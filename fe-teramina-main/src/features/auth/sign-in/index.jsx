@@ -28,7 +28,18 @@ const SignIn = () => {
     }
   };
 
-  if (error) return <Error />;
+  if (error) {
+    return (
+      <Error
+        title="Access is not enabled for this account"
+        message="Teramina is currently in closed beta. Request access and we will notify you after approval."
+        actionLabel="Request access"
+        onAction={() => { window.location.href = "/#waitlist"; }}
+        secondaryLabel="Try another account"
+        onSecondary={() => setError(false)}
+      />
+    );
+  }
 
   return (
     <>

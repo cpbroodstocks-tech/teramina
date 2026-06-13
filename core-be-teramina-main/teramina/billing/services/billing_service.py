@@ -90,6 +90,29 @@ class BillingService:
         )
 
     @staticmethod
+    def submit_invoice_payment(user_id, invoice_id, data):
+        invoice = CommercialInvoice.objects(id=invoice_id, user_id=user_id).first()
+        if not invoice:
+            return 404, DataErrorSchema(code=404, message="Invoice not found")
+        if invoice.status not in {"issued", "payment_submitted"}:
+            return 400, DataErrorSchema(code=400, message="This invoice cannot accept a payment submission")
+        if not data.payment_reference.strip():
+            return 400, DataErrorSchema(code=400, message="Payment reference is required")
+
+        invoice.status = "payment_submitted"
+        invoice.payment_reference = data.payment_reference.strip()
+        invoice.payment_proof_url = data.payment_proof_url.strip()
+        invoice.payment_submitted_at = datetime.now()
+        invoice.notes = data.notes or invoice.notes
+        invoice.updated_at = datetime.now()
+        invoice.save()
+        return 200, DataSuccessSchema(
+            code=200,
+            message="Payment submitted for verification",
+            payload={"invoice": invoice.to_dict()},
+        )
+
+    @staticmethod
     def _grant_invoice_content_access(invoice):
         grants = []
         for content_id in invoice.content_ids or []:

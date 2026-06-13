@@ -217,3 +217,59 @@ class FarmAlert(Document):
         "collection": "farm_alerts",
     }
     objects = QuerySetManager()
+
+
+class ControlLoopRecord(Document):
+    """Links a recommendation or alert to an action, follow-up, and observed outcome."""
+    user_id = fields.StringField(required=True)
+    farm_id = fields.StringField(default="")
+    pond_id = fields.StringField(default="")
+    cycle_id = fields.StringField(default="")
+    source_type = fields.StringField(choices=["alert", "recommendation", "manual"], default="manual")
+    source_id = fields.StringField(default="")
+    action = fields.StringField(required=True)
+    reason = fields.StringField(default="")
+    expected_benefit = fields.StringField(default="")
+    tradeoff = fields.StringField(default="")
+    confidence = fields.StringField(choices=["low", "medium", "high"], default="medium")
+    next_check_at = fields.DateTimeField(null=True)
+    success_signal = fields.StringField(default="")
+    follow_up_task_id = fields.StringField(default="")
+    outcome = fields.StringField(default="")
+    outcome_status = fields.StringField(choices=["worked", "partial", "failed", "unknown"], default="unknown")
+    outcome_memory_id = fields.StringField(default="")
+    status = fields.StringField(choices=["open", "awaiting_outcome", "closed"], default="open")
+    created_at = fields.DateTimeField(default=datetime.now)
+    updated_at = fields.DateTimeField(default=datetime.now)
+    closed_at = fields.DateTimeField(null=True)
+
+    meta = {
+        "indexes": ["user_id", "farm_id", "cycle_id", "status", "-created_at"],
+        "collection": "control_loop_records",
+    }
+    objects = QuerySetManager()
+
+    def to_dict(self):
+        return {
+            "id": str(self.id),
+            "farm_id": self.farm_id,
+            "pond_id": self.pond_id,
+            "cycle_id": self.cycle_id,
+            "source_type": self.source_type,
+            "source_id": self.source_id,
+            "action": self.action,
+            "reason": self.reason,
+            "expected_benefit": self.expected_benefit,
+            "tradeoff": self.tradeoff,
+            "confidence": self.confidence,
+            "next_check_at": self.next_check_at.isoformat() if self.next_check_at else None,
+            "success_signal": self.success_signal,
+            "follow_up_task_id": self.follow_up_task_id,
+            "outcome": self.outcome,
+            "outcome_status": self.outcome_status,
+            "outcome_memory_id": self.outcome_memory_id,
+            "status": self.status,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "closed_at": self.closed_at.isoformat() if self.closed_at else None,
+        }

@@ -11,6 +11,7 @@ import requests
 from mongoengine import ValidationError
 
 from teramina.cycle_data.models.cycle_data_model import CycleData
+from teramina.cycle.models.cycle_model import Cycle
 from teramina.farm.models.farm_model import Farm
 from teramina.helpers.constant_value import Constant
 from teramina.pond.models.pond_model import Pond
@@ -18,6 +19,7 @@ from teramina.schemas.general_schema import DataSuccessSchema, DataErrorSchema
 from ..models.agent_model import (
     AgentConversation,
     AgentMemory,
+    ControlLoopRecord,
     FarmAlert,
     MemoryEmbedding,
     MemoryEntity,
@@ -418,6 +420,125 @@ class AgentService:
         task.completed_at = datetime.utcnow()
         task.save()
         return 200, DataSuccessSchema(code=200, message="Task completed", payload={"id": task_id})
+
+    @staticmethod
+    def create_control_loop(user_id: str, data) -> tuple:
+        if data.source_type not in {"alert", "recommendation", "manual"}:
+            return 400, DataErrorSchema(code=400, message="Unsupported control-loop source")
+        if data.confidence not in {"low", "medium", "high"}:
+            return 400, DataErrorSchema(code=400, message="Unsupported confidence level")
+
+        farm_id = data.farm_id or ""
+        pond_id = data.pond_id or ""
+        cycle_id = data.cycle_id or ""
+        if data.source_type == "alert" and data.source_id:
+            alert = FarmAlert.objects(id=data.source_id, user_id=user_id).first()
+            if not alert:
+                return 400, DataErrorSchema(code=400, message="Alert not found")
+            farm_id = alert.farm_id
+            cycle_id = alert.cycle_id
+        if cycle_id and not pond_id:
+            cycle = Cycle.objects(id=cycle_id).only("pond_id").first()
+            pond_id = cycle.pond_id if cycle else ""
+
+        next_check_at = None
+        if data.next_check_at:
+            try:
+                next_check_at = datetime.fromisoformat(data.next_check_at.replace("Z", "+00:00")).replace(tzinfo=None)
+            except ValueError:
+                return 400, DataErrorSchema(code=400, message="Invalid next check time")
+
+        loop = ControlLoopRecord(
+            user_id=user_id,
+            farm_id=farm_id,
+            pond_id=pond_id,
+            cycle_id=cycle_id,
+            source_type=data.source_type,
+            source_id=data.source_id or "",
+            action=data.action.strip(),
+            reason=data.reason or "",
+            expected_benefit=data.expected_benefit or "",
+            tradeoff=data.tradeoff or "",
+            confidence=data.confidence,
+            next_check_at=next_check_at,
+            success_signal=data.success_signal or "",
+            status="awaiting_outcome" if next_check_at else "open",
+        )
+        if not loop.action:
+            return 400, DataErrorSchema(code=400, message="Action is required")
+        if next_check_at:
+            task = WorkflowTask.objects.create(
+                user_id=user_id,
+                farm_id=farm_id,
+                pond_id=pond_id,
+                cycle_id=cycle_id,
+                task_type="follow_up",
+                title=f"Recheck: {loop.action}",
+                description=loop.success_signal or loop.expected_benefit,
+                due_at=next_check_at,
+                source_alert_id=data.source_id if data.source_type == "alert" else "",
+            )
+            loop.follow_up_task_id = str(task.id)
+        loop.save()
+
+        if data.source_type == "alert" and data.source_id:
+            FarmAlert.objects(id=data.source_id, user_id=user_id).update(
+                set__follow_up_task_id=loop.follow_up_task_id,
+                set__follow_up_scheduled_at=next_check_at,
+            )
+        return 200, DataSuccessSchema(code=200, message="Action recorded", payload=loop.to_dict())
+
+    @staticmethod
+    def get_control_loops(user_id: str, farm_id: str = "", cycle_id: str = "", include_closed: bool = False) -> tuple:
+        filters = {"user_id": user_id}
+        if farm_id:
+            filters["farm_id"] = farm_id
+        if cycle_id:
+            filters["cycle_id"] = cycle_id
+        if not include_closed:
+            filters["status__ne"] = "closed"
+        loops = [item.to_dict() for item in ControlLoopRecord.objects(**filters).order_by("next_check_at", "-created_at")[:100]]
+        return 200, DataSuccessSchema(code=200, message="OK", payload={"control_loops": loops})
+
+    @staticmethod
+    def record_control_loop_outcome(user_id: str, loop_id: str, data) -> tuple:
+        if data.outcome_status not in {"worked", "partial", "failed", "unknown"}:
+            return 400, DataErrorSchema(code=400, message="Unsupported outcome status")
+        loop = ControlLoopRecord.objects(id=loop_id, user_id=user_id).first()
+        if not loop:
+            return 400, DataErrorSchema(code=400, message="Control loop not found")
+
+        loop.outcome = data.outcome.strip()
+        loop.outcome_status = data.outcome_status
+        loop.status = "closed"
+        loop.closed_at = datetime.utcnow()
+        loop.updated_at = datetime.utcnow()
+        if loop.follow_up_task_id:
+            WorkflowTask.objects(id=loop.follow_up_task_id, user_id=user_id).update(
+                set__is_completed=True,
+                set__completed_at=datetime.utcnow(),
+            )
+        memory = AgentMemory.objects.create(
+            user_id=user_id,
+            farm_id=loop.farm_id,
+            pond_id=loop.pond_id,
+            cycle_id=loop.cycle_id,
+            memory_type="event",
+            content=f"Action: {loop.action} | Outcome ({data.outcome_status}): {loop.outcome}",
+            tags=["control_loop_outcome", data.outcome_status, loop.source_type],
+            source="user_input",
+            confidence=0.9,
+            is_verified=True,
+        )
+        index_agent_memory(memory)
+        loop.outcome_memory_id = str(memory.id)
+        loop.save()
+        if loop.source_type == "alert" and loop.source_id:
+            FarmAlert.objects(id=loop.source_id, user_id=user_id).update(
+                set__follow_up_completed=True,
+                set__outcome_memory_id=str(memory.id),
+            )
+        return 200, DataSuccessSchema(code=200, message="Outcome recorded", payload=loop.to_dict())
 
     @staticmethod
     def get_memories(user_id: str, farm_id: str = "", pond_id: str = "", limit: int = 20,
@@ -921,6 +1042,14 @@ class AgentService:
             }
             for t in raw_tasks
         ]
+        control_loops = [
+            loop.to_dict()
+            for loop in ControlLoopRecord.objects(
+                user_id=user_id,
+                farm_id=farm_id,
+                status__ne="closed",
+            ).order_by("next_check_at", "-created_at")[:20]
+        ]
 
         return 200, DataSuccessSchema(
             code=200,
@@ -932,6 +1061,7 @@ class AgentService:
                 "alerts": alerts_payload,
                 "ponds": pond_status,
                 "tasks": tasks_payload,
+                "control_loops": control_loops,
             },
         )
 
@@ -988,4 +1118,25 @@ class AgentService:
         result = get_cycle_timeline(cycle_id=cycle_id, limit=limit)
         if result.get("error"):
             return 400, DataErrorSchema(code=400, message=result["error"])
+        loop_events = []
+        for loop in ControlLoopRecord.objects(user_id=user_id, cycle_id=cycle_id).order_by("-created_at")[:limit]:
+            loop_events.append({
+                "id": str(loop.id),
+                "type": "control_action",
+                "date": loop.created_at.isoformat() if loop.created_at else None,
+                "description": loop.action,
+                "tags": [loop.status, loop.source_type, loop.confidence],
+            })
+            if loop.outcome:
+                loop_events.append({
+                    "id": f"{loop.id}:outcome",
+                    "type": "control_outcome",
+                    "date": loop.closed_at.isoformat() if loop.closed_at else None,
+                    "description": loop.outcome,
+                    "tags": [loop.outcome_status],
+                })
+        result["events"] = loop_events + list(result.get("events") or [])
+        result["events"].sort(key=lambda item: item.get("date") or "", reverse=True)
+        result["events"] = result["events"][:limit]
+        result["total_events"] = len(result["events"])
         return 200, DataSuccessSchema(code=200, message="OK", payload=result)

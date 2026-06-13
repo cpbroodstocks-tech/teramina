@@ -25,6 +25,7 @@ import {
   useVerifyAgentMemory,
 } from "components/agent-chat/queries";
 import { useToastStore } from "store/toast.store";
+import { useDashboardContextStore } from "store/dashboard-context.store";
 
 const typeOptions = ["all", "fact", "preference", "event", "advice", "note"];
 
@@ -213,13 +214,14 @@ const MemoryPage = () => {
   const [saveWithContext, setSaveWithContext] = useState(true);
   const [editingId, setEditingId] = useState("");
   const [draft, setDraft] = useState({ memory_type: "note", content: "", tags: "" });
-  const farmId = useCurrentContext ? localStorage.getItem("farm_id") || "" : "";
-  const pondId = useCurrentContext ? localStorage.getItem("pond_id") || "" : "";
-  const currentFarmId = localStorage.getItem("farm_id") || "";
-  const currentPondId = localStorage.getItem("pond_id") || "";
-  const currentCycleId = localStorage.getItem("cycle_id") || "";
-  const farmName = localStorage.getItem("farm_name") || "";
-  const pondName = localStorage.getItem("pond_name") || "";
+  const context = useDashboardContextStore();
+  const farmId = useCurrentContext ? context.farm_id : "";
+  const pondId = useCurrentContext ? context.pond_id : "";
+  const currentFarmId = context.farm_id;
+  const currentPondId = context.pond_id;
+  const currentCycleId = context.cycle_id;
+  const farmName = context.farm_name;
+  const pondName = context.pond_name;
 
   const { data: memories = [], isLoading, isError, refetch } = useAgentMemories({
     enabled: true,

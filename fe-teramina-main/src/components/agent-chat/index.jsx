@@ -30,6 +30,7 @@ import {
 } from "components/agent-chat/queries";
 import { buildAgentContext } from "components/agent-chat/context";
 import { getEndpoint } from "helper/axios";
+import { useDashboardContextStore } from "store/dashboard-context.store";
 
 const SESSION_KEY = "agent_session_id";
 
@@ -61,6 +62,7 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
   const { setToast } = useToastStore();
   const params = useParams();
   const location = useLocation();
+  const dashboardContext = useDashboardContextStore();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -101,6 +103,9 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
       params,
       search: location.search,
       pathname: location.pathname,
+      storage: {
+        getItem: (key) => dashboardContext[key] || localStorage.getItem(key),
+      },
     });
     const token = localStorage.getItem("authentication") || "";
     const baseURL = getEndpoint() || "";
@@ -229,9 +234,9 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
   }, [open]);
 
   const handleExplainForTeam = async () => {
-    const farmId = localStorage.getItem("farm_id") || "";
-    const cycleId = localStorage.getItem("cycle_id") || "";
-    const pondId = localStorage.getItem("pond_id") || "";
+    const farmId = dashboardContext.farm_id;
+    const cycleId = dashboardContext.cycle_id;
+    const pondId = dashboardContext.pond_id;
     if (!farmId) {
       setToast({ open: true, variant: "warning", text: "No active farm selected" });
       return;
@@ -375,11 +380,12 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
             onClick={handleExplainForTeam}
             disabled={explaining}
             title="Jelaskan ke Tim (Bahasa Indonesia)"
+            aria-label="Explain farm status to the team in Bahasa Indonesia"
             style={{ color: "#474DA4" }}
           >
             {explaining ? <CircularProgress size={14} /> : <MdGroups size={18} />}
           </IconButton>
-          <IconButton size="small" onClick={onClose}>
+          <IconButton size="small" onClick={onClose} aria-label="Close assistant">
             <MdClose />
           </IconButton>
         </Box>
@@ -425,6 +431,7 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
                     onClick={() => handleResolveAlert(alert.id)}
                     style={{ padding: 2, flexShrink: 0, color: "#4caf50" }}
                     title="Mark resolved"
+                    aria-label={`Resolve alert: ${alert.message}`}
                   >
                     <MdDone size={14} />
                   </IconButton>
@@ -433,6 +440,7 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
                     onClick={() => handleDismissAlert(alert.id)}
                     style={{ padding: 2, flexShrink: 0 }}
                     title="Dismiss"
+                    aria-label={`Dismiss alert: ${alert.message}`}
                   >
                     <MdDeleteOutline size={14} />
                   </IconButton>
@@ -485,6 +493,7 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
                     onClick={() => handleCompleteTask(task.id)}
                     style={{ padding: 2, flexShrink: 0, color: "#4caf50" }}
                     title="Mark done"
+                    aria-label={`Complete task: ${task.title}`}
                   >
                     <MdDone size={14} />
                   </IconButton>
@@ -648,6 +657,7 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
           onClick={handleSend}
           disabled={sending || !input.trim()}
           style={{ alignSelf: "flex-end" }}
+          aria-label="Send message"
         >
           <MdSend />
         </IconButton>

@@ -24,6 +24,7 @@ import {
   MdRefresh,
   MdScience,
   MdSupportAgent,
+  MdTaskAlt,
 } from "react-icons/md";
 import { useGetPondTimeline } from "components/agent-chat/queries";
 import { useAdvisoryHistory } from "features/advisory/queries";
@@ -71,6 +72,18 @@ const EVENT_CONFIG = {
     bg: "#efebe9",
     label: "Advisory",
   },
+  control_action: {
+    icon: <MdTaskAlt size={16} />,
+    color: "#ed6c02",
+    bg: "#fff3e0",
+    label: "Action",
+  },
+  control_outcome: {
+    icon: <MdTaskAlt size={16} />,
+    color: "#2e7d32",
+    bg: "#e8f5e9",
+    label: "Outcome",
+  },
 };
 
 const getEventConfig = (type) => {
@@ -90,6 +103,7 @@ const FILTER_OPTIONS = [
   { value: "alert", label: "Alerts" },
   { value: "advice", label: "Advice" },
   { value: "advisory", label: "Advisory" },
+  { value: "actions", label: "Actions" },
 ];
 
 const TimelineEvent = ({ event, onOpen }) => {
@@ -193,6 +207,7 @@ const PondTimeline = () => {
     if (filter === "alert") return e.type === "alert";
     if (filter === "advice") return e.type === "memory_advice" || e.type?.startsWith("memory_");
     if (filter === "advisory") return e.type === "advisory_case";
+    if (filter === "actions") return e.type === "control_action" || e.type === "control_outcome";
     return true;
   });
   const totalEvents = (data?.total_events ?? events.length) + advisoryEvents.length;
@@ -200,7 +215,7 @@ const PondTimeline = () => {
   return (
     <Box>
       <Stack direction="row" gap={1} sx={{ mb: 3, alignItems: "center" }}>
-        <IconButton size="small" onClick={() => navigate(-1)} title="Back">
+        <IconButton size="small" onClick={() => navigate(-1)} title="Back" aria-label="Go back">
           <MdArrowBack />
         </IconButton>
         <Box flex={1}>
@@ -220,6 +235,7 @@ const PondTimeline = () => {
             refetchAdvisoryHistory();
           }}
           title="Refresh"
+          aria-label="Refresh timeline"
         >
           <MdRefresh />
         </IconButton>

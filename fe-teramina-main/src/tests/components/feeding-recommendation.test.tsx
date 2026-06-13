@@ -47,7 +47,8 @@ describe("FeedingRecommendation", () => {
   beforeEach(() => {
     mockSetToast.mockClear();
     server.use(
-      http.get("*/feeding/recommendation", () => HttpResponse.json(baseRecommendation))
+      http.get("*/feeding/recommendation", () => HttpResponse.json(baseRecommendation)),
+      http.post("*/agent/control-loops", () => HttpResponse.json({ payload: { id: "loop-1" } }))
     );
   });
 
@@ -76,7 +77,7 @@ describe("FeedingRecommendation", () => {
     await screen.findByText("12.5");
     await user.click(screen.getByRole("button", { name: /Accept/i }));
     expect(mockSetToast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "success", text: "Recommendation accepted" })
+      expect.objectContaining({ variant: "success", text: "Recommendation accepted and follow-up scheduled" })
     );
   });
 
@@ -122,7 +123,7 @@ describe("FeedingRecommendation", () => {
 
     expect(await screen.findByText("Override recorded")).toBeInTheDocument();
     expect(mockSetToast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "success", text: "Override recorded" })
+      expect.objectContaining({ variant: "success", text: "Override recorded and follow-up scheduled" })
     );
   });
 

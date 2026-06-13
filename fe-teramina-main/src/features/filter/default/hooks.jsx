@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNDayAfter } from "hooks/useNDayAfter";
 import { fetchFilterUrl } from "features/filter/queries";
 import { loadSharedFilterContext, persistDashboardSelection } from "features/filter/shared-context";
+import { useDashboardContextStore } from "store/dashboard-context.store";
 
 const DOC_LENGTH = 120;
 
@@ -17,6 +18,7 @@ const FILTER_SCHEMA = z.object({
 });
 
 const useFilter = () => {
+  const contextKey = useDashboardContextStore((state) => `${state.farm_id}:${state.pond_id}:${state.cycle_id}`);
   const N_DOC_AFTER = useNDayAfter(new Date(), DOC_LENGTH);
   const filterQueryParams = useRef({
     farm_id: "",
@@ -172,7 +174,9 @@ const useFilter = () => {
         setValue("farm_id", shared.values.farm_id);
         setValue("pond_id", shared.values.pond_id);
         setValue("cycle_id", shared.values.cycle_id);
-        setValue("date", shared.filter.daterange?.end_date || "");
+        const date = shared.filter.daterange?.end_date || "";
+        setValue("date", date);
+        setSubmittedParams({ ...shared.values, filter_type: "historical", date });
         setFilter((previousValue) => ({
           ...previousValue,
           filter: {
@@ -190,7 +194,7 @@ const useFilter = () => {
       }
     };
     fetchfilterListItem();
-  }, []);
+  }, [contextKey]);
 
   return {
     ...filterList,

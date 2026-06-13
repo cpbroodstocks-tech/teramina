@@ -12,9 +12,9 @@ const useStyles = makeStyles()((theme) => ({
   },
   lgEmpty: {
     "& img": {
-      width: "614px",
+      width: "360px",
       [theme.breakpoints.down("sm")]: {
-        width: "300px",
+        width: "240px",
       },
     }
   }

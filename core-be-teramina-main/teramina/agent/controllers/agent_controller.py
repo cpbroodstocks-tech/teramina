@@ -9,6 +9,8 @@ from teramina.schemas.general_schema import DataErrorSchema, DataSuccessSchema
 
 from ..schemas.agent_schema import (
     ChatMessageSchema,
+    ControlLoopCreateSchema,
+    ControlLoopOutcomeSchema,
     ExplainSchema,
     MemoryCreateSchema,
     MemoryUpdateSchema,
@@ -88,6 +90,24 @@ def get_tasks(request, include_completed: bool = False):
 def complete_task(request, task_id: str):
     user = get_signed_in_user(request)
     return AgentService.complete_task(task_id, str(user.id))
+
+
+@router.post("/control-loops", response=response_schema, auth=AuthBearer())
+def create_control_loop(request, data: ControlLoopCreateSchema = Body(...)):
+    user = get_signed_in_user(request)
+    return AgentService.create_control_loop(str(user.id), data)
+
+
+@router.get("/control-loops", response=response_schema, auth=AuthBearer())
+def get_control_loops(request, farm_id: str = "", cycle_id: str = "", include_closed: bool = False):
+    user = get_signed_in_user(request)
+    return AgentService.get_control_loops(str(user.id), farm_id, cycle_id, include_closed)
+
+
+@router.patch("/control-loops/{loop_id}/outcome", response=response_schema, auth=AuthBearer())
+def record_control_loop_outcome(request, loop_id: str, data: ControlLoopOutcomeSchema = Body(...)):
+    user = get_signed_in_user(request)
+    return AgentService.record_control_loop_outcome(str(user.id), loop_id, data)
 
 
 @router.get("/memories", response=response_schema, auth=AuthBearer())

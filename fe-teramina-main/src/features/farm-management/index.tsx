@@ -235,7 +235,7 @@ const FarmManagement = () => {
                   {selection.type === "cycle" && (
                     <>
                       <Button variant="contained" endIcon={<OpenInNewIcon />} onClick={() => navigate(`/dashboard/cycle/detail/${selection.cycle.id}`)}>Open cycle details</Button>
-                      <Button variant="outlined" onClick={() => navigate(`/dashboard?farm_id=${selection.farm.id}&pond_id=${selection.pond.id}&cycle_id=${selection.cycle.id}`)}>Open overview</Button>
+                      <Button variant="outlined" onClick={() => navigate(`/dashboard/overview?farm_id=${selection.farm.id}&pond_id=${selection.pond.id}&cycle_id=${selection.cycle.id}`)}>Open overview</Button>
                       {selection.pond.active_cycle_id !== selection.cycle.id && !selection.cycle.is_archived && (
                         <Button
                           variant="outlined"

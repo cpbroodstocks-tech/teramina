@@ -2,9 +2,17 @@
 
 ALLOWED_CSV_TYPES = {"text/csv", "application/csv", "text/plain", "application/octet-stream"}
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ALLOWED_ADVISORY_TYPES = ALLOWED_CSV_TYPES | ALLOWED_IMAGE_TYPES | {
+    "application/pdf",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
 
 MAX_CSV_SIZE_BYTES = 10 * 1024 * 1024   # 10 MB
 MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
+MAX_ADVISORY_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB
 
 
 def validate_csv_file(file) -> str | None:
@@ -24,4 +32,13 @@ def validate_image_file(file) -> str | None:
         return f"Image too large. Maximum allowed size is {MAX_IMAGE_SIZE_BYTES // (1024 * 1024)} MB."
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         return f"Invalid image type '{file.content_type}'. Allowed types: JPEG, PNG, WebP."
+    return None
+
+
+def validate_advisory_file(file) -> str | None:
+    """Validate a private advisory attachment."""
+    if file.size > MAX_ADVISORY_SIZE_BYTES:
+        return f"File too large. Maximum allowed size is {MAX_ADVISORY_SIZE_BYTES // (1024 * 1024)} MB."
+    if file.content_type not in ALLOWED_ADVISORY_TYPES:
+        return f"Invalid file type '{file.content_type}'. Upload PDF, spreadsheet, document, CSV, or image files."
     return None

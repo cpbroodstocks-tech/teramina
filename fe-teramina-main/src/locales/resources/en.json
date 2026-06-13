@@ -86,6 +86,12 @@
   "MENU.POND_TIMELINE": "Pond Timeline",
   "MENU.PROFILE": "Profile",
   "MENU.COST_DATA": "Finance Data",
+  "MENU_GROUP.OPERATE": "Operate",
+  "MENU_GROUP.ANALYZE": "Analyze",
+  "MENU_GROUP.IMPROVE": "Improve",
+  "MENU_GROUP.ACCOUNT": "Account",
+  "MENU_GROUP.ADMIN": "Admin",
+  "MENU_GROUP.OTHER": "Other",
 
   "FARM": "Farm",
   "POND": "Pond",

@@ -12,7 +12,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useUserProfile } from "features/user/queries";
+import { useAdminAccessRequests, useUpdateAdminAccessRequest, useUserProfile } from "features/user/queries";
 import {
   useAcceptAdvisoryAssistantBrief,
   useAdminAssistantAnswerLogs,
@@ -105,8 +105,8 @@ const buildHatcheryMetrics = (form) => {
   return metrics;
 };
 
-const AdminSection = ({ title, description, children }) => (
-  <Paper variant="outlined" sx={{ p: 3 }}>
+const AdminSection = ({ id, title, description, children }) => (
+  <Paper id={id} variant="outlined" sx={{ p: 3, scrollMarginTop: 16 }}>
     <Stack gap={2}>
       <Box>
         <Typography variant="h5" fontWeight={700}>{title}</Typography>
@@ -134,6 +134,8 @@ const CommercialAdminPage = () => {
   const { data: investorScores = [] } = useAdminInvestorScores(isAdmin);
   const { data: phaseSixRevisions = [] } = useAdminPhaseSixRevisions(isAdmin);
   const { data: invoices = [] } = useAdminInvoices(isAdmin);
+  const { data: accessRequests = [] } = useAdminAccessRequests(isAdmin);
+  const updateAccessRequest = useUpdateAdminAccessRequest();
   const createContent = useCreateContentItem();
   const [selectedContentId, setSelectedContentId] = useState("");
   const { data: selectedContent } = useAdminContentItem(selectedContentId, isAdmin);
@@ -843,6 +845,55 @@ const CommercialAdminPage = () => {
           </Typography>
         </Box>
 
+        <Paper variant="outlined" sx={{ p: 1, position: "sticky", top: 8, zIndex: 2 }}>
+          <Stack direction="row" gap={0.5} sx={{ flexWrap: "wrap" }}>
+            <Button href="#access-requests" size="small">Access</Button>
+            <Button href="#content-operations" size="small">Content</Button>
+            <Button href="#billing-operations" size="small">Billing</Button>
+            <Button href="#advisory-operations" size="small">Advisory</Button>
+            <Button href="#audit-trail" size="small">Audit</Button>
+          </Stack>
+        </Paper>
+
+        <AdminSection id="access-requests" title="Closed Beta Access" description="Approve or reject requests before users can create an account.">
+          {updateAccessRequest.isError && <Alert severity="error">Failed to update access request.</Alert>}
+          {accessRequests.length ? (
+            <Stack gap={1}>
+              {accessRequests.slice(0, 20).map((item) => (
+                <Paper key={item.id} variant="outlined" sx={{ p: 1.5 }}>
+                  <Stack direction={{ xs: "column", sm: "row" }} gap={1} sx={{ alignItems: { sm: "center" } }}>
+                    <Box flex={1}>
+                      <Typography fontWeight={700}>{item.name || item.email}</Typography>
+                      <Typography variant="body2" color="text.secondary">{item.email} · {item.source}</Typography>
+                    </Box>
+                    <Chip size="small" label={item.status} color={item.status === "approved" ? "success" : "default"} />
+                    {item.status === "pending" && (
+                      <>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={() => updateAccessRequest.mutate({ requestId: item.id, status: "approved" })}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          size="small"
+                          color="error"
+                          onClick={() => updateAccessRequest.mutate({ requestId: item.id, status: "rejected" })}
+                        >
+                          Reject
+                        </Button>
+                      </>
+                    )}
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
+          ) : (
+            <Alert severity="info">No beta access requests yet.</Alert>
+          )}
+        </AdminSection>
+
         <Box sx={{ display: "grid", gap: 3, gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" } }}>
           <AdminSection title="Create Content" description="Add a draft or published library document for the paid knowledge base.">
             {createContent.isError && <Alert severity="error">Failed to create content.</Alert>}
@@ -932,7 +983,7 @@ const CommercialAdminPage = () => {
           </AdminSection>
         </Box>
 
-        <AdminSection title="Content Operations" description="Edit existing library content and review recent version history.">
+        <AdminSection id="content-operations" title="Content Operations" description="Edit existing library content and review recent version history.">
           <Box sx={{ display: "grid", gap: 3, gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" } }}>
             <Stack component="form" gap={2} onSubmit={submitContentUpdate}>
               {updateContent.isError && <Alert severity="error">Failed to update content.</Alert>}
@@ -1100,7 +1151,7 @@ const CommercialAdminPage = () => {
           </Box>
         </AdminSection>
 
-        <AdminSection title="Billing" description="Issue manual invoices and convert paid invoices into content access grants.">
+        <AdminSection id="billing-operations" title="Billing" description="Issue manual invoices and convert paid invoices into content access grants.">
           <Box sx={{ display: "grid", gap: 3, gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" } }}>
             <Stack component="form" gap={2} onSubmit={submitInvoice}>
               <Typography variant="h6" fontWeight={700}>Create Invoice</Typography>
@@ -1213,7 +1264,7 @@ const CommercialAdminPage = () => {
           </Box>
         </AdminSection>
 
-        <AdminSection title="Advisory Cases" description="Review incoming cases, update workflow status, and keep internal expert notes.">
+        <AdminSection id="advisory-operations" title="Advisory Cases" description="Review incoming cases, update workflow status, and keep internal expert notes.">
           {casesLoading ? (
             <CircularProgress />
           ) : (
@@ -2256,7 +2307,7 @@ const CommercialAdminPage = () => {
           </Box>
         </AdminSection>
 
-        <AdminSection title="Advisory Audit Trail" description="Browse assistant usage and report workflow events for operator review.">
+        <AdminSection id="audit-trail" title="Advisory Audit Trail" description="Browse assistant usage and report workflow events for operator review.">
           <Box sx={{ display: "grid", gap: 3, gridTemplateColumns: { xs: "1fr", lg: "repeat(3, 1fr)" } }}>
             <Stack gap={1.5}>
               <Typography variant="h6" fontWeight={700}>Assistant Brief Logs</Typography>

@@ -7,6 +7,7 @@ from teramina.schemas.general_schema import DataErrorSchema, DataSuccessSchema
 from ..schemas.billing_schema import (
     CommercialInvoiceCreateSchema,
     CommercialInvoicePaidSchema,
+    CommercialInvoicePaymentSubmissionSchema,
 )
 from ..services.billing_service import BillingService
 
@@ -37,3 +38,9 @@ def create_invoice(request, data: CommercialInvoiceCreateSchema = Body(...)):
 def mark_invoice_paid(request, invoice_id: str, data: CommercialInvoicePaidSchema = Body(...)):
     user = get_signed_in_user(request)
     return BillingService.mark_invoice_paid(user, invoice_id, data)
+
+
+@router.post("/invoices/{invoice_id}/payment-submission", response=response_schema, auth=AuthBearer())
+def submit_invoice_payment(request, invoice_id: str, data: CommercialInvoicePaymentSubmissionSchema = Body(...)):
+    user = get_signed_in_user(request)
+    return BillingService.submit_invoice_payment(str(user.id), invoice_id, data)

@@ -8,6 +8,7 @@ import { useToastStore } from "store/toast.store";
 import { useTranslation } from "react-i18next";
 import { fetchFilteredData, fetchFilterUrl } from "features/filter/queries";
 import { loadSharedFilterContext, persistDashboardSelection } from "features/filter/shared-context";
+import { useDashboardContextStore } from "store/dashboard-context.store";
 
 const DOC_LENGTH = 120;
 
@@ -19,6 +20,7 @@ const FILTER_SCHEMA = z.object({
 });
 
 const useFilter = (api) => {
+  const contextKey = useDashboardContextStore((state) => `${state.farm_id}:${state.pond_id}:${state.cycle_id}`);
   const { t } = useTranslation();
   const { setToast: toast } = useToastStore();
   const N_DOC_AFTER = useNDayAfter(new Date(), DOC_LENGTH);
@@ -223,7 +225,8 @@ const useFilter = (api) => {
         setValue("farm_id", shared.values.farm_id);
         setValue("pond_id", shared.values.pond_id);
         setValue("cycle_id", shared.values.cycle_id);
-        setValue("date", shared.filter.daterange?.end_date || "");
+        const date = shared.filter.daterange?.end_date || "";
+        setValue("date", date);
 
         setFilter((previousValue) => ({
           ...previousValue,
@@ -233,6 +236,7 @@ const useFilter = (api) => {
           },
           error: false,
         }));
+        await fetchMVPWithFilter({ ...shared.values, date });
       } catch (err) {
         setFilter((previousValue) => ({
           ...previousValue,
@@ -246,7 +250,7 @@ const useFilter = (api) => {
       }
     };
     fetchfilterListItem();
-  }, []);
+  }, [contextKey]);
 
   return {
     ...filterList,

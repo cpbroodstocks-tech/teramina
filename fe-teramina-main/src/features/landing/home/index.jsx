@@ -13,6 +13,7 @@ import { useStyles } from "./styles";
 import { useTranslation } from "react-i18next";
 import { FaSignInAlt } from "react-icons/fa";
 import { Link } from "react-router-dom";
+import { requestBetaAccess } from "features/user/queries";
 
 const Home = () => {
   const { t } = useTranslation();
@@ -22,12 +23,22 @@ const Home = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
-  const handleWaitlist = (e) => {
+  const handleWaitlist = async (e) => {
     e.preventDefault();
     if (!email.trim()) return;
-    window.location.href = `mailto:contact@teramina.io?subject=Waitlist&body=Email: ${encodeURIComponent(email)}`;
-    setSubmitted(true);
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      await requestBetaAccess(email.trim(), "landing");
+      setSubmitted(true);
+    } catch {
+      setSubmitError("We could not submit your request. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const scrollToWaitlist = () => {
@@ -43,6 +54,8 @@ const Home = () => {
             <img src="/assets/images/logo-teramina3.svg" alt="logo" />
           </div>
           <div className={styles.wrapperBtnHomeHeader}>
+            {!isMobile && <Button component={Link} to="/services">Services</Button>}
+            {!isMobile && <Button component={Link} to="/knowledge">Knowledge</Button>}
             <Link to="/signin" className={styles.wrapperBtnLogin}>
               <Button variant="contained" className={styles.btnLoginTeal}>
                 {isMobile ? <FaSignInAlt /> : (token ? t("OPEN_DASHBOARD") : t("HOME.HERO_CTA_SECONDARY"))}
@@ -180,9 +193,11 @@ const Home = () => {
               variant="contained"
               className={styles.waitlistBtn}
               disableElevation
+              disabled={submitting}
             >
-              {t("HOME.WAITLIST.SUBMIT")}
+              {submitting ? "Submitting..." : t("HOME.WAITLIST.SUBMIT")}
             </Button>
+            {submitError && <Typography color="error">{submitError}</Typography>}
           </form>
         )}
       </div>

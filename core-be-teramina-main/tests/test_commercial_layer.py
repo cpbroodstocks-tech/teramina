@@ -46,6 +46,7 @@ from teramina.billing.models.billing_model import CommercialInvoice
 from teramina.billing.schemas.billing_schema import (
     CommercialInvoiceCreateSchema,
     CommercialInvoicePaidSchema,
+    CommercialInvoicePaymentSubmissionSchema,
 )
 from teramina.billing.services.billing_service import BillingService
 from teramina.content.models.content_model import ContentAccess, ContentItem, ContentRevision
@@ -1201,6 +1202,29 @@ class TestBillingWorkflow:
 
         assert code == 200
         assert [invoice["description"] for invoice in body.payload["invoices"]] == ["User 1 invoice"]
+
+    def test_user_can_submit_manual_payment_for_verification(self, admin_user):
+        _, created = BillingService.create_invoice(
+            admin_user,
+            CommercialInvoiceCreateSchema(
+                user_id="user-1",
+                description="Advisory invoice",
+                amount_idr=750000,
+            ),
+        )
+
+        code, submitted = BillingService.submit_invoice_payment(
+            "user-1",
+            created.payload["invoice"]["id"],
+            CommercialInvoicePaymentSubmissionSchema(
+                payment_reference="BANK-TRANSFER-123",
+                payment_proof_url="https://storage.example/proof.png",
+            ),
+        )
+
+        assert code == 200
+        assert submitted.payload["invoice"]["status"] == "payment_submitted"
+        assert submitted.payload["invoice"]["payment_reference"] == "BANK-TRANSFER-123"
 
     def test_non_admin_cannot_create_invoice(self, member_user):
         code, body = BillingService.create_invoice(

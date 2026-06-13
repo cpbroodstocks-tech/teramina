@@ -42,11 +42,12 @@ export interface FarmHierarchyItem {
   ponds: PondHierarchyItem[];
 }
 
-export const useFarmHierarchy = (includeArchived = false) =>
+export const useFarmHierarchy = (includeArchived = false, enabled = true) =>
   useQuery({
     queryKey: farmKeys.hierarchy(includeArchived),
     queryFn: () =>
       axios.get(`/farm/hierarchy?include_archived=${includeArchived}`).then((r: any) => r.payload?.farms ?? []) as Promise<FarmHierarchyItem[]>,
+    enabled,
   });
 
 const useHierarchyMutation = (endpoint: string) => {

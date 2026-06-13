@@ -10,6 +10,8 @@ import {
   Typography,
 } from "@mui/material";
 import { useToastStore } from "store/toast.store";
+import { useDashboardContextStore } from "store/dashboard-context.store";
+import { useCreateControlLoop } from "components/agent-chat/queries";
 import { useFeedingRecommendation, useOverrideFeedingRecommendation } from "features/cycle-detail/queries";
 
 const FeedingRecommendation = () => {
@@ -19,18 +21,63 @@ const FeedingRecommendation = () => {
   const [overrideKg, setOverrideKg] = useState("");
   const [overrideReason, setOverrideReason] = useState("");
   const [overrideRecorded, setOverrideRecorded] = useState(false);
+  const [accepted, setAccepted] = useState(false);
+  const context = useDashboardContextStore();
 
   const { data, isLoading } = useFeedingRecommendation(cycle_id);
   const { mutate: override, isPending: submitting } = useOverrideFeedingRecommendation(cycle_id);
+  const { mutateAsync: createControlLoop, isPending: recordingAction } = useCreateControlLoop();
+
+  const recordFeedingAction = async (action, reason) => {
+    await createControlLoop({
+      farm_id: context.farm_id,
+      pond_id: context.pond_id,
+      cycle_id,
+      source_type: "recommendation",
+      source_id: `feeding:${cycle_id}:${data?.doc || "today"}`,
+      action,
+      reason,
+      expected_benefit: data?.adjustment_reason || "Follow the recommended feeding plan",
+      next_check_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      success_signal: "Feed response and water quality remain within the expected range",
+      confidence: "medium",
+    });
+  };
+
+  const handleAccept = async () => {
+    try {
+      await recordFeedingAction(
+        `Feed ${data.recommended_ration_kg} kg`,
+        data.adjustment_reason || "Accepted daily feeding recommendation",
+      );
+      setAccepted(true);
+      setToast({ open: true, variant: "success", text: "Recommendation accepted and follow-up scheduled" });
+    } catch {
+      setToast({ open: true, variant: "error", text: "Failed to record recommendation action" });
+    }
+  };
 
   const handleOverrideSubmit = () => {
     override(
       { doc: data?.doc, actual_kg: parseFloat(overrideKg), override_reason: overrideReason },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
+          let followUpRecorded = true;
+          try {
+            await recordFeedingAction(
+              `Feed ${parseFloat(overrideKg)} kg instead of ${data?.recommended_ration_kg} kg`,
+              overrideReason || "Operator override",
+            );
+          } catch {
+            followUpRecorded = false;
+          }
           setOverrideRecorded(true);
           setShowOverrideForm(false);
-          setToast({ open: true, variant: "success", text: "Override recorded" });
+          setToast({
+            open: true,
+            variant: followUpRecorded ? "success" : "warning",
+            text: followUpRecorded ? "Override recorded and follow-up scheduled" : "Override recorded, but follow-up could not be scheduled",
+          });
         },
         onError: () => setToast({ open: true, variant: "error", text: "Failed to record override" }),
       }
@@ -69,16 +116,19 @@ const FeedingRecommendation = () => {
             </Typography>
           )}
 
-          {overrideRecorded ? (
-            <Typography variant="body2" color="success.main">Override recorded</Typography>
+          {overrideRecorded || accepted ? (
+            <Typography variant="body2" color="success.main">
+              {overrideRecorded ? "Override recorded" : "Recommendation accepted; follow-up scheduled"}
+            </Typography>
           ) : (
             <Box style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <Button
                 variant="outlined"
                 color="success"
-                onClick={() => setToast({ open: true, variant: "success", text: "Recommendation accepted" })}
+                onClick={handleAccept}
+                disabled={recordingAction}
               >
-                Accept
+                {recordingAction ? "Recording..." : "Accept"}
               </Button>
               <Button variant="text" onClick={() => setShowOverrideForm((prev) => !prev)}>
                 Override

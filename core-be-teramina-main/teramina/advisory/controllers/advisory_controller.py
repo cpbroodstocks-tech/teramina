@@ -1,8 +1,10 @@
-from ninja import Body, Router
+from ninja import Body, File, Router
+from ninja.files import UploadedFile
 
 from teramina.authentication.auth_bearer import AuthBearer
 from teramina.authentication.services.authentication_service import get_signed_in_user
 from teramina.schemas.general_schema import DataErrorSchema, DataSuccessSchema
+from teramina.helpers.file_validation import validate_advisory_file
 
 from ..schemas.advisory_schema import (
     AdvisoryAssistantAnswerSchema,
@@ -112,6 +114,15 @@ def create_report_from_assistant_brief(request, log_id: str, data: AdvisoryAssis
 def add_case_file(request, case_id: str, data: AdvisoryCaseFileSchema = Body(...)):
     user = get_signed_in_user(request)
     return AdvisoryService.add_case_file(user, case_id, data)
+
+
+@router.post("/cases/{case_id}/files/upload", response=response_schema, auth=AuthBearer())
+def upload_case_file(request, case_id: str, file: UploadedFile = File(...), description: str = ""):
+    user = get_signed_in_user(request)
+    file_error = validate_advisory_file(file)
+    if file_error:
+        return 400, DataErrorSchema(code=400, message=file_error)
+    return AdvisoryService.upload_case_file(user, case_id, file, description)
 
 
 @router.get("/cases/{case_id}/benchmark-consent", response=response_schema, auth=AuthBearer())

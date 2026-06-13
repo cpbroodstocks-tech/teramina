@@ -7,7 +7,9 @@ from mongoengine.errors import DoesNotExist, InvalidQueryError, FieldDoesNotExis
 from ..schemas.registration_schema import RegisterSchema
 from ...schemas.general_schema import DataSuccessSchema, DataErrorSchema
 
-from ..models.user_model import User
+from datetime import datetime
+
+from ..models.user_model import BetaAccessRequest, User
 
 
 class RegistrationService:
@@ -75,3 +77,53 @@ class RegistrationService:
             return True
         except DoesNotExist:
             return False
+
+    @staticmethod
+    def request_beta_access(data):
+        email = data.email.strip().lower()
+        request = BetaAccessRequest.objects(email=email).first()
+        if request:
+            if data.name and not request.name:
+                request.name = data.name.strip()
+                request.updated_at = datetime.now()
+                request.save()
+        else:
+            request = BetaAccessRequest(
+                email=email,
+                name=data.name.strip(),
+                source=data.source.strip() or "landing",
+            ).save()
+        return 200, DataSuccessSchema(
+            code=200,
+            message="Access request received",
+            payload=request.to_dict(),
+        )
+
+    @staticmethod
+    def list_beta_access_requests(user):
+        if getattr(user, "role_user", "") != "admin":
+            return 401, DataErrorSchema(code=401, message="Admin access required")
+        requests = [
+            item.to_dict(include_private=True)
+            for item in BetaAccessRequest.objects.order_by("-created_at")
+        ]
+        return 200, DataSuccessSchema(code=200, message="OK", payload={"requests": requests})
+
+    @staticmethod
+    def update_beta_access_request(user, request_id, data):
+        if getattr(user, "role_user", "") != "admin":
+            return 401, DataErrorSchema(code=401, message="Admin access required")
+        if data.status not in {"pending", "approved", "rejected"}:
+            return 400, DataErrorSchema(code=400, message="Unsupported access request status")
+        request = BetaAccessRequest.objects(id=request_id).first()
+        if not request:
+            return 400, DataErrorSchema(code=400, message="Access request not found")
+        request.status = data.status
+        request.admin_note = data.admin_note or ""
+        request.updated_at = datetime.now()
+        request.save()
+        return 200, DataSuccessSchema(
+            code=200,
+            message="Access request updated",
+            payload=request.to_dict(include_private=True),
+        )

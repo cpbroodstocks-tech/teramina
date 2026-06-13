@@ -3,11 +3,18 @@ import { axios } from "helper/axios";
 import { trackDemoEvent } from "./analytics";
 
 export const demoExperienceKey = ["demo-experience"] as const;
+export const activationStatusKey = ["activation-status"] as const;
 
 export const useDemoExperience = () =>
   useQuery({
     queryKey: demoExperienceKey,
     queryFn: () => axios.get("/user/demo-experience").then((response: any) => response?.payload),
+  });
+
+export const useActivationStatus = () =>
+  useQuery({
+    queryKey: activationStatusKey,
+    queryFn: () => axios.get("/user/activation-status").then((response: any) => response?.payload),
   });
 
 export const useTrackDemoEvent = () => {
@@ -34,8 +41,7 @@ export const useResetDemoExperience = () => {
     mutationFn: () => axios.post("/user/demo-experience/reset", { confirmed: true }).then((response: any) => response?.payload),
     onSuccess: (data) => {
       queryClient.setQueryData(demoExperienceKey, data);
-      queryClient.invalidateQueries({ queryKey: ["farm-hierarchy"] });
-      queryClient.invalidateQueries({ queryKey: ["agent"] });
+      queryClient.invalidateQueries();
     },
   });
 };

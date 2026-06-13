@@ -6,6 +6,7 @@ import { http, HttpResponse } from "msw";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { server } from "../mocks/server";
 import MemoryPage from "pages/dashboard/memory";
+import { useDashboardContextStore } from "store/dashboard-context.store";
 
 const mockSetToast = vi.fn();
 vi.mock("store/toast.store", () => ({
@@ -86,10 +87,12 @@ const graphPayload = {
 describe("MemoryPage", () => {
   beforeEach(() => {
     mockSetToast.mockClear();
-    localStorage.setItem("farm_id", "farm-1");
-    localStorage.setItem("pond_id", "pond-1");
-    localStorage.setItem("farm_name", "Farm One");
-    localStorage.setItem("pond_name", "Pond One");
+    useDashboardContextStore.getState().setContext({
+      farm_id: "farm-1",
+      pond_id: "pond-1",
+      farm_name: "Farm One",
+      pond_name: "Pond One",
+    });
   });
 
   it("renders existing memories from /agent/memories", async () => {

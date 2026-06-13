@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 import { useCreateAdvisoryCase, useServicePackage, useServicePackages } from "./queries";
 import { caseTypeByServiceSlug, servicePackageFallbacks } from "./catalog";
+import { useFarmHierarchy } from "features/farm/queries";
 
 const formatPrice = (min, max) => {
   if (!min && !max) return "Custom scope";
@@ -168,6 +169,7 @@ export const AdvisoryIntakePage = () => {
   const fallbackPackage = servicePackageFallbacks.find((pkg) => pkg.slug === service_slug) || servicePackageFallbacks[0];
   const servicePackage = apiPackage || fallbackPackage;
   const token = localStorage.getItem("authentication");
+  const { data: farms = [] } = useFarmHierarchy(false, !!token);
   const [submittedCase, setSubmittedCase] = useState(null);
   const [form, setForm] = useState(() => buildInitialForm(servicePackage));
   const { mutateAsync, isPending, isError } = useCreateAdvisoryCase();
@@ -177,6 +179,11 @@ export const AdvisoryIntakePage = () => {
     [service_slug],
   );
   const intakeFields = intakeFieldsByCaseType[caseType] || genericIntakeFields;
+  const selectedFarm = farms.find((item) => item.id === form.farm_id);
+  const ponds = selectedFarm?.ponds || [];
+  const selectedPond = ponds.find((item) => item.id === form.pond_id);
+  const cycles = selectedPond?.cycles || [];
+  const hasLinkedContext = intakeFields.some((field) => field.key === "farm_id");
 
   const update = (key) => (event) => setForm((prev) => ({ ...prev, [key]: event.target.value }));
 
@@ -220,7 +227,10 @@ export const AdvisoryIntakePage = () => {
           Sign in to submit an advisory case and track the review in your dashboard.
         </Alert>
       ) : submittedCase ? (
-        <Alert severity="success">
+        <Alert
+          severity="success"
+          action={<Button component={Link} to={`/dashboard/advisory/${submittedCase.id}`} color="inherit">Track Case</Button>}
+        >
           Advisory case submitted. Case ID: {submittedCase.id}
         </Alert>
       ) : (
@@ -236,7 +246,56 @@ export const AdvisoryIntakePage = () => {
             >
               <MenuItem value={caseType}>{caseType.replaceAll("_", " ")}</MenuItem>
             </TextField>
-            {intakeFields.map((field) => (
+            {hasLinkedContext && (
+              <Stack direction={{ xs: "column", md: "row" }} gap={2}>
+                <TextField
+                  select
+                  label="Farm"
+                  value={form.farm_id || ""}
+                  onChange={(event) => {
+                    const farm = farms.find((item) => item.id === event.target.value);
+                    const pond = farm?.ponds[0];
+                    const cycle = pond?.cycles[0];
+                    setForm((prev) => ({
+                      ...prev,
+                      farm_id: farm?.id || "",
+                      pond_id: pond?.id || "",
+                      cycle_id: cycle?.id || "",
+                    }));
+                  }}
+                  fullWidth
+                >
+                  <MenuItem value="">Not linked</MenuItem>
+                  {farms.map((farm) => <MenuItem key={farm.id} value={farm.id}>{farm.name}</MenuItem>)}
+                </TextField>
+                <TextField
+                  select
+                  label="Pond"
+                  value={form.pond_id || ""}
+                  onChange={(event) => {
+                    const pond = ponds.find((item) => item.id === event.target.value);
+                    setForm((prev) => ({ ...prev, pond_id: pond?.id || "", cycle_id: pond?.cycles[0]?.id || "" }));
+                  }}
+                  disabled={!ponds.length}
+                  fullWidth
+                >
+                  <MenuItem value="">Not linked</MenuItem>
+                  {ponds.map((pond) => <MenuItem key={pond.id} value={pond.id}>{pond.name}</MenuItem>)}
+                </TextField>
+                <TextField
+                  select
+                  label="Cycle"
+                  value={form.cycle_id || ""}
+                  onChange={update("cycle_id")}
+                  disabled={!cycles.length}
+                  fullWidth
+                >
+                  <MenuItem value="">Not linked</MenuItem>
+                  {cycles.map((cycle) => <MenuItem key={cycle.id} value={cycle.id}>{cycle.name}</MenuItem>)}
+                </TextField>
+              </Stack>
+            )}
+            {intakeFields.filter((field) => !commonLinkedFields.some((linked) => linked.key === field.key)).map((field) => (
               <TextField
                 key={field.key}
                 select={!!field.options}

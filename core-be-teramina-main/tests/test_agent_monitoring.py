@@ -4,7 +4,8 @@ from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from teramina.agent.models.agent_model import FarmAlert, WorkflowTask, AgentMemory, MemoryObservation, MemoryEntity, MemoryRelation, AgentConversation
+from teramina.agent.models.agent_model import ControlLoopRecord, FarmAlert, WorkflowTask, AgentMemory, MemoryObservation, MemoryEntity, MemoryRelation, AgentConversation
+from teramina.agent.schemas.agent_schema import ControlLoopCreateSchema, ControlLoopOutcomeSchema
 from teramina.agent.services.agent_service import AgentService
 
 
@@ -27,6 +28,7 @@ def _clear():
     MemoryEntity.objects.delete()
     MemoryRelation.objects.delete()
     AgentConversation.objects.delete()
+    ControlLoopRecord.objects.delete()
 
 
 def _make_cycle_data(rows):
@@ -386,6 +388,56 @@ class TestGetTodaySummary:
         assert status == 200
         tasks = response.payload["tasks"]
         assert any(t["id"] == str(task.id) and t["is_overdue"] is True for t in tasks)
+
+
+class TestControlLoop:
+
+    def setup_method(self):
+        _clear()
+
+    def test_alert_action_creates_follow_up_and_verified_outcome_memory(self):
+        alert = FarmAlert(
+            user_id=USER_ID,
+            farm_id=FARM_ID,
+            cycle_id=CYCLE_ID,
+            alert_type="water_quality",
+            severity="critical",
+            message="DO low",
+            expires_at=datetime.utcnow() + timedelta(days=1),
+        ).save()
+
+        code, created = AgentService.create_control_loop(
+            USER_ID,
+            ControlLoopCreateSchema(
+                farm_id=FARM_ID,
+                pond_id=POND_ID,
+                cycle_id=CYCLE_ID,
+                source_type="alert",
+                source_id=str(alert.id),
+                action="Turn on backup aerator",
+                expected_benefit="Restore dissolved oxygen",
+                next_check_at=(datetime.utcnow() + timedelta(hours=2)).isoformat(),
+                success_signal="DO above 5 mg/L",
+            ),
+        )
+
+        assert code == 200
+        loop_id = created.payload["id"]
+        assert created.payload["status"] == "awaiting_outcome"
+        assert WorkflowTask.objects(user_id=USER_ID, task_type="follow_up").count() == 1
+
+        with patch("teramina.agent.services.agent_service.index_agent_memory"):
+            code, closed = AgentService.record_control_loop_outcome(
+                USER_ID,
+                loop_id,
+                ControlLoopOutcomeSchema(outcome="DO stabilized at target", outcome_status="worked"),
+            )
+
+        assert code == 200
+        assert closed.payload["status"] == "closed"
+        memory = AgentMemory.objects(id=closed.payload["outcome_memory_id"]).first()
+        assert memory.is_verified is True
+        assert "DO stabilized" in memory.content
 
 
 # ──────────────────────────────────────────────────────────────────────────────

@@ -29,6 +29,26 @@ export interface AgentTask {
   created_at: string | null;
 }
 
+export interface ControlLoop {
+  id: string;
+  farm_id: string;
+  pond_id: string;
+  cycle_id: string;
+  source_type: "alert" | "recommendation" | "manual";
+  source_id: string;
+  action: string;
+  reason: string;
+  expected_benefit: string;
+  tradeoff: string;
+  confidence: "low" | "medium" | "high";
+  next_check_at: string | null;
+  success_signal: string;
+  status: "open" | "awaiting_outcome" | "closed";
+  outcome: string;
+  outcome_status: "worked" | "partial" | "failed" | "unknown";
+  created_at: string | null;
+}
+
 export interface AgentMemory {
   id: string;
   memory_type: "fact" | "preference" | "event" | "advice" | "note";

@@ -36,9 +36,11 @@ import { useLineEchartsGenerateOptions } from "hooks/useLineEchartsGenerateOptio
 import { Markdown } from "components/markdown";
 import { useToastStore } from "store/toast.store";
 import { useCreateOverviewReport, useOverviewReportPoll } from "widgets/overview/queries";
+import { useDashboardContextStore } from "store/dashboard-context.store";
 
 const OverviewWidget = () => {
   const { t } = useTranslation();
+  const context = useDashboardContextStore();
   const { loading, filter, data, error, form, onFilterChange } = useFilter("/dashboard/overview");
   const { generateOptionsDefault, generateOptionsScatterOverview } = useLineEchartsGenerateOptions();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -89,9 +91,9 @@ const OverviewWidget = () => {
     setDialogMessage("Report download in progress. This may take up to 1 minute...");
     setDialogOpen(true);
     createReport({
-      farm_id: localStorage.getItem("farm_id"),
-      pond_id: localStorage.getItem("pond_id"),
-      cycle_id: localStorage.getItem("cycle_id"),
+      farm_id: context.farm_id,
+      pond_id: context.pond_id,
+      cycle_id: context.cycle_id,
       date: (localStorage.getItem("date") || "").replace(/"/g, ""),
       token: localStorage.getItem("authentication"),
     }, {

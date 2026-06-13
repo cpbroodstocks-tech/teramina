@@ -95,6 +95,27 @@ export const useAddAdvisoryCaseFile = () => {
   });
 };
 
+export const useUploadAdvisoryCaseFile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ caseId, file, description }: { caseId: string; file: File; description?: string }) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      return axios
+        .post(`/advisory/cases/${caseId}/files/upload`, formData, {
+          params: { description: description || "" },
+          headers: { "Content-Type": "multipart/form-data" },
+        })
+        .then((r: any) => r?.payload?.case ?? null);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.case(variables.caseId) });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.cases });
+      queryClient.invalidateQueries({ queryKey: advisoryKeys.adminCases });
+    },
+  });
+};
+
 export const useAcceptBenchmarkConsent = () => {
   const queryClient = useQueryClient();
   return useMutation({

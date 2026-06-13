@@ -105,10 +105,18 @@ const routes = [
     children: [
       {
         path: "",
+        label: "MENU.TODAY",
+        element: <Navigate to="/dashboard/today" replace />,
+        icon: <TodayIcon fontSize="small" />,
+        category: "children",
+      },
+      {
+        path: "overview",
         label: "MENU.OVERVIEW",
         element: <Overview />,
         icon: <ReactSVG src={iconOverview} />,
         category: "parrent",
+        group: "MENU_GROUP.ANALYZE",
       },
       {
         path: "farm",
@@ -123,6 +131,7 @@ const routes = [
         element: <FarmManagement />,
         icon: <ReactSVG src={iconFarm} />,
         category: "parrent",
+        group: "MENU_GROUP.OPERATE",
       },
       {
         path: "pond/:farm_id",
@@ -151,6 +160,7 @@ const routes = [
         element: <Economics />,
         icon: <ReactSVG src={iconEconomics} />,
         category: "parrent",
+        group: "MENU_GROUP.ANALYZE",
       },
       {
         path: "feeding",
@@ -158,6 +168,7 @@ const routes = [
         element: <Feeding />,
         icon: <ReactSVG src={iconFeeding} />,
         category: "parrent",
+        group: "MENU_GROUP.OPERATE",
       },
       {
         path: "forecast",
@@ -165,6 +176,7 @@ const routes = [
         element: <Forecast />,
         icon: <ReactSVG src={iconForecast} />,
         category: "parrent",
+        group: "MENU_GROUP.ANALYZE",
       },
       {
         path: "harvest",
@@ -172,6 +184,7 @@ const routes = [
         element: <Harvest />,
         icon: <ReactSVG src={iconHarvest} />,
         category: "parrent",
+        group: "MENU_GROUP.OPERATE",
       },
       {
         path: "water-quality",
@@ -179,6 +192,7 @@ const routes = [
         element: <WaterQuality />,
         icon: <OpacityIcon fontSize="small" />,
         category: "parrent",
+        group: "MENU_GROUP.OPERATE",
       },
       {
         path: "today",
@@ -186,6 +200,7 @@ const routes = [
         element: <TodayView />,
         icon: <TodayIcon fontSize="small" />,
         category: "parrent",
+        group: "MENU_GROUP.OPERATE",
       },
       {
         path: "memory",
@@ -193,6 +208,7 @@ const routes = [
         element: <Memory />,
         icon: <PsychologyIcon fontSize="small" />,
         category: "parrent",
+        group: "MENU_GROUP.IMPROVE",
       },
       {
         path: "library",
@@ -200,6 +216,7 @@ const routes = [
         element: <Library />,
         icon: <MenuBookIcon fontSize="small" />,
         category: "parrent",
+        group: "MENU_GROUP.IMPROVE",
       },
       {
         path: "advisory",
@@ -207,6 +224,7 @@ const routes = [
         element: <Advisory />,
         icon: <SupportAgentIcon fontSize="small" />,
         category: "parrent",
+        group: "MENU_GROUP.IMPROVE",
       },
       {
         path: "advisory/new",
@@ -228,6 +246,7 @@ const routes = [
         element: <Billing />,
         icon: <ReceiptLongIcon fontSize="small" />,
         category: "parrent",
+        group: "MENU_GROUP.ACCOUNT",
       },
       {
         path: "commercial-admin",
@@ -236,6 +255,7 @@ const routes = [
         icon: <AdminPanelSettingsIcon fontSize="small" />,
         category: "parrent",
         adminOnly: true,
+        group: "MENU_GROUP.ADMIN",
       },
       {
         path: "pond-timeline/:cycle_id",
@@ -250,6 +270,7 @@ const routes = [
         element: <Profile />,
         icon: <ReactSVG src={iconProfile} />,
         category: "parrent",
+        group: "MENU_GROUP.ACCOUNT",
       },
       {
         path: "profile/edit",
