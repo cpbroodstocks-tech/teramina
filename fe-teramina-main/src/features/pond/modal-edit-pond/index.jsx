@@ -112,10 +112,11 @@ const PondEdit = ({ data, onClose }) => {
 };
 
 const ModalPondEdit = (props) => {
+  const { t } = useTranslation();
   const { open, onOpen, onClose } = useModal();
   return (
     <Fragment>
-      <Button onClick={onOpen} sx={{ color: "#161616", minWidth: "unset !important", background: "rgba(71, 77, 164, 0.32)", marginRight: "5px", borderRadius: "6px", padding: "10.5px", "&:hover": { color: "#161616", background: "rgba(71, 77, 164, 0.6)" }, "& svg": { width: "20px", height: "20px" } }}>{ButtonLabel}</Button>
+      <Button aria-label={t("EDIT_POND_DATA")} onClick={onOpen} sx={{ color: "#161616", minWidth: "unset !important", background: "rgba(71, 77, 164, 0.32)", marginRight: "5px", borderRadius: "6px", padding: "10.5px", "&:hover": { color: "#161616", background: "rgba(71, 77, 164, 0.6)" }, "& svg": { width: "20px", height: "20px" } }}>{ButtonLabel}</Button>
       <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
         <DialogContent sx={{ padding: "0px !important" }}>
           <PondEdit {...props} onClose={onClose} />

@@ -17,6 +17,13 @@ const DatePickerPopUp = ({ form, daterange }) => {
     setAnchorEl(event.currentTarget);
   };
 
+  const handleKeyDown = (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handleClick(event);
+    }
+  };
+
   const handleClose = () => {
     setAnchorEl(null);
   };
@@ -32,11 +39,13 @@ const DatePickerPopUp = ({ form, daterange }) => {
 
   return (
     <Fragment>
-      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/interactive-supports-focus */}
       <div
         aria-describedby={id}
+        aria-label={t("DATE")}
         role="button"
+        tabIndex={0}
         onClick={handleClick}
+        onKeyDown={handleKeyDown}
         className={styles.button}
       >
         <Typography variant="h6">

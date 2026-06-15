@@ -150,27 +150,32 @@ const PLReportPage = () => {
       {/* Toolbar — hidden on print */}
       <Box className="no-print" sx={{ display: "flex", gap: 1, justifyContent: "flex-end", mb: 2, flexWrap: "wrap" }}>
         <Tooltip title="AI Narrative Summary">
-          <IconButton size="small" onClick={() => setNarrativeOpen((v) => !v)} color={narrativeOpen ? "primary" : "default"}>
+          <IconButton
+            size="small"
+            onClick={() => setNarrativeOpen((v) => !v)}
+            color={narrativeOpen ? "primary" : "default"}
+            aria-label="Toggle AI narrative summary"
+          >
             <AutoAwesomeIcon fontSize="small" />
           </IconButton>
         </Tooltip>
         <Tooltip title="Download PDF">
-          <IconButton size="small" onClick={() => downloadPLPdf(cycle_id)}>
+          <IconButton size="small" onClick={() => downloadPLPdf(cycle_id)} aria-label="Download P&L PDF">
             <PictureAsPdfIcon fontSize="small" />
           </IconButton>
         </Tooltip>
         <Tooltip title="Download Excel">
-          <IconButton size="small" onClick={() => downloadPLExcel(cycle_id)}>
+          <IconButton size="small" onClick={() => downloadPLExcel(cycle_id)} aria-label="Download P&L Excel">
             <TableChartIcon fontSize="small" />
           </IconButton>
         </Tooltip>
         <Tooltip title="Bank / Cooperative Format PDF">
-          <IconButton size="small" onClick={() => downloadBankPdf(cycle_id)}>
+          <IconButton size="small" onClick={() => downloadBankPdf(cycle_id)} aria-label="Download bank format PDF">
             <AccountBalanceIcon fontSize="small" />
           </IconButton>
         </Tooltip>
         <Tooltip title="Copy shareable link (7-day expiry)">
-          <IconButton size="small" onClick={handleShare} disabled={sharing}>
+          <IconButton size="small" onClick={handleShare} disabled={sharing} aria-label="Copy shareable link">
             {sharing ? <CircularProgress size={16} /> : <ShareIcon fontSize="small" />}
           </IconButton>
         </Tooltip>

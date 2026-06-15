@@ -19,6 +19,7 @@ import Error from "components/error";
 import Empty from "components/empty";
 import { useLineEchartsGenerateOptions } from "hooks/useLineEchartsGenerateOptions";
 import { useConfidenceBands, useProphetForecast } from "widgets/forecast/queries";
+import PageHeader from "components/page-header";
 
 const Forecast = () => {
   const { t } = useTranslation();
@@ -61,7 +62,7 @@ const Forecast = () => {
 
   return (
     <Fragment>
-      <Typography variant="h1" sx={{ mb: "15px", fontSize: 40, textTransform: "uppercase" }}>{t("MENU.FORECAST")}</Typography>
+      <PageHeader title={t("MENU.FORECAST")} description={t("PAGE_DESCRIPTION.FORECAST")} />
       <Filter data={data} filter={filter} form={form} onFilterChange={onFilterChange} />
       {loading && <Loader />}
       {error && <Error />}

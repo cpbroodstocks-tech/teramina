@@ -6,15 +6,15 @@ const useStyles = makeStyles()((theme) => ({
     justifyContent: "space-between",
     verticalAlign: "middle",
     marginBottom: "20px",
+    gap: 12,
+    flexWrap: "wrap",
   },
   leftSection: {
     display: "flex",
-    // alignItems: "center", /* This aligns items in the left section vertically */
+    gap: 4,
+    flexWrap: "wrap",
   },
   table: {
-    [theme.breakpoints.down("sm")]: {
-      width: "1000px",
-    },
     "& th": {
       fontFamily: "Lato",
       background: "#F8FAFC",

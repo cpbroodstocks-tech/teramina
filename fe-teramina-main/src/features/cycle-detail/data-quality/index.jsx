@@ -120,7 +120,12 @@ const DataQuality = () => {
           {anomaly_count > 0 && (
             <Chip label={`${anomaly_count} anomalies`} color="error" size="small" variant="outlined" />
           )}
-          <IconButton size="small" onClick={() => setExpanded((v) => !v)} sx={{ ml: "auto" }}>
+          <IconButton
+            size="small"
+            onClick={() => setExpanded((v) => !v)}
+            sx={{ ml: "auto" }}
+            aria-label={expanded ? "Collapse data quality details" : "Expand data quality details"}
+          >
             {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
           </IconButton>
         </Box>

@@ -6,6 +6,7 @@ const useStyles = makeStyles()(theme => ({
     width: 270,
     position: "fixed",
     height: "100%",
+    zIndex: 1200,
     [theme.breakpoints.between("sm", "md")]: {
       width: 220,
     },
@@ -54,33 +55,31 @@ const useStyles = makeStyles()(theme => ({
   sidebarContent: {
     display: "flex",
     flexDirection: "column",
-    padding: 15,
+    padding: "0 15px 20px",
     maxHeight: "calc(100vh - 115px)",
     overflowY: "auto"
   },
   sidebarMenu: {
-    textDecoration: "none",
-
-    "& button": {
-      marginBottom: 3,
+    marginBottom: 3,
+    display: "flex",
+    gap: 15,
+    color: "white",
+    justifyContent: "start",
+    alignItems: "center",
+    fontFamily: "Lato",
+    fontWeight: 700,
+    lineHeight: "24px",
+    minHeight: 42,
+    padding: "8px 12px",
+    "& div": {
       display: "flex",
-      gap: 15,
-      color: "white",
-      justifyContent: "start",
-      alignItems: "center",
-      fontFamily: "Lato",
-      fontWeight: 700,
-      lineHeight: "24px",
-      "& div": {
-        display: "flex",
-      },
-      "& svg": {
-        marginLeft: 5,
-        width: 16,
-      }
     },
-
-    "& button:hover": {
+    "& svg": {
+      marginLeft: 2,
+      width: 18,
+      flexShrink: 0,
+    },
+    "&:hover": {
       backgroundColor: "white",
       color: "#474DA4",
       "& svg path": {
@@ -95,18 +94,23 @@ const useStyles = makeStyles()(theme => ({
     fontSize: 11,
     fontWeight: 800,
     letterSpacing: "0.08em",
-    margin: "14px 8px 5px",
+    margin: "14px 0 5px",
+    padding: "6px 10px",
     textTransform: "uppercase",
+    justifyContent: "space-between",
+    minHeight: 32,
+    "&:hover": {
+      color: "#fff",
+      background: "rgba(255,255,255,0.08)",
+    },
+    "& svg": {
+      width: 16,
+    },
   },
   sidebarMenuActive: {
     borderLeft: "3px solid rgba(255,255,255,0.85)",
-    "& button": {
-      backgroundColor: "rgba(255,255,255,0.18)",
-      color: "#fff",
-      "& div": {
-        display: "flex",
-      }
-    },
+    backgroundColor: "rgba(255,255,255,0.18)",
+    color: "#fff",
     "& svg path": {
       color: "#fff",
       stroke: "#fff"

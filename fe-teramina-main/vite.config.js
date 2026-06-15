@@ -35,6 +35,14 @@ const ALIAS = {
 const OUTPUT = {
   manualChunks: (id) => {
     if (id.includes("node_modules")) {
+      if (
+        id.includes("/node_modules/react/")
+        || id.includes("/node_modules/react-dom/")
+        || id.includes("/node_modules/scheduler/")
+      ) {
+        return "vendor_react_core";
+      }
+
       if (id.includes("react-router")) {
         return "vendor_react_router";
       }
@@ -63,6 +71,16 @@ const OUTPUT = {
         return "vendor_mui_x_date_pickers";
       }
 
+      if (
+        id.includes("@mui/")
+        || id.includes("@emotion")
+        || id.includes("tss-react")
+        || id.includes("react-transition-group")
+        || id.includes("clsx")
+      ) {
+        return "vendor_mui_core";
+      }
+
       if (id.includes("react-icons")) {
         return "vendor_react_icons";
       }
@@ -85,6 +103,31 @@ const OUTPUT = {
 
       if (id.includes("axios")) {
         return "vendor_axios";
+      }
+
+      if (id.includes("@sentry")) {
+        return "vendor_sentry";
+      }
+
+      if (
+        id.includes("react-markdown")
+        || id.includes("rehype")
+        || id.includes("remark")
+        || id.includes("unified")
+        || id.includes("vfile")
+        || id.includes("mdast")
+        || id.includes("hast")
+        || id.includes("micromark")
+      ) {
+        return "vendor_markdown";
+      }
+
+      if (id.includes("lodash") || id.includes("dayjs") || id.includes("zustand") || id.includes("classnames")) {
+        return "vendor_utils";
+      }
+
+      if (id.includes("react-svg") || id.includes("react-dropzone") || id.includes("react-ga4")) {
+        return "vendor_react_extras";
       }
 
       if (id.includes("@fontsource")) {

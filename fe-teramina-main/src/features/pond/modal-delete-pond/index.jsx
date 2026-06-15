@@ -27,6 +27,7 @@ const ModalDeletePond = ({ data }) => {
   return (
     <Fragment>
       <Button
+        aria-label={t("DELETE_POND_DATA")}
         className={styles.btnDelete}
         onClick={() => setOpenConfirmDelete(true)}
       >

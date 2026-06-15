@@ -20,6 +20,7 @@ import Empty from "components/empty";
 import Error from "components/error";
 import Loader from "components/loader";
 import { useLineEchartsGenerateOptions } from "hooks/useLineEchartsGenerateOptions";
+import PageHeader from "components/page-header";
 
 const Economics = () => {
   const { t } = useTranslation();
@@ -31,7 +32,7 @@ const Economics = () => {
 
   return (
     <Fragment>
-      <Typography variant="h1" sx={{ mb: "15px", fontSize: 40, textTransform: "uppercase" }}>{t("MENU.COST_ACCOUNTING")}</Typography>
+      <PageHeader title={t("MENU.COST_ACCOUNTING")} description={t("PAGE_DESCRIPTION.ECONOMICS")} />
       <Filter filter={filter} form={form} onFilterChange={onFilterChange} />
       {loading && <Loader />}
       {error && <Error />}

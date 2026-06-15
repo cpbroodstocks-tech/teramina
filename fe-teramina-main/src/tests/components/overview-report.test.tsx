@@ -118,13 +118,14 @@ vi.mock("features/filter/overview/hooks", () => ({
       daterange: { start_date: "01/01/2024", end_date: "04/30/2024" },
     },
     data: mockOverviewData,
-    formik: {
+    form: {
       values: { farm_id: "f1", pond_id: "p1", cycle_id: "c1", date: "" },
       handleSubmit: () => {},
       handleReset: () => {},
       dirty: false,
       setFieldValue: () => {},
     },
+    appliedValues: { farm_id: "f1", pond_id: "p1", cycle_id: "c1", date: "" },
     onFilterChange: () => {},
   }),
 }));

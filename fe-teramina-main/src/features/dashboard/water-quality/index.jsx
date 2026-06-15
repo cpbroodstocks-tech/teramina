@@ -3,7 +3,6 @@ import { useFilter } from "features/filter/water-quality/hooks";
 import { useWaterQualityDashboard } from "widgets/water-quality/queries";
 import Filter from "features/filter/water-quality/index2";
 import { useTranslation } from "react-i18next";
-import { Typography } from "@mui/material";
 import Loader from "components/loader";
 import Error from "components/error";
 import { useState } from "react";
@@ -18,6 +17,7 @@ import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Paper from "@mui/material/Paper";
+import PageHeader from "components/page-header";
 
 const WaterQuality = () => {
   const { t } = useTranslation();
@@ -37,7 +37,7 @@ const WaterQuality = () => {
   return (
     <Fragment>
       <div>
-        <Typography variant="h1" sx={{ mb: "15px", fontSize: 40, textTransform: "capitalize", fontWeight: 700 }}>{t("WATER_QUALITY_ANALYSIS")}</Typography>
+        <PageHeader title={t("WATER_QUALITY_ANALYSIS")} description={t("PAGE_DESCRIPTION.WATER_QUALITY")} />
         <Filter data={data} filter={filter} form={form} onFilterChange={onFilterChange} />
       </div>
       {loading && <Loader />}
@@ -46,10 +46,10 @@ const WaterQuality = () => {
       {!loading && !error && data && Object.keys(data).length > 0 && (
         <Box>
           <Box>
-            <Tabs value={value} onChange={handleChange}>
-              <Tab label="Line Chart" />
-              <Tab label="Scatter Chart" />
-              <Tab label="Table" />
+            <Tabs value={value} onChange={handleChange} variant="scrollable" scrollButtons="auto">
+              <Tab label={t("LINE_CHART")} />
+              <Tab label={t("SCATTER_CHART")} />
+              <Tab label={t("TABLE")} />
             </Tabs>
           </Box>
           {value === 0 && (
@@ -69,7 +69,7 @@ const WaterQuality = () => {
           {value === 2 && (
             <Box>
               <TableContainer component={Paper}>
-                <Table aria-label="simple table">
+                <Table aria-label={t("WATER_QUALITY_TABLE")}>
                   <TableHead>
                     <TableRow>
                       {tableColumns.map((key) => (

@@ -8,6 +8,7 @@ import {
   TableRow,
   Paper,
   Button,
+  Box,
   Typography,
 } from "@mui/material";
 import EastIcon from "@mui/icons-material/East";
@@ -22,6 +23,7 @@ import { useDebounce } from "hooks/useDebounce";
 import { useTranslation } from "react-i18next";
 import PondMemoryPanel from "components/pond-memory-panel";
 import { useDashboardContextStore } from "store/dashboard-context.store";
+import ResponsiveDataList from "components/responsive-data-list";
 
 const PondList = ({ data }) => {
   const { t } = useTranslation();
@@ -44,6 +46,24 @@ const PondList = ({ data }) => {
     );
   }, [search]);
 
+  const renderActions = (cycle) => (
+    <>
+      <ModalCycleEdit data={cycle} />
+      <ModalCycleDelete data={cycle} />
+      <Button
+        className={styles.btnViewMore}
+        onClick={() => {
+          localStorage.setItem("selectedCycleStartDate", cycle.start_date);
+          setContext({ cycle_id: cycle._id, cycle_name: cycle.name });
+          navigate(`/dashboard/cycle/detail/${cycle._id}`);
+        }}
+      >
+        <Typography variant="span" className={styles.btnViewMoreText}>{t("VIEW_MORE")}</Typography>
+        <EastIcon className={styles.btnViewMoreIcon} />
+      </Button>
+    </>
+  );
+
   return (
     <Fragment>
       <Typography variant="h2" className={styles.pageTitle}>
@@ -65,47 +85,37 @@ const PondList = ({ data }) => {
       </div>
       <PondMemoryPanel farmId={farmId} pondId={pondId} pondName={data.pond_name} />
       {/* List Farm */}
-      <TableContainer component={Paper}>
-        <Table className={styles.table}>
-          <TableHead>
-            <TableRow>
-              <TableCell>{t("CYCLE_NAME")}</TableCell>
-              <TableCell>{t("START_DATE")}</TableCell>
-              <TableCell>&nbsp;</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {table.map((cycle, key) => (
-              <TableRow key={key}>
-                <TableCell>{cycle.name}</TableCell>
-                <TableCell>{cycle.start_date}</TableCell>
-                <TableCell>
-                  <div className={styles.actionContainer}>
-                    <ModalCycleEdit data={cycle} />
-                    <ModalCycleDelete data={cycle} />
-                    <Button
-                      className={styles.btnViewMore}
-                      onClick={() => {
-                        localStorage.setItem("selectedCycleStartDate", cycle.start_date);
-                        setContext({ cycle_id: cycle._id, cycle_name: cycle.name });
-                        navigate(`/dashboard/cycle/detail/${cycle._id}`);
-                      }}
-                    >
-                      <Typography
-                        variant="span"
-                        className={styles.btnViewMoreText}
-                      >
-                        {t("VIEW_MORE")}
-                      </Typography>
-                      <EastIcon className={styles.btnViewMoreIcon} />
-                    </Button>
-                  </div>
-                </TableCell>
+      <ResponsiveDataList
+        items={table}
+        getKey={(cycle) => cycle._id}
+        fields={[
+          { label: t("CYCLE_NAME"), value: (cycle) => cycle.name },
+          { label: t("START_DATE"), value: (cycle) => cycle.start_date },
+        ]}
+        renderActions={renderActions}
+      />
+      <Box sx={{ display: { xs: "none", md: "block" } }}>
+        <TableContainer component={Paper}>
+          <Table className={styles.table}>
+            <TableHead>
+              <TableRow>
+                <TableCell>{t("CYCLE_NAME")}</TableCell>
+                <TableCell>{t("START_DATE")}</TableCell>
+                <TableCell>&nbsp;</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {table.map((cycle) => (
+                <TableRow key={cycle._id}>
+                  <TableCell>{cycle.name}</TableCell>
+                  <TableCell>{cycle.start_date}</TableCell>
+                  <TableCell><div className={styles.actionContainer}>{renderActions(cycle)}</div></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Box>
     </Fragment>
   );
 };

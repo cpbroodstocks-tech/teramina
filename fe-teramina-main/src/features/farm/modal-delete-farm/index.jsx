@@ -27,6 +27,7 @@ const ModalDeleteFarm = ({ data }) => {
   return (
     <Fragment>
       <Button
+        aria-label={t("DELETE_FARM_DATA")}
         className={styles.btnDelete}
         onClick={() => setOpenConfirmDelete(true)}
       >

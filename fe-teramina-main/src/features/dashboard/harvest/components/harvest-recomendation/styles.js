@@ -1,13 +1,10 @@
 import { makeStyles } from "tss-react/mui";
 
-const useStyles = makeStyles()((theme) => ({
+const useStyles = makeStyles()(() => ({
   harvestInfo: {
     marginTop: "12px",
   },
   table: {
-    [theme.breakpoints.down("sm")]: {
-      width: "1000px",
-    },
     "& th": {
       fontFamily: "Lato",
       background: "#F8FAFC",

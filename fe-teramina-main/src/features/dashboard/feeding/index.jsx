@@ -26,6 +26,7 @@ import Loader from "components/loader";
 import Empty from "components/empty";
 import ModalAddFeeding from "features/feeding/modal-add-feeding";
 import { useLineEchartsGenerateOptions } from "hooks/useLineEchartsGenerateOptions";
+import PageHeader from "components/page-header";
 
 const Feeding = () => {
   const { t } = useTranslation();
@@ -42,7 +43,7 @@ const Feeding = () => {
 
   return (
     <Fragment>
-      <Typography variant="h1" sx={{ mb: "15px", fontSize: 40, textTransform: "uppercase" }}>{t("MENU.FEEDING")}</Typography>
+      <PageHeader title={t("MENU.FEEDING")} description={t("PAGE_DESCRIPTION.FEEDING")} />
       <Filter data={data} filter={filter} form={form} onFilterChange={onFilterChange} />
       {loading && <Loader />}
       {error && <Error />}

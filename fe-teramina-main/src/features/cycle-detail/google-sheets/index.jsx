@@ -134,6 +134,7 @@ const IssuesTable = ({ rejectedRows, spreadsheetUrl, maxRows = 50 }) => {
                       href={spreadsheetUrl}
                       target="_blank"
                       rel="noreferrer"
+                      aria-label="Open rejected row in Google Sheets"
                     >
                       <OpenInNewIcon sx={{ fontSize: 14 }} />
                     </IconButton>

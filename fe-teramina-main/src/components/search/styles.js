@@ -3,6 +3,8 @@ import { makeStyles } from "tss-react/mui";
 const useStyles = makeStyles()((theme) => ({
   wrapperSearch: {
     display: "inline-flex",
+    maxWidth: "100%",
+    flex: "1 1 260px",
     "& input": {
       width: "342px",
       [theme.breakpoints.down("sm")]: {
@@ -15,7 +17,10 @@ const useStyles = makeStyles()((theme) => ({
     "& fieldset": {
       border: "1px solid #E2E8F0",
       borderRadius: 3,
-    }
+    },
+    "& .MuiTextField-root": {
+      maxWidth: "100%",
+    },
 
   },
   bgIcon: {

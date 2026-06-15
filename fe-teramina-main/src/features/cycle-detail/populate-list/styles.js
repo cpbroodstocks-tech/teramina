@@ -8,9 +8,6 @@ const useStyles = makeStyles()((theme) => ({
     marginBottom: "20px",
   },
   table: {
-    [theme.breakpoints.down("sm")]: {
-      width: "1000px",
-    },
     "& th": {
       fontFamily: "Lato",
       background: "#F8FAFC",

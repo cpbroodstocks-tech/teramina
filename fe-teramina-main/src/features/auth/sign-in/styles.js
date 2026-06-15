@@ -17,14 +17,19 @@ const useStyles = makeStyles()((theme) => ({
     position: "fixed",
     top: "30px",
     left: "30px",
+    zIndex: 3,
+    [theme.breakpoints.down("sm")]: {
+      top: 16,
+      left: 16,
+    },
   },
   contentSignIn: {
     display: "flex",
     flexDirection: "row",
     justifyContent: "space-between",
+    minHeight: "calc(100vh - 60px)",
     [theme.breakpoints.down("sm")]: {
-      flexDirection: "column",
-      height: "calc(100vh - 55px)",
+      minHeight: "calc(100vh - 55px)",
       alignItems: "center",
     },
 
@@ -42,25 +47,25 @@ const useStyles = makeStyles()((theme) => ({
     justifyContent: "center",
     flexWrap: "wrap",
     [theme.breakpoints.down("sm")]: {
-      flex: "100%",
-      position: "absolute",
-      top: "30%",
+      flex: "1 1 100%",
+      width: "100%",
+      padding: "96px 16px 32px",
       zIndex: 2,
     },
 
   },
   formWrapper: {
-    width: "352px",
-    height: "254px",
+    width: "min(420px, calc(100vw - 32px))",
+    minHeight: "254px",
     padding: "46px",
-    borderRadius: "5px",
+    borderRadius: "12px",
     boxShadow: "0px 6px 8px rgba(0, 0, 0, 0.05)",
     display: "flex",
     flexDirection: "column",
     justifyContent: "center",
     backgroundColor: "#fff",
     [theme.breakpoints.down("sm")]: {
-      backgroundColor: "#fff",
+      padding: "32px 24px",
     },
   },
   headingSmallSignIn: {
@@ -95,9 +100,7 @@ const useStyles = makeStyles()((theme) => ({
     zIndex: "1",
     height: "calc(100vh - 60px)",
     [theme.breakpoints.down("sm")]: {
-      boxShadow: "inset 0 0 0 2000px #474da447",
-      flex: "100%",
-      width: "100%",
+      display: "none",
     },
 
   }

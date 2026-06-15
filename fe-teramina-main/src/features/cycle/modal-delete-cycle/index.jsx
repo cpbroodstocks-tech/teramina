@@ -27,6 +27,7 @@ const ModalCycleDelete = ({ data }) => {
   return (
     <Fragment>
       <Button
+        aria-label={t("DELETE_CYCLE_DATA")}
         className={styles.btnDelete}
         onClick={() => setOpenConfirmDelete(true)}
       >

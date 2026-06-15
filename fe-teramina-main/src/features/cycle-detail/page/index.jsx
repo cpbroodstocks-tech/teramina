@@ -13,6 +13,7 @@ import FeedingRecommendation from "features/cycle-detail/feeding-recommendation"
 import BenchmarkSection from "features/cycle-detail/benchmark";
 import GoogleSheets from "features/cycle-detail/google-sheets";
 import DataQuality from "features/cycle-detail/data-quality";
+import { useTranslation } from "react-i18next";
 
 const PopulateContent = () => {
   const { data, isLoading, isError } = useCycleDataList();
@@ -29,6 +30,7 @@ const CycleDetail = () => {
   const { data } = useCycleDataList();
   const { cycle_id } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   return (
     <Box>
@@ -39,46 +41,47 @@ const CycleDetail = () => {
           <Typography variant="body2" color="text.primary" fontWeight={600}>{data.cycle_name}</Typography>
         </Breadcrumbs>
       )}
-      <Box sx={{ display: "flex", alignItems: "center", borderBottom: "1px solid #e0e0e0", mb: 1 }}>
+      <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1, borderBottom: "1px solid", borderColor: "divider", mb: 1 }}>
         <Tabs
           value={tab}
           onChange={(_, v) => setTab(v)}
-          sx={{ flexGrow: 1 }}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{ flex: "1 1 420px", minWidth: 0 }}
         >
-          <Tab label="Data" />
-          <Tab label="AI Insights" />
-          <Tab label="Feeding" />
-          <Tab label="Benchmark" />
+          <Tab label={t("DATA")} />
+          <Tab label={t("AI_INSIGHTS")} />
+          <Tab label={t("FEEDING")} />
+          <Tab label={t("BENCHMARK")} />
         </Tabs>
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<TimelineIcon />}
-          onClick={() => navigate(`/dashboard/pond-timeline/${cycle_id}`)}
-          sx={{ mr: 1, fontSize: 12 }}
-        >
-          Timeline
-        </Button>
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<BarChartIcon />}
-          onClick={() => navigate(`/dashboard/cycle/pl-report/${cycle_id}`)}
-          sx={{ mr: 1, fontSize: 12 }}
-        >
-          P&amp;L Report
-        </Button>
-        <Tooltip title={sheetsOpen ? "Close Google Sheets" : "Connect Google Sheets"}>
-          <IconButton
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, pb: 1 }}>
+          <Button
             size="small"
-            sx={{ mr: 1.5 }}
-            onClick={() => setSheetsOpen((v) => !v)}
-            color={sheetsOpen ? "primary" : "default"}
-            aria-label={sheetsOpen ? "Close Google Sheets setup" : "Connect Google Sheets"}
+            variant="outlined"
+            startIcon={<TimelineIcon />}
+            onClick={() => navigate(`/dashboard/pond-timeline/${cycle_id}`)}
           >
-            <SiGooglesheets size={20} color={sheetsOpen ? "#474DA4" : "#34A853"} />
-          </IconButton>
-        </Tooltip>
+            {t("TIMELINE")}
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<BarChartIcon />}
+            onClick={() => navigate(`/dashboard/cycle/pl-report/${cycle_id}`)}
+          >
+            {t("P_AND_L_REPORT")}
+          </Button>
+          <Tooltip title={sheetsOpen ? t("CLOSE_GOOGLE_SHEETS") : t("CONNECT_GOOGLE_SHEETS")}>
+            <IconButton
+              size="small"
+              onClick={() => setSheetsOpen((v) => !v)}
+              color={sheetsOpen ? "primary" : "default"}
+              aria-label={sheetsOpen ? t("CLOSE_GOOGLE_SHEETS") : t("CONNECT_GOOGLE_SHEETS")}
+            >
+              <SiGooglesheets size={20} color={sheetsOpen ? "#474DA4" : "#237A43"} />
+            </IconButton>
+          </Tooltip>
+        </Box>
       </Box>
       {tab === 0 && (
         <>

@@ -63,27 +63,16 @@ const useFilter = () => {
       });
     }),
     handleReset: () => {
-      reset();
-      setSubmittedParams(null);
-      setSelectedFilter({ date: "", cycle_id: "" });
-      setFilter((previousValue) => ({
-        ...previousValue,
-        filter: {
-          farms: previousValue.filter.farms,
-          ponds: undefined,
-          cycles: undefined,
-          daterange: {
-            start_date: dayjs(new Date()).format("MM/DD/YYYY"),
-            end_date: dayjs(N_DOC_AFTER).format("MM/DD/YYYY"),
-          },
-        },
-      }));
-      filterQueryParams.current = {
-        farm_id: "",
-        pond_id: "",
-        cycle_id: "",
-        filter_type: "historical",
+      const date = filterList.filter.daterange?.end_date || "";
+      const values = {
+        farm_id: filterQueryParams.current.farm_id,
+        pond_id: filterQueryParams.current.pond_id,
+        cycle_id: filterQueryParams.current.cycle_id,
+        date,
       };
+      reset(values);
+      setSelectedFilter({ date, cycle_id: values.cycle_id });
+      setSubmittedParams({ ...values, filter_type: "historical" });
     },
     dirty: formState.isDirty,
     setFieldValue: setValue,

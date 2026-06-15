@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import Footer from "components/footer";
 import { useStyles } from "./styles";
-import { Typography, Avatar, Box, Button } from "@mui/material";
+import { Alert, Typography, Avatar, Box, Button, CircularProgress } from "@mui/material";
 import { Navigate } from "react-router-dom";
 import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { useLocalStorage } from "hooks/useLocalStorage";
@@ -12,7 +12,8 @@ const SignIn = () => {
   const { t } = useTranslation();
   const { classes: styles } = useStyles();
   const { get } = useLocalStorage();
-  const [error, setError] = useState(false);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const isAuthenticated = get("authentication");
   if (isAuthenticated) return <Navigate to={"/dashboard"} />;
@@ -20,23 +21,33 @@ const SignIn = () => {
   const handleOnClick = async () => {
     const auth = getAuth();
     const provider = new GoogleAuthProvider();
+    setError(null);
+    setLoading(true);
     try {
       const response = await signInWithPopup(auth, provider);
       if (!response) throw response;
     } catch (err) {
-      setError(true);
+      const recoverableErrors = {
+        "auth/popup-closed-by-user": "SIGN_IN_POPUP_CLOSED",
+        "auth/cancelled-popup-request": "SIGN_IN_POPUP_CLOSED",
+        "auth/popup-blocked": "SIGN_IN_POPUP_BLOCKED",
+        "auth/network-request-failed": "SIGN_IN_NETWORK_ERROR",
+      };
+      setError(recoverableErrors[err?.code] || "ACCESS_DENIED");
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (error) {
+  if (error === "ACCESS_DENIED") {
     return (
       <Error
-        title="Access is not enabled for this account"
-        message="Teramina is currently in closed beta. Request access and we will notify you after approval."
-        actionLabel="Request access"
+        title={t("ACCESS_NOT_ENABLED")}
+        message={t("CLOSED_BETA_MESSAGE")}
+        actionLabel={t("REQUEST_ACCESS")}
         onAction={() => { window.location.href = "/#waitlist"; }}
-        secondaryLabel="Try another account"
-        onSecondary={() => setError(false)}
+        secondaryLabel={t("TRY_ANOTHER_ACCOUNT")}
+        onSecondary={() => setError(null)}
       />
     );
   }
@@ -68,15 +79,16 @@ const SignIn = () => {
                 onClick={handleOnClick}
                 variant="outlined"
                 className={styles.btnSignIn}
+                disabled={loading}
                 startIcon={
-                  <Avatar
-                    src="/assets/images/lgGoogle.png"
-                    className={styles.avatarGoogle}
-                  />
+                  loading
+                    ? <CircularProgress size={20} />
+                    : <Avatar src="/assets/images/lgGoogle.png" className={styles.avatarGoogle} alt="" />
                 }
               >
-                {t("LOGIN_WITH_GOOGLE")}
+                {loading ? t("SIGNING_IN") : t("LOGIN_WITH_GOOGLE")}
               </Button>
+              {error && <Alert severity="error" sx={{ mt: 2 }}>{t(error)}</Alert>}
             </Box>
           </div>
           <div className={styles.rightContent}>

@@ -86,7 +86,7 @@ describe("Water Quality dashboard", () => {
     });
 
     render(<WaterQuality />);
-    await userEvent.click(screen.getByRole("tab", { name: "Table" }));
+    await userEvent.click(screen.getByRole("tab", { name: "TABLE" }));
 
     expect(screen.getByRole("table")).toBeInTheDocument();
   });

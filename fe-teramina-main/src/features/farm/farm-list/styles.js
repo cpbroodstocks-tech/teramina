@@ -6,12 +6,11 @@ const useStyles = makeStyles()((theme) => ({
     justifyContent: "space-between",
     verticalAlign: "middle",
     marginBottom: "20px",
+    gap: 12,
+    flexWrap: "wrap",
   },
   table: {
     fontFamily: "Lato",
-    [theme.breakpoints.down("sm")]: {
-      width: "1000px",
-    },
     "& th": {
       background: "#F8FAFC",
       fontFamily: "Lato",

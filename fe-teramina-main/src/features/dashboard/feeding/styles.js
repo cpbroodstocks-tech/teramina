@@ -151,9 +151,6 @@ const useStyles = makeStyles()((theme) => ({
   },
   table: {
     fontFamily: "Lato",
-    [theme.breakpoints.down("sm")]: {
-      width: "1000px",
-    },
     "& th": {
       background: "#F8FAFC",
       fontWeight: 600,

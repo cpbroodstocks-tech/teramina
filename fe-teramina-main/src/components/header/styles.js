@@ -2,17 +2,26 @@ import { makeStyles } from "tss-react/mui";
 
 const useStyles = makeStyles()((theme) => ({
   header: {
-    position: "absolute",
-    width: "100%",
+    position: "sticky",
     top: 0,
-    right: 0,
-    left: 0,
-    margin: "auto",
     zIndex: 1064,
-    padding: "15px",
+    minHeight: 68,
+    margin: "0 -40px 16px",
+    padding: "10px 40px",
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 8,
+    backgroundColor: "rgba(255,255,255,0.96)",
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    backdropFilter: "blur(10px)",
+    [theme.breakpoints.down("sm")]: {
+      margin: "0 -12px 12px",
+      padding: "8px 12px",
+    },
+    [theme.breakpoints.between("sm", "md")]: {
+      margin: "0 -20px 16px",
+      padding: "10px 20px",
+    },
   },
   toggleButton: {
     [theme.breakpoints.up("sm")]: {
@@ -24,12 +33,11 @@ const useStyles = makeStyles()((theme) => ({
   userButton: {
     marginLeft: "auto",
     alignItems: "center",
-    "& span:first-child": {
-      padding: "2px 10px",
-      marginRight: 10,
-      borderRadius: "50%",
-      background: "#1976d2 !important",
-      color: "white",
+    color: theme.palette.text.primary,
+    [theme.breakpoints.down("sm")]: {
+      minWidth: 40,
+      padding: 4,
+      fontSize: 0,
     },
   },
   avatarContainer: {
@@ -42,7 +50,8 @@ const useStyles = makeStyles()((theme) => ({
   },
   avatarUser: {
     width: "100%",
-    height: "auto",
+    height: "100%",
+    objectFit: "cover",
     position: "absolute",
     top: "50%",
     left: "50%",

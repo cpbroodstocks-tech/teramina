@@ -44,6 +44,7 @@ const useFilter = (api) => {
     data: {},
     error: false,
   }));
+  const [appliedValues, setAppliedValues] = useState(null);
 
   const { control, handleSubmit, reset, setValue, formState } = useForm({
     resolver: zodResolver(FILTER_SCHEMA),
@@ -69,6 +70,7 @@ const useFilter = (api) => {
         data: response.payload,
         error: false,
       }));
+      setAppliedValues(values);
     } catch (err) {
       const errorMessage =
         err.response?.data?.message || t("SOMETHING_WENT_WRONG");
@@ -97,28 +99,15 @@ const useFilter = (api) => {
       fetchMVPWithFilter(values);
     }),
     handleReset: () => {
-      reset();
-      setFilter((previousValue) => ({
-        ...previousValue,
-        filter: {
-          farms: previousValue.filter.farms,
-          ponds: undefined,
-          cycles: undefined,
-          daterange: {
-            start_date: dayjs(new Date()).format("MM/DD/YYYY"),
-            end_date: dayjs(N_DOC_AFTER).format("MM/DD/YYYY"),
-          },
-        },
-        data: {},
-        error: false,
-      }));
-
-      filterQueryParams.current = {
-        farm_id: "",
-        pond_id: "",
-        cycle_id: "",
-        filter_type: "historical",
+      const date = filterList.filter.daterange?.end_date || "";
+      const values = {
+        farm_id: filterQueryParams.current.farm_id,
+        pond_id: filterQueryParams.current.pond_id,
+        cycle_id: filterQueryParams.current.cycle_id,
+        date,
       };
+      reset(values);
+      fetchMVPWithFilter(values);
     },
     dirty: formState.isDirty,
     setFieldValue: setValue,
@@ -258,6 +247,7 @@ const useFilter = (api) => {
     ...filterList,
     form,
     onFilterChange: handleFilterChange,
+    appliedValues,
   };
 };
 

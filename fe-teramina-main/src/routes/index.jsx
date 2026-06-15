@@ -117,6 +117,7 @@ const routes = [
         icon: <ReactSVG src={iconOverview} />,
         category: "parrent",
         group: "MENU_GROUP.ANALYZE",
+        contextLevel: "cycle",
       },
       {
         path: "farm",
@@ -139,6 +140,7 @@ const routes = [
         element: <Pond />,
         icon: <ReactSVG src={iconFarm} />,
         category: "children",
+        navParent: "MENU.FARM_MANAGEMENT",
       },
       {
         path: "cycle/:pond_id",
@@ -146,6 +148,7 @@ const routes = [
         element: <Cycle />,
         icon: <ReactSVG src={iconFarm} />,
         category: "children",
+        navParent: "MENU.FARM_MANAGEMENT",
       },
       {
         path: "cycle/detail/:cycle_id",
@@ -153,6 +156,7 @@ const routes = [
         element: <CycleDetail />,
         icon: <ReactSVG src={iconFarm} />,
         category: "children",
+        navParent: "MENU.FARM_MANAGEMENT",
       },
       {
         path: "economics",
@@ -161,6 +165,7 @@ const routes = [
         icon: <ReactSVG src={iconEconomics} />,
         category: "parrent",
         group: "MENU_GROUP.ANALYZE",
+        contextLevel: "cycle",
       },
       {
         path: "feeding",
@@ -169,6 +174,7 @@ const routes = [
         icon: <ReactSVG src={iconFeeding} />,
         category: "parrent",
         group: "MENU_GROUP.OPERATE",
+        contextLevel: "cycle",
       },
       {
         path: "forecast",
@@ -177,6 +183,7 @@ const routes = [
         icon: <ReactSVG src={iconForecast} />,
         category: "parrent",
         group: "MENU_GROUP.ANALYZE",
+        contextLevel: "cycle",
       },
       {
         path: "harvest",
@@ -185,6 +192,7 @@ const routes = [
         icon: <ReactSVG src={iconHarvest} />,
         category: "parrent",
         group: "MENU_GROUP.OPERATE",
+        contextLevel: "cycle",
       },
       {
         path: "water-quality",
@@ -193,6 +201,7 @@ const routes = [
         icon: <OpacityIcon fontSize="small" />,
         category: "parrent",
         group: "MENU_GROUP.OPERATE",
+        contextLevel: "cycle",
       },
       {
         path: "today",
@@ -200,7 +209,8 @@ const routes = [
         element: <TodayView />,
         icon: <TodayIcon fontSize="small" />,
         category: "parrent",
-        group: "MENU_GROUP.OPERATE",
+        group: "MENU_GROUP.TODAY",
+        contextLevel: "farm",
       },
       {
         path: "memory",
@@ -209,6 +219,7 @@ const routes = [
         icon: <PsychologyIcon fontSize="small" />,
         category: "parrent",
         group: "MENU_GROUP.IMPROVE",
+        contextLevel: "cycle",
       },
       {
         path: "library",
@@ -232,6 +243,7 @@ const routes = [
         element: <AdvisoryNew />,
         icon: <SupportAgentIcon fontSize="small" />,
         category: "children",
+        navParent: "MENU.ADVISORY",
       },
       {
         path: "advisory/:case_id",
@@ -239,6 +251,7 @@ const routes = [
         element: <AdvisoryDetail />,
         icon: <SupportAgentIcon fontSize="small" />,
         category: "children",
+        navParent: "MENU.ADVISORY",
       },
       {
         path: "billing",
@@ -263,6 +276,7 @@ const routes = [
         element: <PondTimeline />,
         icon: <TimelineIcon fontSize="small" />,
         category: "children",
+        navParent: "MENU.FARM_MANAGEMENT",
       },
       {
         path: "profile",
@@ -278,6 +292,7 @@ const routes = [
         element: <ProfileEdit />,
         icon: <ReactSVG src={iconProfile} />,
         category: "children",
+        navParent: "MENU.PROFILE",
       },
       {
         path: "cost-data/:farm_id",
@@ -285,6 +300,7 @@ const routes = [
         element: <CostData />,
         icon: <ReactSVG src={iconProfile} />,
         category: "children",
+        navParent: "MENU.COST_ACCOUNTING",
       },
       {
         path: "harvest-simulator/:cycle_id",
@@ -292,6 +308,7 @@ const routes = [
         element: <HarvestSimulator />,
         icon: <ReactSVG src={iconHarvest} />,
         category: "children",
+        navParent: "MENU.HARVEST",
       },
       {
         path: "cycle/pl-report/:cycle_id",
@@ -299,6 +316,7 @@ const routes = [
         element: <PLReport />,
         icon: <ReactSVG src={iconEconomics} />,
         category: "children",
+        navParent: "MENU.COST_ACCOUNTING",
       },
       {
         path: "farm/pl-report/:farm_id",
@@ -306,6 +324,7 @@ const routes = [
         element: <FarmPLReport />,
         icon: <ReactSVG src={iconEconomics} />,
         category: "children",
+        navParent: "MENU.COST_ACCOUNTING",
       },
     ],
   },

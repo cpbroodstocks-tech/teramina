@@ -62,26 +62,24 @@ const useFilter = () => {
       });
     }),
     handleReset: () => {
-      reset();
-      setSubmittedParams(null);
-      setFilter((previousValue) => ({
-        ...previousValue,
-        filter: {
-          farms: previousValue.filter.farms,
-          ponds: undefined,
-          cycles: [],
-          daterange: {
-            start_date: dayjs(new Date()).format("MM/DD/YYYY"),
-            end_date: dayjs(N_DOC_AFTER).format("MM/DD/YYYY"),
-          },
-          variables: [],
-        },
-      }));
-      filterQueryParams.current = {
-        farm_id: "",
-        pond_id: "",
-        cycle_id: [],
+      const variables = filterList.filter.variables?.includes("wqi_1")
+        ? ["wqi_1"]
+        : filterList.filter.variables?.slice(0, 1) || [];
+      const values = {
+        farm_id: filterQueryParams.current.farm_id,
+        pond_id: filterQueryParams.current.pond_id,
+        cycle_id: filterQueryParams.current.cycle_id,
+        start_date: filterList.filter.daterange?.start_date || "",
+        end_date: filterList.filter.daterange?.end_date || "",
+        variables,
       };
+      reset(values);
+      setSubmittedParams({
+        cycles: values.cycle_id.join(","),
+        start_date: dayjs(values.start_date).format("YYYY-MM-DD"),
+        end_date: dayjs(values.end_date).format("YYYY-MM-DD"),
+        variables: values.variables.join(","),
+      });
     },
     dirty: formState.isDirty,
     errors: formState.errors,
@@ -89,6 +87,11 @@ const useFilter = () => {
   };
 
   const handleFilterChange = async (key, value) => {
+    if (["start_date", "end_date", "variables"].includes(key)) {
+      setValue(key, value, { shouldDirty: true });
+      return;
+    }
+
     const fields = [
       "farm_id",
       "pond_id",

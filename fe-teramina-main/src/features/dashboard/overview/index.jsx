@@ -36,12 +36,11 @@ import { useLineEchartsGenerateOptions } from "hooks/useLineEchartsGenerateOptio
 import { Markdown } from "components/markdown";
 import { useToastStore } from "store/toast.store";
 import { useCreateOverviewReport, useOverviewReportPoll } from "widgets/overview/queries";
-import { useDashboardContextStore } from "store/dashboard-context.store";
+import PageHeader from "components/page-header";
 
 const OverviewWidget = () => {
   const { t } = useTranslation();
-  const context = useDashboardContextStore();
-  const { loading, filter, data, error, form, onFilterChange } = useFilter("/dashboard/overview");
+  const { loading, filter, data, error, form, onFilterChange, appliedValues } = useFilter("/dashboard/overview");
   const { generateOptionsDefault, generateOptionsScatterOverview } = useLineEchartsGenerateOptions();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogTitle, setDialogTitle] = useState("");
@@ -87,14 +86,15 @@ const OverviewWidget = () => {
   const button_loading = creatingReport || !!reportTaskId;
 
   const handleClick = () => {
+    const reportContext = appliedValues || form.values;
     setDialogTitle("Info");
     setDialogMessage("Report download in progress. This may take up to 1 minute...");
     setDialogOpen(true);
     createReport({
-      farm_id: context.farm_id,
-      pond_id: context.pond_id,
-      cycle_id: context.cycle_id,
-      date: (localStorage.getItem("date") || "").replace(/"/g, ""),
+      farm_id: reportContext.farm_id,
+      pond_id: reportContext.pond_id,
+      cycle_id: reportContext.cycle_id,
+      date: reportContext.date,
       token: localStorage.getItem("authentication"),
     }, {
       onSuccess: (id) => setReportTaskId(id),
@@ -111,7 +111,7 @@ const OverviewWidget = () => {
 
   return (
     <Fragment>
-      <Typography variant="h1" sx={{ mb: "15px", fontSize: 40, textTransform: "uppercase" }}>{t("MENU.OVERVIEW").toUpperCase()}</Typography>
+      <PageHeader title={t("MENU.OVERVIEW")} description={t("PAGE_DESCRIPTION.OVERVIEW")} />
       <Filter filter={filter} form={form} onFilterChange={onFilterChange} />
       {loading && <Loader />}
       {error && <Error />}

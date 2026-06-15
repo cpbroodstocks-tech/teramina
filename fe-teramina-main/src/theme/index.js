@@ -5,10 +5,33 @@ const theme = createTheme({
   palette: {
     primary: {
       main: "#474DA4",
+      dark: "#343986",
+      light: "#EEF0FF",
+      contrastText: "#FFFFFF",
     },
     secondary: {
-      main: "#2EC4B6",
-      contrastText: "#fff",
+      main: "#147D73",
+      dark: "#0F6159",
+      light: "#E5F6F3",
+      contrastText: "#FFFFFF",
+    },
+    background: {
+      default: "#F6F7FB",
+      paper: "#FFFFFF",
+    },
+    text: {
+      primary: "#1D2433",
+      secondary: "#5F6B7A",
+    },
+    divider: "#DDE2EA",
+    success: {
+      main: "#237A43",
+    },
+    warning: {
+      main: "#A95E00",
+    },
+    error: {
+      main: "#B42318",
     },
   },
   custom: {
@@ -17,9 +40,33 @@ const theme = createTheme({
     },
     font: {
       main: "#ffffff",
-    }
+    },
+    surface: {
+      muted: "#F6F7FB",
+      selected: "#EEF0FF",
+    },
+    status: {
+      successBackground: "#EAF6EE",
+      warningBackground: "#FFF4E5",
+      errorBackground: "#FDECEC",
+      infoBackground: "#EDF4FF",
+    },
+  },
+  shape: {
+    borderRadius: 8,
   },
   components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: {
+          backgroundColor: "#F6F7FB",
+        },
+        "*:focus-visible": {
+          outline: "3px solid #7B83DB",
+          outlineOffset: 2,
+        },
+      },
+    },
     MuiDataGrid: {
       styleOverrides: {
         columnHeadersInner: {
@@ -34,7 +81,8 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           boxShadow: "none",
-          border: "1px solid #E2E8F0"
+          border: "1px solid #DDE2EA",
+          borderRadius: 10,
         }
       }
     },
@@ -68,19 +116,26 @@ const theme = createTheme({
         containedPrimary: {
           backgroundColor: "#474DA4",
           "&:hover": {
-            backgroundColor: "#fff",
-            color: "#474DA4"
+            backgroundColor: "#343986",
           },
         },
         root: {
           textTransform: "capitalize",
           textDecoration: "none",
+          borderRadius: 8,
+          fontWeight: 700,
+          minHeight: 40,
         },
       }
     },
     MuiButtonBase: {
       styleOverrides: {
-        padding: "inherit"
+        root: {
+          "&.Mui-focusVisible": {
+            outline: "3px solid #7B83DB",
+            outlineOffset: 2,
+          },
+        },
       }
     },
     MuiTypography: {
@@ -129,9 +184,12 @@ const theme = createTheme({
     body1: {
       fontFamily: "Lato",
       fontSize: "14px",
-      "@media (max-width:600px)": {
-        fontSize: "12px",
-      },
+      lineHeight: 1.5,
+    },
+    body2: {
+      fontFamily: "Lato",
+      fontSize: "14px",
+      lineHeight: 1.45,
     },
     h1: {
       fontFamily: "Lato",
@@ -161,7 +219,7 @@ const theme = createTheme({
     h6: {
       fontFamily: "Lato",
       fontSize: "14px",
-      fontWeight: 500
+      fontWeight: 700
     },
     p: {
       fontFamily: "Lato",

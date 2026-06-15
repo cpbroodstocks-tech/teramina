@@ -1,11 +1,15 @@
 import { useEffect } from "react";
 import { FormControl, InputLabel, MenuItem, Select, Stack } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { trackDemoEvent } from "features/demo-experience/analytics";
 import { useFarmHierarchy } from "features/farm/queries";
 import { useDashboardContextStore } from "store/dashboard-context.store";
 
-const ContextSelector = () => {
+type ContextLevel = "farm" | "pond" | "cycle";
+
+const ContextSelector = ({ level = "cycle" }: { level?: ContextLevel }) => {
+  const { t } = useTranslation();
   const { data: farms = [] } = useFarmHierarchy();
   const context = useDashboardContextStore();
   const queryClient = useQueryClient();
@@ -62,11 +66,16 @@ const ContextSelector = () => {
   };
 
   return (
-    <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ flex: 1 }}>
-      <FormControl size="small" sx={{ minWidth: 180 }}>
-        <InputLabel>Farm</InputLabel>
+    <Stack
+      direction={{ xs: "column", lg: "row" }}
+      spacing={1}
+      sx={{ flex: 1, minWidth: 0 }}
+      aria-label={t("OPERATIONAL_CONTEXT")}
+    >
+      <FormControl size="small" sx={{ minWidth: { lg: 180 }, flex: "1 1 180px" }}>
+        <InputLabel>{t("FARM")}</InputLabel>
         <Select
-          label="Farm"
+          label={t("FARM")}
           value={selectedFarm.id}
           onChange={(event) => {
             const farm = farms.find((item) => item.id === event.target.value);
@@ -85,10 +94,10 @@ const ContextSelector = () => {
           {farms.map((farm) => <MenuItem key={farm.id} value={farm.id}>{farm.name}</MenuItem>)}
         </Select>
       </FormControl>
-      <FormControl size="small" sx={{ minWidth: 180 }} disabled={!ponds.length}>
-        <InputLabel>Pond</InputLabel>
+      {level !== "farm" && <FormControl size="small" sx={{ minWidth: { lg: 180 }, flex: "1 1 180px" }} disabled={!ponds.length}>
+        <InputLabel>{t("POND")}</InputLabel>
         <Select
-          label="Pond"
+          label={t("POND")}
           value={selectedPond?.id || ""}
           onChange={(event) => {
             const pond = ponds.find((item) => item.id === event.target.value);
@@ -103,11 +112,11 @@ const ContextSelector = () => {
         >
           {ponds.map((pond) => <MenuItem key={pond.id} value={pond.id}>{pond.name}</MenuItem>)}
         </Select>
-      </FormControl>
-      <FormControl size="small" sx={{ minWidth: 210 }} disabled={!cycles.length}>
-        <InputLabel>Cycle</InputLabel>
+      </FormControl>}
+      {level === "cycle" && <FormControl size="small" sx={{ minWidth: { lg: 210 }, flex: "1 1 210px" }} disabled={!cycles.length}>
+        <InputLabel>{t("CYCLE")}</InputLabel>
         <Select
-          label="Cycle"
+          label={t("CYCLE")}
           value={selectedCycle?.id || ""}
           onChange={(event) => {
             const cycle = cycles.find((item) => item.id === event.target.value);
@@ -116,11 +125,11 @@ const ContextSelector = () => {
         >
           {cycles.map((cycle) => (
             <MenuItem key={cycle.id} value={cycle.id}>
-              {cycle.name}{cycle.dashboard_ready ? "" : " (not ready)"}
+              {cycle.name}{cycle.dashboard_ready ? "" : ` (${t("NOT_READY")})`}
             </MenuItem>
           ))}
         </Select>
-      </FormControl>
+      </FormControl>}
     </Stack>
   );
 };

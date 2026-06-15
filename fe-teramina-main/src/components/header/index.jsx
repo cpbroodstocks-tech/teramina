@@ -52,13 +52,13 @@ const Header = (props) => {
     <header className={styles.header}>
       <Button onClick={() => setOpen(!open)} className={styles.toggleButton}>
         <GiHamburgerMenu />
-        {/* Buka Menu */}
+        <span className="sr-only">{t("OPEN_NAVIGATION")}</span>
       </Button>
 
       {user && (
         <>
           <Tooltip title="AI Assistant">
-            <IconButton onClick={() => setAgentOpen(true)}>
+            <IconButton onClick={() => setAgentOpen(true)} aria-label={t("OPEN_AI_ASSISTANT")}>
               <Badge badgeContent={alertCount} color="error">
                 <RiRobot2Line />
               </Badge>
@@ -72,7 +72,7 @@ const Header = (props) => {
             onInitialMessageConsumed={() => setPendingMessage("")}
           />
           <Tooltip title={t("OPEN_SETTINGS")}>
-            <Button className={styles.userButton} onClick={handleOpenUserMenu}>
+            <Button className={styles.userButton} onClick={handleOpenUserMenu} aria-label={t("OPEN_SETTINGS")}>
               <div className={styles.avatarContainer}>
                 {user.picture ? (
                   <img

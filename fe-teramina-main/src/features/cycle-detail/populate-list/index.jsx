@@ -8,6 +8,7 @@ import {
   TableRow,
   Paper,
   Button,
+  Box,
   Typography,
 } from "@mui/material";
 import { BiChevronLeftCircle } from "react-icons/bi";
@@ -16,6 +17,7 @@ import ModalPopulateAdd from "features/cycle-detail/modal-add-populate";
 import ButtonDownloadData from "features/cycle-detail/download-data";
 import { useStyles } from "features/cycle-detail/populate-list/styles";
 import { useTranslation } from "react-i18next";
+import ResponsiveDataList from "components/responsive-data-list";
 
 const PopulateList = ({ data }) => {
   const { t } = useTranslation();
@@ -45,28 +47,29 @@ const PopulateList = ({ data }) => {
         <ButtonDownloadData />
       </div>
       {/* List Farm */}
-      <TableContainer component={Paper}>
-        <Table className={styles.table}>
-          <TableHead>
-            <TableRow>
-              {data.columns.map((column, key) => (
-                <TableCell key={key}>{column}</TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {data.data.map((populations, key) => (
-              <TableRow key={key}>
-                {data.columns.map((column, key_column) => (
-                  <TableCell key={key_column}>
-                    {populations[`${column}`]}
-                  </TableCell>
-                ))}
+      <ResponsiveDataList
+        items={data.data}
+        getKey={(_, index) => index}
+        fields={data.columns.map((column) => ({ label: column, value: (population) => population[column] }))}
+      />
+      <Box sx={{ display: { xs: "none", md: "block" } }}>
+        <TableContainer component={Paper}>
+          <Table className={styles.table}>
+            <TableHead>
+              <TableRow>
+                {data.columns.map((column) => <TableCell key={column}>{column}</TableCell>)}
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {data.data.map((populations, key) => (
+                <TableRow key={key}>
+                  {data.columns.map((column) => <TableCell key={column}>{populations[column]}</TableCell>)}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Box>
     </Fragment>
   );
 };
