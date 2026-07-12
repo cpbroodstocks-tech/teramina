@@ -2,6 +2,7 @@
 
 from typing import Optional
 from ninja import Schema
+from pydantic import ConfigDict
 
 
 class FeedDataSchema(Schema):
@@ -10,8 +11,7 @@ class FeedDataSchema(Schema):
     feed_leftover: Optional[float] = None   # optional: farmer may skip tray reading
     date: str
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(json_schema_extra={
             "name": "Feed Data",
             "example": {
                 "ration_number": 1,
@@ -19,15 +19,14 @@ class FeedDataSchema(Schema):
                 "feed_leftover": 1.5,       # can be omitted
                 "date": "02/08/2023",
             },
-        }
+        })
 
 
 class FeedUpdateSchema(Schema):
     feed_given: float
     feed_leftover: Optional[float] = None   # optional: farmer may skip tray reading
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(json_schema_extra={
             "name": "Feed Update Data",
             "example": {"feed_given": 19.5, "feed_leftover": 1.5},
-        }
+        })

@@ -3,7 +3,7 @@
 import re
 from ninja import Schema
 from typing import Optional
-from pydantic import validator
+from pydantic import ConfigDict, validator
 
 
 class RegisterSchema(Schema):
@@ -12,15 +12,14 @@ class RegisterSchema(Schema):
     password: str
     phone: str
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(json_schema_extra={
             "example": {
                 "name": "Sundari Sukoco",
                 "email": "sukoco@gmail.com",
                 "password": "Password123!",
                 "phone": "089563763889",
             }
-        }
+        })
 
     @validator("email")
     @classmethod

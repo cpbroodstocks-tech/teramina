@@ -10,7 +10,7 @@ class Farm(Document):
     demo_bundle_version = fields.StringField(default="")
     archived_at = fields.DateTimeField()
     archived_by = fields.StringField(default="")
-    created_at = fields.DateTimeField(default=datetime.now())
+    created_at = fields.DateTimeField(default=datetime.now)
     last_updated = fields.DateTimeField()
 
     meta = {"indexes": ["user_id"]}

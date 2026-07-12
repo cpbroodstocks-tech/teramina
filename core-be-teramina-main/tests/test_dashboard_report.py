@@ -4,9 +4,11 @@ from unittest.mock import MagicMock, patch
 
 
 class TestDashboardReportRoutes:
+    @patch("teramina.dashboard.controllers.dashboard_controller.cache")
+    @patch("teramina.dashboard.controllers.dashboard_controller.verify_farm_owner", return_value=True)
     @patch("teramina.dashboard.controllers.dashboard_controller.generate_overview_report")
     @patch("teramina.dashboard.controllers.dashboard_controller.get_signed_in_user")
-    def test_create_report_queues_task_and_returns_task_id(self, mock_user, mock_task):
+    def test_create_report_queues_task_and_returns_task_id(self, mock_user, mock_task, _mock_owner, mock_cache):
         from teramina.dashboard.controllers.dashboard_controller import create_report
 
         mock_user.return_value = SimpleNamespace(id="user_001")
@@ -30,12 +32,17 @@ class TestDashboardReportRoutes:
             None,
             "user_001",
         )
+        mock_cache.set.assert_called_once_with("dashboard_report_owner:task_123", "user_001", timeout=3600)
 
+    @patch("teramina.dashboard.controllers.dashboard_controller.get_signed_in_user")
+    @patch("teramina.dashboard.controllers.dashboard_controller.cache")
     @patch("teramina.dashboard.controllers.dashboard_controller.AsyncResult")
-    def test_get_report_pending_returns_json_status(self, MockAsyncResult):
+    def test_get_report_pending_returns_json_status(self, MockAsyncResult, mock_cache, mock_user):
         from teramina.dashboard.controllers.dashboard_controller import get_report
 
         MockAsyncResult.return_value = SimpleNamespace(state="PENDING")
+        mock_user.return_value = SimpleNamespace(id="user_001")
+        mock_cache.get.return_value = "user_001"
 
         response = get_report(MagicMock(), "task_123")
 
@@ -43,20 +50,27 @@ class TestDashboardReportRoutes:
         assert response["Content-Type"] == "application/json"
         assert b'"status": "PENDING"' in response.content
 
+    @patch("teramina.dashboard.controllers.dashboard_controller.get_signed_in_user")
+    @patch("teramina.dashboard.controllers.dashboard_controller.cache")
     @patch("teramina.dashboard.controllers.dashboard_controller.AsyncResult")
-    def test_get_report_failure_returns_failure_json(self, MockAsyncResult):
+    def test_get_report_failure_returns_failure_json(self, MockAsyncResult, mock_cache, mock_user):
         from teramina.dashboard.controllers.dashboard_controller import get_report
 
         MockAsyncResult.return_value = SimpleNamespace(state="FAILURE", result=RuntimeError("boom"))
+        mock_user.return_value = SimpleNamespace(id="user_001")
+        mock_cache.get.return_value = "user_001"
 
         response = get_report(MagicMock(), "task_123")
 
         assert response.status_code == 500
         assert b'"status": "FAILURE"' in response.content
         assert b"boom" in response.content
+        mock_cache.delete.assert_called_once_with("dashboard_report_owner:task_123")
 
+    @patch("teramina.dashboard.controllers.dashboard_controller.get_signed_in_user")
+    @patch("teramina.dashboard.controllers.dashboard_controller.cache")
     @patch("teramina.dashboard.controllers.dashboard_controller.AsyncResult")
-    def test_get_report_success_returns_pdf(self, MockAsyncResult):
+    def test_get_report_success_returns_pdf(self, MockAsyncResult, mock_cache, mock_user):
         from teramina.dashboard.controllers.dashboard_controller import get_report
 
         pdf_bytes = b"%PDF-1.4 fake"
@@ -69,6 +83,8 @@ class TestDashboardReportRoutes:
                 "data_base64": base64.b64encode(pdf_bytes).decode("ascii"),
             },
         )
+        mock_user.return_value = SimpleNamespace(id="user_001")
+        mock_cache.get.return_value = "user_001"
 
         response = get_report(MagicMock(), "task_123")
 
@@ -76,6 +92,21 @@ class TestDashboardReportRoutes:
         assert response["Content-Type"] == "application/pdf"
         assert response["Content-Disposition"] == 'attachment; filename="report_teramina.pdf"'
         assert response.content == pdf_bytes
+        mock_cache.delete.assert_called_once_with("dashboard_report_owner:task_123")
+
+    @patch("teramina.dashboard.controllers.dashboard_controller.get_signed_in_user")
+    @patch("teramina.dashboard.controllers.dashboard_controller.cache")
+    @patch("teramina.dashboard.controllers.dashboard_controller.AsyncResult")
+    def test_get_report_hides_another_users_task(self, MockAsyncResult, mock_cache, mock_user):
+        from teramina.dashboard.controllers.dashboard_controller import get_report
+
+        mock_user.return_value = SimpleNamespace(id="user_002")
+        mock_cache.get.return_value = "user_001"
+
+        response = get_report(MagicMock(), "task_123")
+
+        assert response.status_code == 404
+        MockAsyncResult.assert_not_called()
 
 
 class TestDashboardReportTask:

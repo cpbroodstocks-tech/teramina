@@ -58,6 +58,7 @@ import {
   useCreateInvoice,
   useMarkInvoicePaid,
 } from "features/billing/queries";
+import { AccessRequestsSection, AdminNavigation, AdminSection } from "features/commercial-admin/sections";
 
 const listFromText = (value) => value.split("\n").map((item) => item.trim()).filter(Boolean);
 
@@ -104,18 +105,6 @@ const buildHatcheryMetrics = (form) => {
   });
   return metrics;
 };
-
-const AdminSection = ({ id, title, description, children }) => (
-  <Paper id={id} variant="outlined" sx={{ p: 3, scrollMarginTop: 16 }}>
-    <Stack gap={2}>
-      <Box>
-        <Typography variant="h5" fontWeight={700}>{title}</Typography>
-        <Typography color="text.secondary">{description}</Typography>
-      </Box>
-      {children}
-    </Stack>
-  </Paper>
-);
 
 const CommercialAdminPage = () => {
   const { data: profile, isLoading: profileLoading } = useUserProfile();
@@ -845,54 +834,8 @@ const CommercialAdminPage = () => {
           </Typography>
         </Box>
 
-        <Paper variant="outlined" sx={{ p: 1, position: "sticky", top: 8, zIndex: 2 }}>
-          <Stack direction="row" gap={0.5} sx={{ flexWrap: "wrap" }}>
-            <Button href="#access-requests" size="small">Access</Button>
-            <Button href="#content-operations" size="small">Content</Button>
-            <Button href="#billing-operations" size="small">Billing</Button>
-            <Button href="#advisory-operations" size="small">Advisory</Button>
-            <Button href="#audit-trail" size="small">Audit</Button>
-          </Stack>
-        </Paper>
-
-        <AdminSection id="access-requests" title="Closed Beta Access" description="Approve or reject requests before users can create an account.">
-          {updateAccessRequest.isError && <Alert severity="error">Failed to update access request.</Alert>}
-          {accessRequests.length ? (
-            <Stack gap={1}>
-              {accessRequests.slice(0, 20).map((item) => (
-                <Paper key={item.id} variant="outlined" sx={{ p: 1.5 }}>
-                  <Stack direction={{ xs: "column", sm: "row" }} gap={1} sx={{ alignItems: { sm: "center" } }}>
-                    <Box flex={1}>
-                      <Typography fontWeight={700}>{item.name || item.email}</Typography>
-                      <Typography variant="body2" color="text.secondary">{item.email} · {item.source}</Typography>
-                    </Box>
-                    <Chip size="small" label={item.status} color={item.status === "approved" ? "success" : "default"} />
-                    {item.status === "pending" && (
-                      <>
-                        <Button
-                          size="small"
-                          variant="contained"
-                          onClick={() => updateAccessRequest.mutate({ requestId: item.id, status: "approved" })}
-                        >
-                          Approve
-                        </Button>
-                        <Button
-                          size="small"
-                          color="error"
-                          onClick={() => updateAccessRequest.mutate({ requestId: item.id, status: "rejected" })}
-                        >
-                          Reject
-                        </Button>
-                      </>
-                    )}
-                  </Stack>
-                </Paper>
-              ))}
-            </Stack>
-          ) : (
-            <Alert severity="info">No beta access requests yet.</Alert>
-          )}
-        </AdminSection>
+        <AdminNavigation />
+        <AccessRequestsSection accessRequests={accessRequests} updateAccessRequest={updateAccessRequest} />
 
         <Box sx={{ display: "grid", gap: 3, gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" } }}>
           <AdminSection title="Create Content" description="Add a draft or published library document for the paid knowledge base.">

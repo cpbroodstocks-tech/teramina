@@ -14,8 +14,25 @@ const SERVICE_WORKER = VitePWA({
     clientsClaim: true,
     skipWaiting: true,
     cleanupOutdatedCaches: true,
-    globPatterns: ["**/*.{html,js,css,ico,png,gif,woff2,svg}"],
-    globIgnores: ["**/laptop.svg"],
+    globPatterns: ["**/*.{html,css,ico,woff2}"],
+    runtimeCaching: [
+      {
+        urlPattern: ({ request }) => request.destination === "script",
+        handler: "StaleWhileRevalidate",
+        options: {
+          cacheName: "teramina-scripts",
+          expiration: { maxEntries: 80, maxAgeSeconds: 7 * 24 * 60 * 60 },
+        },
+      },
+      {
+        urlPattern: ({ request }) => request.destination === "image",
+        handler: "CacheFirst",
+        options: {
+          cacheName: "teramina-images",
+          expiration: { maxEntries: 60, maxAgeSeconds: 30 * 24 * 60 * 60 },
+        },
+      },
+    ],
   },
 });
 const ALIAS = {

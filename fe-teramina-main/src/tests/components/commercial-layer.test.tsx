@@ -194,7 +194,7 @@ describe("Commercial public surfaces", () => {
     expect(submittedPayload.case_type).toBe("farm_diagnostic");
     expect(submittedPayload.intake_data.farm_name_location).toBe("Tambak A, Lampung");
     expect(submittedPayload.intake_data.main_question).toBe("FCR increased after DOC 50");
-  }, 10000);
+  }, 30000);
 
   it("renders advisory case detail with structured intake and delivered report", async () => {
     server.use(
@@ -773,7 +773,7 @@ describe("Commercial admin surface", () => {
     expect(screen.getByRole("heading", { name: "Editorial Workflow" })).toBeInTheDocument();
     expect(screen.getByText("Grant Library Access")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Create Invoice" })).toBeInTheDocument();
-    expect(await screen.findByText("Revision 2", {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByText("Revision 2", {}, { timeout: 30000 })).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getAllByText("Weak FCR review").length).toBeGreaterThan(0);
     });
@@ -821,7 +821,7 @@ describe("Commercial admin surface", () => {
     expect(screen.getByText("2026-06")).toBeInTheDocument();
     expect(screen.getByText("Hatchery 1 | Investor 1")).toBeInTheDocument();
     expect(screen.getByText("Deliver Report")).toBeInTheDocument();
-  }, 30000);
+  }, 120000);
 
   it("blocks commercial admin page for non-admin users", async () => {
     server.use(

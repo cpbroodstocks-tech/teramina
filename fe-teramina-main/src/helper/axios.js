@@ -59,7 +59,8 @@ AXIOS.interceptors.response.use(
 
     const { status } = error.response;
 
-    if (status === 401) {
+    if (status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
       try {
         const new_access_token = await AXIOS.get("/user/verify-with-refresh-token", {
           headers: { Authorization: `Bearer ${get("refresh_token")}` },
@@ -76,6 +77,8 @@ AXIOS.interceptors.response.use(
         return (window.location.href = "/");
       }
     }
+
+    if (status === 401) return Promise.reject(error);
 
     if (status === 429) {
       showToast({ open: true, variant: "info", text: "Too many requests. Please wait a moment and try again." });

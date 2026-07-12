@@ -39,7 +39,7 @@ class Cycle(Document):
 class Data(Document):
     cycle_id = fields.StringField()
     data = fields.ListField()
-    last_updated = fields.DateTimeField(default=datetime.now())
+    last_updated = fields.DateTimeField(default=datetime.now)
 
     # Define the objects manager
     objects = QuerySetManager()

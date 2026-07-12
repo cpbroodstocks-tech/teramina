@@ -3,6 +3,7 @@
 from ninja import Body, Router
 
 from teramina.authentication.auth_bearer import AuthBearer
+from teramina.authentication.services.authentication_service import get_signed_in_user
 from ...schemas.general_schema import DataErrorSchema, DataSuccessSchema
 from ..services.variable_management import AddVariableSchema, VariableManagement
 
@@ -13,6 +14,9 @@ response_schema = {200: DataSuccessSchema, 401: DataErrorSchema, 400: DataErrorS
 
 @router.post("/update-variable", response=response_schema, auth=AuthBearer())
 def update_variable(request, data: AddVariableSchema = Body(...)):
+    user = get_signed_in_user(request)
+    if getattr(user, "role_user", "") != "admin":
+        return 401, DataErrorSchema(code=401, message="Unauthorized")
     return VariableManagement().add_variable(data)
 
 

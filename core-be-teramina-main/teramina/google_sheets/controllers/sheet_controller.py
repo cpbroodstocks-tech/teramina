@@ -97,7 +97,7 @@ def get_sync_log(request, cycle_id: str, sync_id: str = ""):
                 }
                 for r in log.rejected_rows
             ],
-        ).dict(),
+        ).model_dump(),
     )
 
 
@@ -199,7 +199,7 @@ def preview_sync(request, cycle_id: str, import_mode: str = "valid_rows_only"):
         rows_error=rows_error,
         tab_summaries=tab_summaries,
         rejected_rows=rejected_rows,
-    ).dict()
+    ).model_dump()
 
     cache.set(
         f"sheet_preview:{preview_id}",

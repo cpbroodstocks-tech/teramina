@@ -28,5 +28,15 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/tests/setup.ts"],
     pool: "forks",
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json-summary"],
+      thresholds: {
+        lines: 39,
+        functions: 48,
+        statements: 39,
+        branches: 63,
+      },
+    },
   },
 });

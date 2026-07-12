@@ -186,7 +186,7 @@ class AdvisoryService:
         if not _is_admin(user):
             return 401, DataErrorSchema(code=401, message="Unauthorized")
         try:
-            package = ServicePackage(**data.dict())
+            package = ServicePackage(**data.model_dump())
             package.save()
             return 200, DataSuccessSchema(code=200, message="Service package created", payload={"package": package.to_dict()})
         except (NotUniqueError, ValidationError) as exc:
@@ -1133,7 +1133,7 @@ class AdvisoryService:
         if not _can_access_case(user, case):
             return 401, DataErrorSchema(code=401, message="Unauthorized")
 
-        file_data = AdvisoryService._normalize_case_file(data.dict(), case, str(user.id))
+        file_data = AdvisoryService._normalize_case_file(data.model_dump(), case, str(user.id))
         case.uploaded_files = list(case.uploaded_files or []) + [file_data]
         case.updated_at = datetime.now()
         case.save()

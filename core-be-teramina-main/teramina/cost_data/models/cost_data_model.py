@@ -8,7 +8,7 @@ class CostData(Document):
     start_date = fields.StringField()
     end_date = fields.StringField()
     data = fields.ListField()
-    last_updated = fields.DateTimeField(default=datetime.now())
+    last_updated = fields.DateTimeField(default=datetime.now)
 
     # Define the objects manager
     objects = QuerySetManager()

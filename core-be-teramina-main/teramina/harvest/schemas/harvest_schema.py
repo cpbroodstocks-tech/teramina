@@ -1,6 +1,7 @@
 # pylint: disable=missing-class-docstring, too-few-public-methods
 
 from ninja import Schema
+from pydantic import ConfigDict
 
 
 class HarvestDataSchema(Schema):
@@ -9,8 +10,7 @@ class HarvestDataSchema(Schema):
     partial3: dict
     final: dict
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(json_schema_extra={
             "name": "Harvest Data",
             "example": {
                 "partial1": {"doc": 60, "biomass": 120, "revenue": 10000000},
@@ -18,4 +18,4 @@ class HarvestDataSchema(Schema):
                 "partial3": {"doc": 90, "biomass": 890, "revenue": 10000000},
                 "final": {"doc": 100, "biomass": 1200, "revenue": 10000000},
             },
-        }
+        })

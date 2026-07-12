@@ -14,7 +14,7 @@ class Pond(Document):
     is_active = fields.BooleanField(default=True)
     archived_at = fields.DateTimeField()
     archived_by = fields.StringField(default="")
-    created_at = fields.DateTimeField(default=datetime.now())
+    created_at = fields.DateTimeField(default=datetime.now)
     last_updated = fields.DateTimeField()
     active_cycle_id = fields.StringField()
 

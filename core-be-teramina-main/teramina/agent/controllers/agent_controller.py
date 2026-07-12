@@ -1,6 +1,7 @@
 # pylint: disable=missing-function-docstring, unused-argument
 
 from django.http import StreamingHttpResponse
+from django.core.cache import cache
 from ninja import Router, Body
 from typing import Optional
 from teramina.authentication.auth_bearer import AuthBearer
@@ -20,13 +21,18 @@ from ..services.agent_service import AgentService
 
 router = Router(tags=["Farm Assistant"])
 
-response_schema = {200: DataSuccessSchema, 400: DataErrorSchema, 401: DataErrorSchema}
+response_schema = {200: DataSuccessSchema, 400: DataErrorSchema, 401: DataErrorSchema, 404: DataErrorSchema}
+SUMMARY_TASK_OWNER_TTL = 60 * 60
+
+
+def _summary_task_owner_key(task_id):
+    return f"agent_summary_owner:{task_id}"
 
 
 @router.post("/chat", response=response_schema, auth=AuthBearer())
 def chat(request, data: ChatMessageSchema = Body(...)):
     user = get_signed_in_user(request)
-    page_context = data.page_context.dict() if data.page_context else {}
+    page_context = data.page_context.model_dump() if data.page_context else {}
     return AgentService.chat(
         user_id=str(user.id),
         message=data.message,
@@ -161,7 +167,7 @@ def update_memory(request, memory_id: str, data: MemoryUpdateSchema = Body(...))
 @router.post("/chat/stream", auth=AuthBearer())
 def stream_chat(request, data: ChatMessageSchema = Body(...)):
     user = get_signed_in_user(request)
-    page_context = data.page_context.dict() if data.page_context else {}
+    page_context = data.page_context.model_dump() if data.page_context else {}
     gen = AgentService.stream_chat_generator(
         user_id=str(user.id),
         message=data.message,
@@ -196,11 +202,20 @@ def get_today_summary(request, farm_id: str):
 
 @router.post("/summary", response=response_schema, auth=AuthBearer())
 def request_summary(request, data: SummaryRequestSchema = Body(...)):
-    return AgentService.request_external_summary(data.question, data.model)
+    user = get_signed_in_user(request)
+    status, response = AgentService.request_external_summary(data.question, data.model)
+    if status == 200 and isinstance(response.payload, dict):
+        task_id = response.payload.get("task_id") or response.payload.get("id")
+        if task_id:
+            cache.set(_summary_task_owner_key(task_id), str(user.id), timeout=SUMMARY_TASK_OWNER_TTL)
+    return status, response
 
 
 @router.get("/summary/{task_id}", response=response_schema, auth=AuthBearer())
 def get_summary_result(request, task_id: str):
+    user = get_signed_in_user(request)
+    if cache.get(_summary_task_owner_key(task_id)) != str(user.id):
+        return 404, DataErrorSchema(code=404, message="Summary task not found")
     return AgentService.get_external_summary_result(task_id)
 
 

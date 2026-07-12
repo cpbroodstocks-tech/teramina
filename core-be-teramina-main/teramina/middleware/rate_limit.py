@@ -25,8 +25,8 @@ def _get_client_ip(request):
 def _limit_for_path(path):
     for prefix, limit in _LIMITS.items():
         if path.startswith(prefix):
-            return limit
-    return _DEFAULT_LIMIT
+            return prefix, limit
+    return "default", _DEFAULT_LIMIT
 
 
 class RateLimitMiddleware:
@@ -39,26 +39,27 @@ class RateLimitMiddleware:
             return self.get_response(request)
 
         ip = _get_client_ip(request)
-        max_requests, window = _limit_for_path(path)
+        limit_name, (max_requests, window) = _limit_for_path(path)
 
         bucket = int(time.time() // window)
-        key = f"rl:{ip}:{bucket}"
+        key = f"rl:{limit_name}:{ip}:{bucket}"
 
         try:
-            count = cache.get(key, 0)
+            count = cache.incr(key)
+        except ValueError:
+            if cache.add(key, 1, timeout=window * 2):
+                count = 1
+            else:
+                count = cache.incr(key)
         except Exception as exc:  # pragma: no cover - depends on cache backend availability
             logger.warning("Rate limit skipped because cache is unavailable: %s", exc)
             return self.get_response(request)
 
-        if count >= max_requests:
+        if count > max_requests:
             logger.warning("Rate limit exceeded: ip=%s path=%s", ip, path)
             return JsonResponse(
                 {"code": 429, "message": "Too many requests. Please slow down."},
                 status=429,
             )
 
-        try:
-            cache.set(key, count + 1, timeout=window * 2)
-        except Exception as exc:  # pragma: no cover - depends on cache backend availability
-            logger.warning("Rate limit counter not saved because cache is unavailable: %s", exc)
         return self.get_response(request)

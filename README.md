@@ -20,6 +20,9 @@ Combined repository for the Teramina shrimp farming management platform.
 - `GOOGLE_SHEETS_INTEGRATION_TODO.md` - remaining Google Sheets hardening work.
 - `GOOGLE_SHEETS_MANUAL_QA.md` - manual QA checklist for real Google Sheets sync.
 - `DEPLOYMENT.md` - production deployment checklist and required secrets.
+- `LOCAL_DEVELOPMENT.md` - clean local setup and verification path.
+- `OPERATIONS_RUNBOOK.md` - health, backup/restore, alerting, rollback, and rotation procedures.
+- `SERVICE_LEVEL_OBJECTIVES.md` - initial beta reliability objectives and error budget.
 
 ## Frontend
 
@@ -30,7 +33,9 @@ yarn dev
 yarn lint
 yarn typecheck
 yarn test
+yarn test:coverage
 yarn build
+yarn bundle:check
 ```
 
 Required production environment:
@@ -47,9 +52,9 @@ Do not set `VITE_DEV_TOKEN` outside local development.
 cd core-be-teramina-main
 python -m venv .venv
 . .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 python manage.py runserver
-pytest -q
+pytest -q --cov=teramina --cov-fail-under=57
 python manage.py check --deploy
 ```
 
@@ -74,8 +79,8 @@ Keep `.env` files and service account credentials out of git.
 Before merging production-bound work:
 
 ```bash
-cd fe-teramina-main && yarn lint && yarn typecheck && yarn test && yarn build
-cd ../core-be-teramina-main && pytest -q && python manage.py check --deploy
+cd fe-teramina-main && yarn lint && yarn typecheck && yarn test:coverage && yarn build && yarn bundle:check
+cd ../core-be-teramina-main && pytest -q --cov=teramina --cov-fail-under=57 && python manage.py check --deploy
 ```
 
 The frontend uses Yarn as the lockfile source of truth.

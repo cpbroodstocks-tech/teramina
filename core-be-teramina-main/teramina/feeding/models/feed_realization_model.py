@@ -10,7 +10,7 @@ class FeedRealization(Document):
     feed_ration = fields.FloatField()
     feed_given = fields.FloatField()
     feed_leftover = fields.FloatField()
-    last_updated = fields.DateTimeField(default=datetime.now())
+    last_updated = fields.DateTimeField(default=datetime.now)
 
     # Define the objects manager
     objects = QuerySetManager()

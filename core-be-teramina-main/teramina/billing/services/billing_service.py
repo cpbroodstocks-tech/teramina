@@ -22,7 +22,7 @@ class BillingService:
         if not _is_admin(user):
             return 401, DataErrorSchema(code=401, message="Unauthorized")
 
-        payload = data.dict()
+        payload = data.model_dump()
         try:
             invoice = CommercialInvoice(invoice_number=_invoice_number(), **payload)
             invoice.save()

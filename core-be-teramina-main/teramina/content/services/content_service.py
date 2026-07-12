@@ -176,7 +176,7 @@ class ContentService:
         if not _is_admin(user):
             return 401, DataErrorSchema(code=401, message="Unauthorized")
         try:
-            payload = data.dict()
+            payload = data.model_dump()
             change_note = payload.pop("change_note", "Initial version")
             if payload.get("status") == "published" and not payload.get("published_at"):
                 payload["published_at"] = datetime.now()

@@ -13,7 +13,7 @@ class User(Document):
     role_user = fields.StringField()
     is_there_data = fields.BooleanField(default=False)
     fcm_token = fields.StringField(default=None)
-    created_at = fields.DateTimeField(default=datetime.now())
+    created_at = fields.DateTimeField(default=datetime.now)
 
     meta = {"indexes": [{"fields": ["email"], "unique": True}]}
 

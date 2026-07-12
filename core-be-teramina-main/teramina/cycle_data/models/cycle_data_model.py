@@ -6,7 +6,7 @@ from mongoengine import Document, fields, QuerySetManager
 class CycleData(Document):
     cycle_id = fields.StringField()
     result_data = fields.ListField()
-    last_updated = fields.DateTimeField(default=datetime.now())
+    last_updated = fields.DateTimeField(default=datetime.now)
 
     meta = {"indexes": ["cycle_id"]}
 
@@ -16,7 +16,7 @@ class CycleData(Document):
 class ResultData(Document):
     cycle_id = fields.StringField()
     result_data = fields.ListField()
-    last_updated = fields.DateTimeField(default=datetime.now())
+    last_updated = fields.DateTimeField(default=datetime.now)
 
     meta = {"indexes": ["cycle_id"]}
 
@@ -26,7 +26,7 @@ class ResultData(Document):
 class ForecastData(Document):
     cycle_id = fields.StringField()
     result_data = fields.ListField()
-    last_updated = fields.DateTimeField(default=datetime.now())
+    last_updated = fields.DateTimeField(default=datetime.now)
 
     meta = {"indexes": ["cycle_id"]}
 

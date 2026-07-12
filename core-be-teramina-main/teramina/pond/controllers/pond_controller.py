@@ -7,7 +7,7 @@ from teramina.pond.schemas.pond_schema import PondDataSchema, UpdatePondSchema
 from teramina.schemas.general_schema import DataErrorSchema, DataSuccessSchema
 from teramina.pond.services.pond_service import PondService
 from teramina.authentication.services.authentication_service import get_signed_in_user
-from teramina.helpers.ownership import verify_farm_owner, verify_pond_owner
+from teramina.helpers.ownership import verify_cycle_owner, verify_farm_owner, verify_pond_owner
 
 router = Router(tags=["Pond"])
 

@@ -13,7 +13,7 @@ from teramina.authentication.auth_bearer import AuthBearer
 from teramina.authentication.services.authentication_service import authenticate
 from teramina.user.models.user_model import User
 
-JWT_SECRET = os.getenv("JWT_SECRET_KEY", "test-jwt-secret")
+JWT_SECRET = os.getenv("JWT_SECRET_KEY", "test-jwt-secret-with-at-least-32-bytes")
 
 
 # ---------------------------------------------------------------------------
@@ -75,7 +75,7 @@ class TestAuthenticate:
         assert result is False
 
     def test_wrong_secret_returns_false(self, bearer, mock_request, user):
-        token = _make_token(user.id, secret="wrong-secret")
+        token = _make_token(user.id, secret="wrong-secret-with-at-least-32-bytes")
         result = bearer.authenticate(mock_request, token)
         assert result is False
 

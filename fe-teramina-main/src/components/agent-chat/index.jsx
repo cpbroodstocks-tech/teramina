@@ -357,7 +357,7 @@ const AgentChat = ({ open, onClose, onAlertsLoaded, initialMessage, onInitialMes
       anchor="right"
       open={open}
       onClose={onClose}
-      PaperProps={{ style: { width: 420, display: "flex", flexDirection: "column" } }}
+      slotProps={{ paper: { style: { width: 420, display: "flex", flexDirection: "column" } } }}
     >
       <Box
         style={{
