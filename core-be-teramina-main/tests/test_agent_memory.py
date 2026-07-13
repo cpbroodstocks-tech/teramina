@@ -771,7 +771,10 @@ class TestAgentMemoryControllers:
             confidence=0.8,
         )
 
-        with patch.object(agent_controller, "get_signed_in_user", return_value=self._signed_in_user()):
+        with (
+            patch.object(agent_controller, "get_signed_in_user", return_value=self._signed_in_user()),
+            patch.object(agent_controller, "_owns_context", return_value=True),
+        ):
             status, response = agent_controller.add_memory(self._request(), payload)
 
         assert status == 200
@@ -784,7 +787,10 @@ class TestAgentMemoryControllers:
         AgentService.add_memory(USER_ID, FARM_ID, "note", "Visible memory.", pond_id=POND_ID)
         AgentService.add_memory(USER_ID, FARM_ID, "note", "Hidden memory.", pond_id="other-pond")
 
-        with patch.object(agent_controller, "get_signed_in_user", return_value=self._signed_in_user()):
+        with (
+            patch.object(agent_controller, "get_signed_in_user", return_value=self._signed_in_user()),
+            patch.object(agent_controller, "_owns_context", return_value=True),
+        ):
             status, response = agent_controller.get_memories(self._request(), FARM_ID, POND_ID)
 
         assert status == 200
@@ -807,7 +813,10 @@ class TestAgentMemoryControllers:
             confidence=0.9,
         ).save()
 
-        with patch.object(agent_controller, "get_signed_in_user", return_value=self._signed_in_user()):
+        with (
+            patch.object(agent_controller, "get_signed_in_user", return_value=self._signed_in_user()),
+            patch.object(agent_controller, "_owns_context", return_value=True),
+        ):
             status, response = agent_controller.get_memories(
                 self._request(), farm_id=FARM_ID, max_confidence=0.5
             )
@@ -819,7 +828,10 @@ class TestAgentMemoryControllers:
     def test_get_memory_graph_controller_returns_graph_payload(self):
         AgentService.add_memory(USER_ID, FARM_ID, "event", "Controller graph memory.", pond_id=POND_ID)
 
-        with patch.object(agent_controller, "get_signed_in_user", return_value=self._signed_in_user()):
+        with (
+            patch.object(agent_controller, "get_signed_in_user", return_value=self._signed_in_user()),
+            patch.object(agent_controller, "_owns_context", return_value=True),
+        ):
             status, response = agent_controller.get_memory_graph(self._request(), FARM_ID, POND_ID)
 
         assert status == 200

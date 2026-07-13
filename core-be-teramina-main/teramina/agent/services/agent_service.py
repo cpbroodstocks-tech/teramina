@@ -14,6 +14,7 @@ from teramina.cycle_data.models.cycle_data_model import CycleData
 from teramina.cycle.models.cycle_model import Cycle
 from teramina.farm.models.farm_model import Farm
 from teramina.helpers.constant_value import Constant
+from teramina.helpers.ownership import verify_cycle_owner, verify_farm_owner, verify_pond_owner
 from teramina.pond.models.pond_model import Pond
 from teramina.schemas.general_schema import DataSuccessSchema, DataErrorSchema
 from ..models.agent_model import (
@@ -168,6 +169,16 @@ def _run_tool(tool_name: str, tool_input: dict, user_id: str = "") -> str:
     if not fn:
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
     try:
+        if user_id:
+            ownership_checks = (
+                ("farm_id", verify_farm_owner),
+                ("pond_id", verify_pond_owner),
+                ("cycle_id", verify_cycle_owner),
+            )
+            for key, verifier in ownership_checks:
+                resource_id = tool_input.get(key)
+                if resource_id and not verifier(resource_id, user_id):
+                    return json.dumps({"error": "Unauthorized resource context"})
         if tool_name == "save_farm_memory":
             tool_input = {**tool_input, "current_user_id": user_id}
         result = fn(**tool_input)

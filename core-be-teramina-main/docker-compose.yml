@@ -49,8 +49,10 @@ services:
   beat:
     build: .
     restart: unless-stopped
-    command: celery -A teramina beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler --pidfile=/tmp/celerybeat.pid
+    command: celery -A teramina beat --loglevel=info --schedule=/var/lib/celery/celerybeat-schedule --pidfile=/tmp/celerybeat.pid
     env_file: .env
+    volumes:
+      - celerybeat-data:/var/lib/celery
     depends_on:
       redis:
         condition: service_healthy
@@ -61,6 +63,7 @@ services:
       retries: 3
 
 volumes:
+  celerybeat-data:
   gcs-credentials:
     driver: local
     driver_opts:

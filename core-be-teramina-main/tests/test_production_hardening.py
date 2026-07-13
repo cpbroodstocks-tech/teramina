@@ -4,8 +4,9 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from teramina.cost_data.models.cost_data_model import CostData
-from teramina.agent.controllers.agent_controller import get_summary_result, request_summary
-from teramina.agent.schemas.agent_schema import SummaryRequestSchema
+from teramina.agent.controllers.agent_controller import chat, get_summary_result, request_summary
+from teramina.agent.schemas.agent_schema import ChatMessageSchema, SummaryRequestSchema
+from teramina.agent.services.agent_service import _run_tool
 from teramina.cycle.models.cycle_model import Data
 from teramina.cycle_data.models.cycle_data_model import (
     CycleData,
@@ -18,7 +19,7 @@ from teramina.feeding.models.feed_realization_model import FeedRealization
 from teramina.harvest.models.harvest_recommendation_model import HarvestRecommendation
 from teramina.harvest.models.harvest_record_model import HarvestRecord
 from teramina.middleware.rate_limit import RateLimitMiddleware
-from teramina.dashboard.controllers.dashboard_controller import overview
+from teramina.dashboard.controllers.dashboard_controller import _owns_dashboard_context, overview
 from teramina.pond.controllers.pond_controller import set_active_cycle
 from teramina.pond.models.pond_model import Pond
 from teramina.user.models.user_model import User
@@ -165,3 +166,39 @@ def test_external_summary_poll_hides_another_users_task():
     assert status == 404
     assert response.message == "Summary task not found"
     service.assert_not_called()
+
+
+def test_agent_chat_rejects_another_users_farm_context():
+    request = SimpleNamespace(META={"HTTP_AUTHORIZATION": "Bearer token"})
+    data = ChatMessageSchema(message="How is this farm?", farm_id="another-users-farm")
+
+    with (
+        patch("teramina.agent.controllers.agent_controller.get_signed_in_user", return_value=SimpleNamespace(id="user-1")),
+        patch("teramina.agent.controllers.agent_controller.verify_farm_owner", return_value=False),
+        patch("teramina.agent.controllers.agent_controller.AgentService.chat") as service,
+    ):
+        status, response = chat(request, data)
+
+    assert status == 401
+    assert response.message == "Unauthorized"
+    service.assert_not_called()
+
+
+def test_agent_tool_rejects_another_users_cycle_context():
+    with (
+        patch("teramina.agent.services.agent_service.verify_cycle_owner", return_value=False),
+        patch("teramina.agent.services.agent_service.TOOL_REGISTRY", {"tool": MagicMock()}) as tools,
+    ):
+        result = _run_tool("tool", {"cycle_id": "another-users-cycle"}, user_id="user-1")
+
+    assert "Unauthorized resource context" in result
+    tools["tool"].assert_not_called()
+
+
+def test_dashboard_context_rejects_another_users_pond():
+    with (
+        patch("teramina.dashboard.controllers.dashboard_controller.verify_farm_owner", return_value=True),
+        patch("teramina.dashboard.controllers.dashboard_controller.verify_pond_owner", return_value=False),
+        patch("teramina.dashboard.controllers.dashboard_controller.verify_cycle_owner", return_value=True),
+    ):
+        assert not _owns_dashboard_context("user-1", "owned-farm", "another-users-pond", "owned-cycle")

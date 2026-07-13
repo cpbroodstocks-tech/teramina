@@ -76,6 +76,23 @@ jobs:
       - name: Add server to known hosts
         run: echo "${{ secrets.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
 
+      - name: Validate critical backend secrets
+        env:
+          FIREBASE_CREDENTIALS_JSON: ${{ secrets.FIREBASE_CREDENTIALS_JSON }}
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
+          CELERY_RESULT_BACKEND: ${{ secrets.CELERY_RESULT_BACKEND }}
+        run: |
+          missing=()
+          for name in FIREBASE_CREDENTIALS_JSON GOOGLE_APPLICATION_CREDENTIALS_JSON MONGODB_URI CELERY_BROKER_URL CELERY_RESULT_BACKEND; do
+            if [ -z "${!name}" ]; then missing+=("$name"); fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Critical staging secret is empty: %s\n' "${missing[@]}"
+            exit 1
+          fi
+
       - name: Write backend environment on server
         run: |
           ssh -o ServerAliveInterval=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'

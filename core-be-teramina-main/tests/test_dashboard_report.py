@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 class TestDashboardReportRoutes:
     @patch("teramina.dashboard.controllers.dashboard_controller.cache")
-    @patch("teramina.dashboard.controllers.dashboard_controller.verify_farm_owner", return_value=True)
+    @patch("teramina.dashboard.controllers.dashboard_controller._owns_dashboard_context", return_value=True)
     @patch("teramina.dashboard.controllers.dashboard_controller.generate_overview_report")
     @patch("teramina.dashboard.controllers.dashboard_controller.get_signed_in_user")
     def test_create_report_queues_task_and_returns_task_id(self, mock_user, mock_task, _mock_owner, mock_cache):

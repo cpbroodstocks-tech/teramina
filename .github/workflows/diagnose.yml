@@ -39,6 +39,21 @@ jobs:
           echo "== docker-compose ps =="
           docker-compose ps
 
+          unhealthy="$(docker-compose ps --services --filter status=exited)"
+          restarting="$(docker-compose ps | awk '$0 ~ /Restarting/ {print $1}')"
+          if [ -n "$unhealthy$restarting" ]; then
+            echo "Unhealthy services: $unhealthy $restarting"
+            docker-compose logs --tail=120 $unhealthy $restarting
+            exit 1
+          fi
+
+          echo "== celery health =="
+          docker-compose exec -T worker celery -A teramina inspect ping
+          docker-compose exec -T worker celery -A teramina inspect active
+          docker-compose exec -T worker celery -A teramina inspect reserved
+          docker-compose exec -T worker celery -A teramina inspect scheduled
+          docker-compose exec -T beat sh -c 'test -s /tmp/celerybeat.pid && kill -0 "$(cat /tmp/celerybeat.pid)"'
+
           echo "== backend env/file checks =="
           docker-compose exec -T web python - << 'PY'
           import os
@@ -60,7 +75,7 @@ jobs:
 
           for label, path in [("firebase", firebase_path), ("google", google_path)]:
               if not path:
-                  continue
+                  raise SystemExit(f"{label}_credentials_configured=False")
               try:
                   with open(path, "rb") as handle:
                       handle.read(1)

@@ -1,6 +1,6 @@
 # P1 Validation Record
 
-Date: 2026-07-11
+Updated: 2026-07-13
 
 ## Completed Locally
 
@@ -12,17 +12,19 @@ Date: 2026-07-11
 
 ## Staging Blockers
 
-- `gh auth status` reports the configured `cpbroodstocks-tech` token as invalid.
-- GitHub API access is unavailable, so environment secrets and workflow dispatch cannot be inspected or executed.
-- No usable staging SSH host alias is configured locally; `staging` resolves only as a literal hostname with the local user.
+- Staging diagnostics run `29215932803` reached the host and completed on 2026-07-13.
+- Django, Redis, the Celery worker, Firebase credentials, MongoDB, and five seeded dashboard cycles were healthy; dashboard, economics, feeding, and water-quality checks returned 200.
+- Celery Beat was restart-looping because Compose selected the relational `django_celery_beat` scheduler in a MongoEngine-only deployment. The Compose fix is pending deployment.
+- `GOOGLE_APPLICATION_CREDENTIALS_JSON` is registered in the GitHub staging environment but resolves empty. Google Sheets and storage cannot pass until a valid rotated credential is installed.
+- Deployment now fails before modifying the server when critical backend secrets are empty.
 - No real Firebase staging session or seeded farmer credentials are available for authenticated browser smoke testing.
+- Backup/restore, alert delivery, rollback, and credential-rotation drills still require staging operator access and isolated restore resources.
 
 ## Resume Commands
 
-After restoring access:
+After installing the rotated Google credential and deploying the pending fixes:
 
 ```bash
-gh auth login -h github.com
 ./scripts/check_deploy_readiness.sh staging
 gh workflow run deploy.yml -f target=staging -f service=all
 ```

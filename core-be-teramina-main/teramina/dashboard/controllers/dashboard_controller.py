@@ -14,7 +14,7 @@ from teramina.schemas.general_schema import (
 )
 from teramina.authentication.services.authentication_service import get_signed_in_user
 from teramina.authentication.auth_bearer import AuthBearer
-from teramina.helpers.ownership import verify_cycle_owner, verify_farm_owner
+from teramina.helpers.ownership import verify_cycle_owner, verify_farm_owner, verify_pond_owner
 
 from teramina.dashboard.services.historical.overview import DashboardOverview
 from teramina.dashboard.services.historical.economic import DashboardEconomic
@@ -36,10 +36,19 @@ def _report_task_owner_key(task_id):
     return f"dashboard_report_owner:{task_id}"
 
 
+def _owns_dashboard_context(user_id, farm_id="", pond_id="", cycle_id=""):
+    return (
+        bool(farm_id)
+        and verify_farm_owner(farm_id, user_id)
+        and (not pond_id or verify_pond_owner(pond_id, user_id))
+        and (not cycle_id or verify_cycle_owner(cycle_id, user_id))
+    )
+
+
 @router.get("/overview", response=response_schema, auth=AuthBearer())
 def overview(request, farm_id, pond_id=None, cycle_id=None, date=None):
     user = get_signed_in_user(request)
-    if not verify_farm_owner(farm_id, str(user.id)):
+    if not _owns_dashboard_context(str(user.id), farm_id, pond_id, cycle_id):
         return 401, DataErrorSchema(code=401, message="Unauthorized")
     return DashboardOverview(
         farm_id=farm_id, pond_id=pond_id, cycle_id=cycle_id, date=date
@@ -49,7 +58,7 @@ def overview(request, farm_id, pond_id=None, cycle_id=None, date=None):
 @router.get("/economics", response=response_schema, auth=AuthBearer())
 def economics(request, farm_id, pond_id=None, cycle_id=None, date=None):
     user = get_signed_in_user(request)
-    if not verify_farm_owner(farm_id, str(user.id)):
+    if not _owns_dashboard_context(str(user.id), farm_id, pond_id, cycle_id):
         return 401, DataErrorSchema(code=401, message="Unauthorized")
     return DashboardEconomic(
         farm_id=farm_id, pond_id=pond_id, cycle_id=cycle_id, date=date
@@ -59,7 +68,7 @@ def economics(request, farm_id, pond_id=None, cycle_id=None, date=None):
 @router.get("/feeding", response=response_schema, auth=AuthBearer())
 def feeding(request, farm_id, pond_id=None, cycle_id=None, date=None):
     user = get_signed_in_user(request)
-    if not verify_farm_owner(farm_id, str(user.id)):
+    if not _owns_dashboard_context(str(user.id), farm_id, pond_id, cycle_id):
         return 401, DataErrorSchema(code=401, message="Unauthorized")
     return DashboardFeed(
         farm_id=farm_id, pond_id=pond_id, cycle_id=cycle_id, date=date
@@ -99,7 +108,7 @@ def wq_filter_data(request, farm_id=None, pond_id=None, cycle_id=None):
 @router.get("/download-pdf-report", auth=AuthBearer())
 async def download_pdf_report(request, farm_id, pond_id=None, cycle_id=None, date=None):
     user = get_signed_in_user(request)
-    if not verify_farm_owner(farm_id, str(user.id)):
+    if not _owns_dashboard_context(str(user.id), farm_id, pond_id, cycle_id):
         return 401, DataErrorSchema(code=401, message="Unauthorized")
     dashboard = DashboardOverview(
         farm_id=farm_id, pond_id=pond_id, cycle_id=cycle_id, date=date,
@@ -129,7 +138,9 @@ async def download_pdf_report(request, farm_id, pond_id=None, cycle_id=None, dat
 @router.post("/create-report", auth=AuthBearer())
 def create_report(request, payload: dict):
     user = get_signed_in_user(request)
-    if not verify_farm_owner(payload.get("farm_id"), str(user.id)):
+    if not _owns_dashboard_context(
+        str(user.id), payload.get("farm_id"), payload.get("pond_id"), payload.get("cycle_id")
+    ):
         return JsonResponse({"code": 401, "message": "Unauthorized"}, status=401)
     task = generate_overview_report.delay(
         payload.get("farm_id"),

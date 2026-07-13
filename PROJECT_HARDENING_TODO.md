@@ -10,14 +10,15 @@ Move Teramina from a strong beta to a production-ready service without adding ne
 - [x] Replace import-time MongoEngine datetime defaults with callable defaults.
 - [x] Make rate-limit counters atomic and isolate buckets by route limit.
 - [x] Prevent repeated Axios refresh attempts after a retried request returns 401.
-- [ ] Audit ownership and role enforcement across all API routes, with negative tests for cross-user access.
+- [x] Audit ownership and role enforcement across all API routes, with negative tests for cross-user access.
 - [x] Protect dashboard farm/cycle reads and report creation with ownership checks.
 - [x] Protect water-quality reads and exports with cycle ownership checks.
 - [x] Restrict global water-quality variable mutation to admins.
 - [x] Treat malformed resource IDs as unauthorized instead of raising server errors.
 - [x] Bind asynchronous report task IDs to the requesting user before allowing result polling.
 - [x] Bind external summary task IDs to the requesting user before allowing result polling.
-- [ ] Rotate locally present API and service-account credentials, then verify no secret exists in Git history.
+- [x] Verify credential files and secret values are absent from Git history.
+- [ ] Rotate locally present API and service-account credentials in their provider consoles, then replace the ignored local values.
 
 ## P1: Reproducible Verification
 
