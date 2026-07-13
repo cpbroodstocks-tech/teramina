@@ -17,6 +17,7 @@ Updated: 2026-07-13
 - Celery Beat was restart-looping because Compose selected the relational `django_celery_beat` scheduler in a MongoEngine-only deployment. The Compose fix is pending deployment.
 - `GOOGLE_APPLICATION_CREDENTIALS_JSON` is registered in the GitHub staging environment but resolves empty. Google Sheets and storage cannot pass until a valid rotated credential is installed.
 - Deployment now fails before modifying the server when critical backend secrets are empty.
+- Backend deploy run `29216069360` verified that fail-closed behavior and stopped at preflight with only `GOOGLE_APPLICATION_CREDENTIALS_JSON` empty; no server write or container restart occurred.
 - No real Firebase staging session or seeded farmer credentials are available for authenticated browser smoke testing.
 - Backup/restore, alert delivery, rollback, and credential-rotation drills still require staging operator access and isolated restore resources.
 
